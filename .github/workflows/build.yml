@@ -43,6 +43,8 @@ jobs:
           provenance: false
           build-args: MODE=production
           tags: ${{ steps.meta.outputs.tags }} # 确保 tags 被正确设置
+          secrets: |
+            github_packages_token=${{ secrets.PACKAGES_TOKEN }}
 
       - name: Get Jenkins CRUMB
         id: get-crumb
