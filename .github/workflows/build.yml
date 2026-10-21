@@ -46,11 +46,12 @@ jobs:
           secrets: |
             github_packages_token=${{ secrets.PACKAGES_TOKEN }}
 
-      - name: Trigger Jenkins Build
+      - name: Get Jenkins CRUMB
+        id: get-crumb
         run: |
-          curl -fsS -X POST \
-            -u "${{ secrets.JENKINS_USERNAME }}:${{ secrets.JENKINS_API_TOKEN }}" \
-            "${{ secrets.JENKINS_URL }}/job/你的任务名/build"
+          CRUMB=$(curl -s -u ${{ secrets.JENKINS_USERNAME }}:${{ secrets.JENKINS_API_TOKEN }} \
+            "${{ secrets.JENKINS_URL }}/crumbIssuer/api/json" | jq -r .crumb)
+          echo "crumb=$CRUMB" >> $GITHUB_OUTPUT
 
       - name: Notify Jenkins for Production
         if: startsWith(github.ref, 'refs/heads/release')
