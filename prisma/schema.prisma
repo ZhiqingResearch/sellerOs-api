@@ -1,0 +1,3757 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 类目分析任务：请求幂等、结果按用户隔离；逻辑 userId 沿用 User 的 Int 类型。
+model CategoryAnalysisRecord {
+  id             Int       @id @default(autoincrement()) @db.UnsignedInt // 任务主键
+  userId         Int // 所属用户，逻辑外键
+  requestId      String    @db.VarChar(36) // 客户端请求幂等键
+  fingerprint    String    @db.VarChar(64) // 请求摘要，防同键不同请求
+  marketplace    String    @db.VarChar(10) // Amazon 站点
+  title          String    @db.VarChar(500) // 类目名称摘要
+  categories     Json // 选择的 0–5 个类目快照
+  keywords       Json? // 用户输入的英文关键词，最多 5 个
+  plan           String    @default("cat") @db.VarChar(10) // cat 类目 / kw 关键词 / mix 交集
+  resolution     Json? // 关键词反查候选与用户确认快照
+  status         String    @default("PENDING") @db.VarChar(20) // PENDING / PROCESSING / AWAITING_SELECTION / COMPLETED / FAILED
+  leaseToken     String?   @db.VarChar(36) // 任务认领令牌
+  leaseExpiresAt DateTime? // 任务租约，过期标失败而不重复消耗外部配额
+  error          String?   @db.VarChar(500) // 中文失败原因
+  credits        Decimal   @default(0) @db.Decimal(12, 4) // 实际 AI 账单累计实扣积分（旧固定费退款后为零）
+  result         Json? // 六节结构化报告及标准化 Markdown
+  createdAt      DateTime  @default(now()) // 创建时间
+  updatedAt      DateTime  @updatedAt // 更新时间
+  deletedAt      DateTime? // 软删除，保留计费幂等记录
+
+  @@unique([userId, requestId])
+  @@index([userId, deletedAt, createdAt])
+  @@index([status, leaseExpiresAt])
+}
+
+// 公共市场数据缓存（SIF 14 天、Keepa 当天）；跨刷新和重启复用，不含用户报告或凭证。
+model CategoryAnalysisCache {
+  id        Int      @id @default(autoincrement()) @db.UnsignedInt // 缓存主键
+  cacheKey  String   @unique @db.VarChar(64) // 请求键 SHA256
+  payload   Json // 第三方成功响应
+  expiresAt DateTime // 按数据源策略保存固定到期时间，读取不续期
+  createdAt DateTime @default(now()) // 创建时间
+  updatedAt DateTime @updatedAt // 更新时间
+
+  @@index([expiresAt])
+}
+
+// 样本解析入口按文档保留为 API，不在页面恢复数据源面板。
+model CategoryAnalysisSample {
+  id          Int      @id @default(autoincrement()) @db.UnsignedInt // 样本主键
+  userId      Int // 用户隔离，与 User.id 类型一致
+  categoryId  String   @db.VarChar(100) // 类目节点
+  marketplace String   @db.VarChar(10) // 站点
+  month       String   @db.VarChar(7) // yyyy-MM
+  rows        Json // 已去重、归一化的样本行
+  createdAt   DateTime @default(now()) // 导入时间
+  updatedAt   DateTime @updatedAt // 更新时间
+
+  @@unique([userId, categoryId, marketplace, month])
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                       Int                       @id @default(autoincrement())
+  username                 String
+  phone                    String                    @unique
+  email                    String?                   @db.VarChar(120) // 账号通知邮件投递地址
+  receiptEmail             String?                   @db.VarChar(100) // 默认收据接收邮箱（收据中心可改；空=用账号 email）
+  password                 String
+  balance                  Decimal                   @default(720) @db.Decimal(12, 4)
+  totalSpent               Decimal                   @default(0) @db.Decimal(12, 4)
+  modelUnlocked            Boolean                   @default(false)
+  isActive                 Boolean                   @default(true)
+  deactivatedAt            DateTime?
+  lastLoginAt              DateTime?
+  mustChangePassword       Boolean                   @default(false)
+  // 会员 / 积分体系（等级由订阅 + 邀请身份推导，与积分余额无关）
+  membershipLevel          MembershipLevel           @default(NONE) // 冗余当前等级，订阅/邀请变更时回写
+  subscriptionTier         Int? // 1/2/3，过期不清（保留等级）
+  subscriptionStart        DateTime?
+  subscriptionExpiresAt    DateTime? // 过期只影响「升级 vs 续费」判定
+  canInvite                Boolean                   @default(false) // true = 分销代理（可邀请、计返利；不再切等级）
+  discount                 Decimal                   @default(1) @db.Decimal(4, 3) // 0.5~1.0 消费折扣（邀请人及其被邀请人）
+  rebateRate               Decimal                   @default(0.30) @db.Decimal(4, 3) // 一级返利比例（开启邀请后生效）
+  invitedById              Int? // 邀请人；审批通过建号时写入（仅关系，不再带 LV4 等级）
+  inviteCode               String?                   @unique @db.VarChar(32)
+  inviteCodeExpiresAt      DateTime? // 邀请码 24h 有效
+  canRecharge              Boolean                   @default(false) // 后台充值操作员白名单（账号级，连超管也需显式开）
+  shareCreditsWithInvitees Boolean                   @default(false) // LV5：开启后其下级可在自身额度外继续消耗本邀请人额度（仅 canRecharge 运营可改）
+  inviteQuota              Int? // 邀请名额（null=不限）；approve 成功计 1
+  subInviteAllowed         Boolean                   @default(false) // 下级可继续邀请；打开时批量打开一级下级邀请权（2026-09-01 起落库制）
+  canInviteManualOff       Boolean                   @default(false) // 邀请权被人工单独关闭（2026-09-01）：上级批量打开时跳过；批量收回/单独再开时清除
+  corpPassUp               Boolean? // 进企业后仍计返利（企业池段，2026-08-31）：null=跟随全局 RebateRule.corpCounts；逐人设定优先于全局
+  rebateEnabled            Boolean                   @default(true) // 参与返利计划
+  level2RebateRate         Decimal?                  @db.Decimal(4, 3) // 默认二级返利比例（null 用全局默认 0.10）
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+  roles                    UserRole[]
+  orgs                     UserOrganization[]
+  histories                History[]
+  productReports           ProductReport[]
+  selectedProducts         SelectedProduct[]
+  selectionAnalyses        SelectionAnalysisRecord[]
+  productLibraryItems      ProductLibraryItem[]
+  asinAuditRecords         AsinAuditRecord[]
+  asinEvidenceRecords      AsinEvidenceRecord[]
+  smartPricingRecords      SmartPricingRecord[]
+
+  promotionPlanRecords      PromotionPlanRecord[]
+  competitorAnalysisRecords CompetitorAnalysisRecord[]
+  videoAnalysisRecords      VideoAnalysisRecord[]
+  businessAiRuns            BusinessAiRun[]
+  usageLogs                 UsageLog[]
+  customers                 Customer[]
+  crawlLogs                 CrawlLog[]
+  imageProjects             ImageProject[]
+  productPublishTasks       ProductPublishTask[]
+  imageTasks                GenerationTask[]
+  imageGenJobs              ImageGenJob[]
+  imageTemplates            ImageTemplate[]
+  imageTemplateGroups       ImageTemplateGroup[]
+  brandKits                 BrandKit[]
+  sensitiveWords            SensitiveWord[]
+  announcements             Announcement[]
+  videoProjects             VideoProject[]
+  videoTasks                VideoTask[]
+  rpaCreationProjects       RpaCreationProject[]
+  rpaCreationTasks          RpaCreationTask[]
+  beautyProjects            BeautyProject[]
+  beautyTasks               BeautyTask[]
+  salesWorkflows            SalesWorkflow[]
+  poolImages                PoolImage[]
+  poolGroups                PoolGroup[]
+  digitalHumans             DigitalHuman[]
+  scenes                    Scene[]
+  inspirationSubscriptions  InspirationSubscription[]
+  adCleaningTasks           AdCleaningTask[]
+  invitedBy                 User?                      @relation("UserInvites", fields: [invitedById], references: [id])
+  invitees                  User[]                     @relation("UserInvites")
+  inviteApplications        InviteApplication[]
+  creditLots                CreditLot[]
+  creditTxns                CreditTransaction[]
+  scheduledPlans            ScheduledPlan[]
+  billingOrders             BillingOrder[]
+  receipts                  Receipt[]
+  teamsAdmin                Team[]                     @relation("TeamAdmin")
+  teamMemberships           TeamMember[]
+  skillMarketUserSkills     SkillMarketUserSkill[]
+  emailAccounts             EmailAccount[]
+  skillsKeyCredentials      SkillsKeyCredential[]
+}
+
+/// 广告数据清洗任务状态
+enum AdCleaningTaskStatus {
+  /// 已创建，正在等待 Worker 处理
+  PENDING
+  /// Worker 正在读取、清洗或上传结果
+  PROCESSING
+  /// 清洗结果已成功上传到文件服务器
+  SUCCESS
+  /// 文件校验、清洗或上传失败
+  FAILED
+}
+
+/// 广告数据清洗任务；只保存任务元数据和清洗结果 URL，不保存原始或清洗后的逐行广告数据
+model AdCleaningTask {
+  /// 数据库自增主键，仅供内部关联使用
+  id     Int    @id @default(autoincrement())
+  /// 对外暴露的任务 UUID
+  taskId String @unique @default(uuid()) @db.VarChar(36)
+  /// 创建任务的用户 ID，从 JWT 获取
+  userId Int
+  /// 创建任务的用户
+  user   User   @relation(fields: [userId], references: [id])
+
+  /// 任务状态：PENDING / PROCESSING / SUCCESS / FAILED
+  status   AdCleaningTaskStatus @default(PENDING)
+  /// 前端展示进度，范围 0～100
+  progress Int                  @default(0)
+  /// 当前处理阶段或简短状态说明
+  stage    String               @default("等待处理") @db.VarChar(100)
+
+  /// 用户上传的原始文件名，仅用于任务展示和生成结果文件名
+  originalFilename String  @db.VarChar(500)
+  /// 清洗结果上传到文件服务器后返回的稳定 URL；成功前为空
+  resultFileUrl    String? @db.VarChar(1000)
+
+  /// 失败原因；成功任务为空
+  errorMessage String?   @db.Text
+  /// Worker 实际开始处理时间
+  startedAt    DateTime?
+  /// 成功或失败的完成时间
+  completedAt  DateTime?
+
+  /// 任务创建时间
+  createdAt DateTime @default(now())
+  /// 任务最后更新时间
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+model SmsCode {
+  id        Int      @id @default(autoincrement())
+  phone     String
+  code      String
+  used      Boolean  @default(false)
+  attempts  Int      @default(0) // 错码累计5次后不可核销
+  expiredAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+}
+
+// 视频分析成功结果快照；软删除保留请求幂等键，不删除计费流水。
+model VideoAnalysisRecord {
+  id              String    @id @default(uuid()) @db.VarChar(36)
+  userId          Int
+  user            User      @relation(fields: [userId], references: [id])
+  chargeRequestId String    @db.VarChar(191)
+  fingerprint     String    @db.VarChar(64)
+  title           String    @db.VarChar(500)
+  videoUrl        String    @db.Text
+  duration        Float
+  focus           String?   @db.Text
+  mimeType        String    @db.VarChar(191)
+  model           String    @db.VarChar(191)
+  result          Json
+  usage           Json
+  usageDetail     Json
+  charge          Json
+  createdAt       DateTime  @default(now())
+  deletedAt       DateTime?
+
+  @@unique([userId, chargeRequestId])
+  @@index([userId, deletedAt, createdAt])
+}
+
+model History {
+  id         Int               @id @default(autoincrement())
+  title      String            @db.VarChar(500)
+  type       HistoryType
+  score      Float?
+  data       Json
+  version    Int               @default(1) // 当前 data 版本号 = max(revisions.version)
+  userId     Int
+  user       User              @relation(fields: [userId], references: [id])
+  revisions  HistoryRevision[]
+  listingRun ListingRun? // 仅 ORM 反向关联，不增加 History 数据库列
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([userId])
+}
+
+// History.data 的历史版本快照（仅 data 参与版本化；title/score 为当前元数据，不留档）
+model HistoryRevision {
+  id        Int      @id @default(autoincrement())
+  historyId Int
+  history   History  @relation(fields: [historyId], references: [id], onDelete: Cascade)
+  version   Int // 该 History 内自增 1..N
+  data      Json // 该版本的 data 快照
+  createdAt DateTime @default(now())
+
+  @@unique([historyId, version])
+  @@index([historyId])
+}
+
+// Listing 工作流状态独立于公共报告及其版本；创建任务时原子建立 History。
+model ListingRun {
+  id          Int                     @id @default(autoincrement()) @db.UnsignedInt // 主键
+  runId       String                  @unique @db.VarChar(36) // 客户端工作流 UUID，幂等创建键
+  historyId   Int                     @unique // 对应通用报告，兼容 History 的有符号主键；归属用户从报告读取
+  history     History                 @relation(fields: [historyId], references: [id], onDelete: Restrict) // 保留任务与报告的关联证据
+  status      String                  @default("ANALYZING") @db.VarChar(24) // ANALYZING / RUNNING / COMPLETED / FAILED
+  stage       String                  @default("preparation") @db.VarChar(50) // 当前业务步骤
+  error       String?                 @db.VarChar(1000) // 失败原因，不存凭证
+  attempts    Json? // A/B 方案各次生成状态，不与可编辑报告混存
+  steps       ListingAiStep[] // 任务的模型调用步骤
+  generations ListingGenerationTask[] // 可恢复的主生成任务，不依赖浏览器连接
+  createdAt   DateTime                @default(now()) // 创建时间
+  updatedAt   DateTime                @updatedAt // 最近状态更新时间
+}
+
+// 每次模型调用先建步骤；输出与公共 UsageLog 扣费在同一事务提交，不另存一份积分。
+model ListingAiStep {
+  id           Int        @id @default(autoincrement()) @db.UnsignedInt // 主键
+  listingRunId Int        @db.UnsignedInt // 所属 ListingRun 的主键
+  listingRun   ListingRun @relation(fields: [listingRunId], references: [id], onDelete: Restrict) // 不级联删除调用证据
+  operation    String     @db.VarChar(50) // category_match / attribute_analysis / long_title / generation / optimization / qa_rewrite / score
+  model        String     @db.VarChar(100) // 实际调用模型
+  status       String     @default("RUNNING") @db.VarChar(24) // RUNNING / COMPLETED / FAILED
+  usageLogId   Int?       @unique // 逻辑关联公共 UsageLog，避免在计费热表增加外键；同事务写入，费用以台账为准
+  requestId    String?    @db.VarChar(200) // 网关请求 ID
+  outputText   String?    @db.LongText // 原始模型正文，用于失败排查与结果恢复，不在列表中返回
+  error        String?    @db.VarChar(1000) // 失败原因
+  createdAt    DateTime   @default(now()) // 开始时间
+  updatedAt    DateTime   @updatedAt // 最近更新时间
+
+  @@index([listingRunId, createdAt])
+}
+
+// 主生成先保存模型响应，平台规则校验完成后才原子保存报告与扣费。
+model ListingGenerationTask {
+  id              Int        @id @default(autoincrement()) @db.UnsignedInt // 主键
+  attemptId       String     @unique @db.VarChar(36) // 同一次提交幂等键
+  listingRunId    Int        @db.UnsignedInt // 所属工作流
+  listingRun      ListingRun @relation(fields: [listingRunId], references: [id], onDelete: Restrict)
+  planIndex       Int        @db.UnsignedTinyInt // 0=A，1=B
+  status          String     @default("QUEUED") @db.VarChar(24) // QUEUED/RUNNING/READY/COMPLETED/PARTIAL/FAILED
+  input           Json // Prompt 和平台规则上下文快照，不存用户凭证
+  mainStepId      Int        @unique @db.UnsignedInt // 逻辑关联 ListingAiStep，原始正文只存一份
+  longTitleStepId Int?       @unique @db.UnsignedInt // 可选长标题调用步骤
+  billing         Json? // 服务端写入的网关账单快照，仅用于原事务恢复，不对页面下发
+  isModelComplete Boolean    @default(false) // 完整收到正文及网关终态；截断内容不能标为成功
+  leaseUntil      DateTime? // 多实例运行租约，过期仅恢复已有正文，不再次调用模型
+  error           String?    @db.VarChar(1000) // 失败原因
+  createdAt       DateTime   @default(now()) // 创建时间
+  updatedAt       DateTime   @updatedAt // 更新时间
+
+  @@index([status, leaseUntil])
+  @@index([listingRunId, createdAt])
+}
+
+/// 运营工具 AI 运行证据：模型一旦完成即保存原始正文，页面断线后按 runId 读取，不重复调用模型。
+model BusinessAiRun {
+  id         Int      @id @default(autoincrement()) @db.UnsignedInt // 主键
+  userId     Int // 所属用户，与现有 User.id 类型保持一致
+  user       User     @relation(fields: [userId], references: [id], onDelete: Restrict) // 调用证据不可随用户误删
+  runId      String   @db.VarChar(100) // 页面生成的稳定运行号，同一操作重试复用
+  module     String   @db.VarChar(50) // promotion-plan / smart-pricing / competitor-analysis
+  operation  String   @db.VarChar(50) // generate / extract / research / summary
+  model      String   @db.VarChar(100) // 实际选择的模型
+  inputHash  String   @db.Char(64) // systemPrompt + userPrompt 指纹，防止幂等号误复用
+  status     String   @default("RUNNING") @db.VarChar(24) // RUNNING / COMPLETED / FAILED
+  requestId  String?  @db.VarChar(200) // AI 中转站请求 ID
+  usageLogId Int?     @unique // 逻辑关联公共 UsageLog，费用仍以积分台账为准
+  outputText String?  @db.LongText // 完整原始模型正文，供解析失败或断线恢复
+  billing    Json? // 网关账单终态快照，仅用于服务端恢复结算，不对页面下发
+  error      String?  @db.VarChar(1000) // 失败原因，不保存凭证
+  createdAt  DateTime @default(now()) // 创建时间
+  updatedAt  DateTime @updatedAt // 更新时间
+
+  @@unique([userId, module, operation, runId])
+  @@index([userId, module, createdAt])
+  @@index([status, updatedAt])
+}
+
+model ProductReport {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(500)
+  score       Float?
+  description String?  @db.Text
+  data        Json
+  reportUrl   String?  @db.VarChar(1000)
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model SelectedProduct {
+  id          Int      @id @default(autoincrement())
+  productCode String
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+/// 选品分析入口
+enum SelectionAnalysisEntry {
+  /// 逛类目找机会
+  CATALOG
+  /// 验证单个商品
+  PRODUCT
+}
+
+/// 选品分析流程状态
+enum SelectionAnalysisStatus {
+  /// 当前入口的分析流程尚未完成
+  PROCESSING
+  /// 当前入口的分析流程已完成
+  COMPLETED
+}
+
+/// 五步选品分析的步骤类型
+enum SelectionAnalysisStepType {
+  /// 第1步：类目机会诊断
+  CATEGORY_DIAGNOSIS
+  /// 第2步：赛道验证
+  TRACK_VALIDATION
+  /// 第3步：产品验证与竞品池
+  COMPETITOR_POOL
+  /// 第4步：流量与广告验证
+  TRAFFIC_AD_VALIDATION
+  /// 第5步：最终产品清单
+  PRODUCT_LIST
+  /// 产品验证入口：单步最终结果
+  PRODUCT_VALIDATION
+}
+
+/// 选品分析主记录：CATALOG 为五步，PRODUCT 为单步
+model SelectionAnalysisRecord {
+  /// 分析记录ID，UUID格式
+  id                    String                   @id @default(uuid()) @db.VarChar(36)
+  /// 所属用户ID，从JWT获取
+  userId                Int
+  /// 所属用户
+  user                  User                     @relation(fields: [userId], references: [id])
+  /// 前端创建请求唯一ID，用于避免网络重试产生重复分析
+  clientRequestId       String                   @db.VarChar(64)
+  /// 创建请求规范化内容的SHA-256指纹，用于识别幂等键误复用
+  createFingerprint     String                   @db.VarChar(64)
+  /// 电商站点代码，例如US、UK、DE、JP
+  marketplace           String                   @db.VarChar(16)
+  /// 分析入口，默认逛类目
+  entry                 SelectionAnalysisEntry   @default(CATALOG)
+  /// 主类目节点ID
+  primaryCategoryNodeId String?                  @db.VarChar(255)
+  /// 主类目完整路径，用于列表展示和搜索
+  primaryCategoryPath   String?                  @db.VarChar(1000)
+  /// 主类目名称，优先保存中文名
+  primaryCategoryName   String?                  @db.VarChar(500)
+  /// 本次分析选择的全部类目上下文JSON
+  categories            Json
+  /// 当前有效的最高已完成步骤，范围1到5
+  lastCompletedStep     Int                      @default(1)
+  /// 最终商品数量；PRODUCT 完成时为1，未完成时为0
+  pickCount             Int                      @default(0)
+  /// 当前分析状态
+  status                SelectionAnalysisStatus  @default(PROCESSING)
+  /// 主记录乐观锁版本，每次有效步骤变更递增
+  version               Int                      @default(1)
+  /// 创建时间
+  createdAt             DateTime                 @default(now())
+  /// 最后更新时间
+  updatedAt             DateTime                 @updatedAt
+  /// 软删除时间，NULL表示未删除
+  deletedAt             DateTime?
+  /// 当前有效的分步结果
+  steps                 SelectionAnalysisStep[]
+  /// 从该分析存入商品库的画像快照
+  productSnapshots      ProductLibrarySnapshot[]
+
+  /// 同一用户的同一个创建请求只能对应一条分析记录
+  @@unique([userId, clientRequestId])
+  /// 当前用户分析记录列表按更新时间查询
+  @@index([userId, deletedAt, updatedAt])
+  /// 当前用户按站点筛选分析记录
+  @@index([userId, marketplace, deletedAt, updatedAt], map: "SelectionAnalysisRecord_user_marketplace_updated_idx")
+}
+
+/// 选品分析分步结果：每个分析的每个步骤只保留一条当前有效记录
+model SelectionAnalysisStep {
+  /// 步骤记录自增主键
+  id            Int                       @id @default(autoincrement())
+  /// 所属分析记录ID
+  analysisId    String                    @db.VarChar(36)
+  /// 所属分析；物理删除分析时级联删除步骤
+  analysis      SelectionAnalysisRecord   @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  /// 步骤编号，范围1到5
+  stepNo        Int
+  /// 步骤业务类型
+  stepType      SelectionAnalysisStepType
+  /// 当前步骤payload的数据结构版本
+  schemaVersion Int                       @default(1)
+  /// 当前步骤完整结果JSON，不包含其他步骤数据
+  payload       Json
+  /// 规范化payload的SHA-256哈希，用于内容幂等
+  payloadHash   String                    @db.VarChar(64)
+  /// 当前步骤内容修订版本，实际变化时递增
+  revision      Int                       @default(1)
+  /// 首次保存时间
+  createdAt     DateTime                  @default(now())
+  /// 最后更新时间
+  updatedAt     DateTime                  @updatedAt
+
+  /// 每次分析的每个步骤只保留一条当前有效结果
+  @@unique([analysisId, stepNo])
+  /// 按分析ID加载全部步骤
+  @@index([analysisId])
+}
+
+/// 智能定价历史快照：前端完成定价后一次性归档，后端不重新计算报告
+model SmartPricingRecord {
+  /// 对外暴露的记录 UUID
+  id                String    @id @default(uuid()) @db.VarChar(36)
+  /// 所属用户 ID，从 JWT 获取
+  userId            Int
+  user              User      @relation(fields: [userId], references: [id])
+  /// 前端创建请求 UUID，用于创建幂等
+  clientRequestId   String    @db.VarChar(64)
+  /// 规范化创建内容的 SHA-256 指纹
+  createFingerprint String    @db.VarChar(64)
+  /// 快照数据结构版本
+  schemaVersion     Int       @default(1)
+  /// 唯一且稳定的站点代码，例如 AMAZON_US
+  marketplaceCode   String    @db.VarChar(32)
+  /// 归档时的站点展示名称，例如 Amazon US
+  marketplaceName   String    @db.VarChar(64)
+  /// 当前固定为 USD
+  currency          String    @db.Char(3)
+  /// 商品类目展示名称
+  category          String    @db.VarChar(255)
+  /// 列表摘要：商品名称
+  productName       String    @db.VarChar(500)
+  /// 列表摘要：建议售价
+  suggestedPrice    Decimal   @db.Decimal(18, 6)
+  /// 列表摘要：净利率，按百分数保存
+  netMargin         Decimal   @db.Decimal(12, 6)
+  /// 列表摘要：单件净利
+  netProfit         Decimal   @db.Decimal(18, 6)
+  /// 列表摘要：保本价
+  floorPrice        Decimal   @db.Decimal(18, 6)
+  /// 列表摘要：综合评分
+  compositeScore    Decimal   @db.Decimal(7, 4)
+  /// 列表摘要：结论文案
+  verdictText       String    @db.VarChar(255)
+  /// 完整产品输入快照
+  product           Json
+  /// 完整定价输入快照；API 响应映射为 input
+  inputSnapshot     Json
+  /// 竞品上下文；竞品查询失败时为 NULL
+  competitorContext Json?
+  /// 完整定价结果快照
+  result            Json
+  /// 记录版本，创建时为 1，软删除时递增
+  version           Int       @default(1)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  @@unique([userId, clientRequestId])
+  @@index([userId, deletedAt, createdAt])
+  @@index([userId, marketplaceCode, deletedAt, createdAt], map: "SmartPricingRecord_user_market_created_idx")
+  @@index([userId, category, deletedAt, createdAt], map: "SmartPricingRecord_user_category_created_idx")
+}
+
+/// 新品推广计划 · 历史记录（只读快照，无更新语义）
+model PromotionPlanRecord {
+  /// 对外暴露的记录 UUID
+  id              String @id @default(uuid()) @db.VarChar(36)
+  /// 归属用户 ID，从 JWT 获取
+  userId          Int
+  user            User   @relation(fields: [userId], references: [id])
+  /// 幂等键，前端每次生成成功时 crypto.randomUUID() 生成
+  clientRequestId String @unique @db.VarChar(36)
+  /// 快照结构版本，当前恒为 1
+  schemaVersion   Int    @default(1)
+  /// 乐观锁版本，当前恒为 1（预留，无更新接口）
+  version         Int    @default(1)
+
+  /// 列表展示名 + 关键词搜索（取 result.productName）
+  productName     String @db.VarChar(200)
+  /// Market 枚举值（DTO 层校验，DB 存 string 以便扩展新站点）
+  market          String @db.VarChar(32)
+  /// 类目中文名（前端预设 11 选 1，透传存储）
+  category        String @db.VarChar(64)
+  /// 锚点常规价（冗余列，取 result.anchorPrice，列表摘要用）
+  anchorPrice     Float?
+  /// 竞品对标数（冗余列，取 input.competitors.length）
+  competitorCount Int    @default(0)
+
+  /// 生成时表单输入快照
+  input  Json
+  /// SopResult 全量（不透明 JSON 存储，仅强校验 productName）
+  result Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+enum CompetitorAnalysisMode {
+  ASIN
+  KEYWORD
+}
+
+/// 竞品分析历史主记录：保存总体结果、最终报告和列表摘要
+model CompetitorAnalysisRecord {
+  id                 String                      @id @default(uuid()) @db.VarChar(36)
+  userId             Int
+  user               User                        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  clientRequestId    String                      @db.VarChar(36)
+  createFingerprint  String                      @db.Char(64)
+  schemaVersion      Int                         @default(1)
+  marketplace        String                      @db.VarChar(16)
+  mode               CompetitorAnalysisMode
+  ownAsin            String?                     @db.Char(10)
+  competitorAsins    Json
+  sourceKeyword      String?                     @db.VarChar(500)
+  title              String                      @db.VarChar(500)
+  productCount       Int
+  competitorCount    Int
+  inputSnapshot      Json
+  analysisResult     Json
+  reportData         Json
+  reportPdfUrl       String?                     @db.VarChar(2048)
+  reportPdfUpdatedAt DateTime?
+  payloadBytes       Int
+  version            Int                         @default(1)
+  createdAt          DateTime                    @default(now())
+  updatedAt          DateTime                    @updatedAt
+  deletedAt          DateTime?
+  products           CompetitorAnalysisProduct[]
+
+  @@unique([userId, clientRequestId])
+  @@index([userId, deletedAt, createdAt])
+  @@index([userId, marketplace, deletedAt, createdAt], map: "CompetitorAnalysisRecord_user_market_created_idx")
+  @@index([userId, ownAsin, deletedAt, createdAt], map: "CompetitorAnalysisRecord_user_own_asin_created_idx")
+}
+
+/// 一次竞品分析中的单个产品；productData 按前端传入内容原样保存
+model CompetitorAnalysisProduct {
+  id          Int                             @id @default(autoincrement())
+  recordId    String                          @db.VarChar(36)
+  record      CompetitorAnalysisRecord        @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  asin        String                          @db.Char(10)
+  sortOrder   Int
+  productData Json
+  steps       CompetitorAnalysisProductStep[]
+  createdAt   DateTime                        @default(now())
+  updatedAt   DateTime                        @updatedAt
+
+  @@unique([recordId, asin])
+  @@unique([recordId, sortOrder])
+  @@index([asin, recordId], map: "CompetitorAnalysisProduct_asin_record_idx")
+}
+
+/// 单个产品的一步分析结果；步骤类型和数量由前端决定
+model CompetitorAnalysisProductStep {
+  id            Int                       @id @default(autoincrement())
+  productId     Int
+  product       CompetitorAnalysisProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stepCode      String                    @db.VarChar(64)
+  stepNo        Int
+  schemaVersion Int                       @default(1)
+  resultData    Json
+  payloadHash   String                    @db.Char(64)
+  payloadBytes  Int
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+
+  @@unique([productId, stepCode])
+  @@unique([productId, stepNo])
+}
+
+/// 用户商品库主表：同一用户、站点和ASIN只保存一条商品
+model ProductLibraryItem {
+  /// 商品库记录自增主键
+  id                 Int                      @id @default(autoincrement())
+  /// 所属用户ID，从JWT获取
+  userId             Int
+  /// 所属用户
+  user               User                     @relation(fields: [userId], references: [id])
+  /// 电商站点代码，例如US、UK、DE、JP
+  marketplace        String                   @db.VarChar(16)
+  /// Amazon ASIN；可选，传入时统一转大写
+  asin               String?                  @db.VarChar(32)
+  /// 商品标题
+  title              String?                  @db.VarChar(1000)
+  /// 品牌名称
+  brand              String?                  @db.VarChar(255)
+  /// 商品主图URL
+  imageUrl           String?                  @db.VarChar(2048)
+  /// 用户标签字符串数组
+  tags               Json?
+  /// 用户备注
+  notes              String?                  @db.Text
+  /// 最新一次画像的主攻关键词
+  latestKeyword      String?                  @db.VarChar(500)
+  /// 最新一次画像的竞品综合评分，用于列表排序
+  latestCompScore    Decimal?                 @db.Decimal(10, 4)
+  /// 最新一次画像的商品价格
+  latestPrice        Decimal?                 @db.Decimal(12, 2)
+  /// 最新一次画像的月销量
+  latestMonthlySales Int?
+  /// 最新一次画像的评论数量
+  latestRatingNum    Int?
+  /// 首次入库时间
+  createdAt          DateTime                 @default(now())
+  /// 最后更新时间
+  updatedAt          DateTime                 @updatedAt
+  /// 软删除时间，NULL表示未删除
+  deletedAt          DateTime?
+  /// 该商品的不同来源画像快照
+  snapshots          ProductLibrarySnapshot[]
+
+  /// 有 ASIN 时，同一用户、站点和ASIN在商品库中只有一条主记录；NULL 不参与去重
+  @@unique([userId, marketplace, asin])
+  /// 当前用户商品库列表按更新时间查询
+  @@index([userId, deletedAt, updatedAt])
+  /// 当前用户按站点和最新评分筛选、排序
+  @@index([userId, marketplace, deletedAt, latestCompScore], map: "ProductLibraryItem_user_marketplace_score_idx")
+}
+
+/// 商品库来源画像快照：保留同一商品在不同分析和关键词下的完整画像
+model ProductLibrarySnapshot {
+  /// 商品画像快照自增主键
+  id               Int                     @id @default(autoincrement())
+  /// 所属商品库主记录ID
+  itemId           Int
+  /// 所属商品；物理删除商品时级联删除画像
+  item             ProductLibraryItem      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  /// 来源选品分析记录ID
+  sourceAnalysisId String                  @db.VarChar(36)
+  /// 来源分析；存在画像时禁止物理删除来源分析
+  sourceAnalysis   SelectionAnalysisRecord @relation(fields: [sourceAnalysisId], references: [id], onDelete: Restrict)
+  /// 该画像对应的主攻关键词
+  keyword          String                  @db.VarChar(500)
+  /// 该次分析的竞品综合评分
+  compScore        Decimal?                @db.Decimal(10, 4)
+  /// 该次分析的商品价格
+  price            Decimal?                @db.Decimal(12, 2)
+  /// 该次分析的月销量
+  monthlySales     Int?
+  /// 该次分析的评论数量
+  ratingNum        Int?
+  /// 来源分析中的完整商品画像JSON快照
+  profile          Json
+  /// 画像及摘要字段的SHA-256哈希，用于入库幂等
+  profileHash      String                  @db.VarChar(64)
+  /// 画像首次入库时间
+  createdAt        DateTime                @default(now())
+  /// 画像最后更新时间
+  updatedAt        DateTime                @updatedAt
+
+  /// 同一商品、来源分析和关键词只保留一份画像
+  @@unique([itemId, sourceAnalysisId, keyword])
+  /// 按来源分析查询已入库画像
+  @@index([sourceAnalysisId])
+  /// 按商品查询画像并按更新时间排序
+  @@index([itemId, updatedAt])
+}
+
+enum HistoryType {
+  PRODUCT_SCORING
+  LISTING_GENERATION
+  LISTING_SCORING
+  ADMIN_ACTION // 后台敏感操作审计（如查看用户手机号全号）
+}
+
+enum TagCategory {
+  INDUSTRY // 所属行业
+  PLATFORM // 运营平台
+  ACCOUNT_STYLE // 账号风格
+}
+
+// 标签表
+model Tag {
+  id       Int         @id @default(autoincrement())
+  name     String // 标签名称
+  category TagCategory // 分类
+
+  createdAt DateTime @default(now())
+
+  @@unique([name, category])
+}
+
+// 客户表
+model Customer {
+  id             Int     @id @default(autoincrement())
+  name           String // 客户名称
+  industry       Json // 所属行业（多选）["美容护肤", "母婴"]
+  contentFocus   String // 内容方向
+  platforms      Json // 运营平台 ["小红书", "抖音"]
+  targetAudience String? // 目标受众
+  marketingGoals String? // 运营目标
+  contentTone    String? // 内容调性
+  avoidTopics    String? // 规避方向
+  strategy       String? @db.Text // AI生成的运营方案（Markdown）
+
+  userId Int // 所属用户（创建者）
+  user   User @relation(fields: [userId], references: [id])
+
+  accounts Account[]
+  avatars  Avatar[]
+  voices   Voice[]
+  projects Project[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId])
+}
+
+// 账号表
+model Account {
+  id                Int     @id @default(autoincrement())
+  name              String // 账号名称
+  platform          String // 平台
+  accountStyle      String? // 账号风格（单选，选填）
+  coreKeywords      Json // 核心关键词 ["抗衰", "成分党"]
+  targetPositioning String? // 目标定位
+  strategy          String? @db.Text // AI生成的账号规划方案（Markdown）
+
+  customerId Int
+  customer   Customer  @relation(fields: [customerId], references: [id])
+  projects   Project[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+// 形象表
+// kind = CLONED：客户私有克隆形象（曦灵训练），trainingUrl/thumbnailUrl/status 走训练状态机
+// kind = PUBLIC：客户从"公共形象库"添加的引用（figureId 指向 PublicAvatar），创建时 status=SUCCESS
+//                 详情字段（templateImg/templateVideoUrl/pose/background 等）读时 LEFT JOIN PublicAvatar 补全
+model Avatar {
+  id           Int      @id @default(autoincrement())
+  name         String // 形象名称
+  gender       String   @default("FEMALE") // 性别: MALE / FEMALE
+  description  String? // 形象描述
+  trainingUrl  String? // 训练文件 URL（PUBLIC 行为 NULL）
+  figureId     String? // 百度曦灵数字人 ID（克隆行由曦灵生成；公共行复制自 PublicAvatar.figureId）
+  status       String   @default("GENERATING") // GENERATING / SUCCESS / FAILED（公共行恒为 SUCCESS）
+  thumbnailUrl String? // 缩略图 URL（克隆：训练成功后填充；公共：复制 PublicAvatar.templateImg）
+  kind         String   @default("CLONED") // CLONED / PUBLIC
+  customerId   Int
+  customer     Customer @relation(fields: [customerId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  scripts   Script[]
+
+  @@unique([customerId, figureId]) // 同一客户下 figureId 不可重复；跨客户允许重复（同一公共形象可被多个客户绑定）
+  @@index([customerId, kind])
+}
+
+// 音色表
+// kind = CLONED：客户私有克隆音色；kind = PUBLIC：公共音色引用（perId 指向 PublicVoice）
+model Voice {
+  id              Int      @id @default(autoincrement())
+  name            String // 音色名称
+  gender          String   @default("female") // 性别: male / female / unknown
+  description     String? // 音色描述
+  trainingUrl     String? // 训练文件 URL（PUBLIC 行为 NULL）
+  perId           String? // 百度曦灵声音 ID
+  status          String   @default("GENERATING") // GENERATING / SUCCESS / FAILED（公共行恒为 SUCCESS）
+  exampleText     String?  @db.VarChar(200) // 试听文本（提交克隆时记录；公共行 NULL）
+  exampleAudioUrl String? // 示例音频 URL（克隆：成功后填充；公共：复制 PublicVoice.exampleAudioUrl）
+  kind            String   @default("CLONED") // CLONED / PUBLIC
+  customerId      Int
+  customer        Customer @relation(fields: [customerId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  scripts   Script[]
+
+  @@unique([customerId, perId]) // 同一客户下 perId 不可重复；跨客户允许重复
+  @@index([customerId, kind])
+}
+
+// 公共形象镜像表（百度曦灵公共形象的本地镜像，TTL=24h 刷新）
+// 弹窗 picker 从此表读；客户添加后在 Avatar 表插入 kind=PUBLIC 行并复制 figureId
+model PublicAvatar {
+  id               Int      @id @default(autoincrement())
+  figureId         String   @unique // 百度主业务键
+  name             String
+  item             String // 百度组件类型：VIDEO-DH_2D / VIDEO-DH_2D_LITE / VIDEO-DH_3D
+  gender           String? // MALE / FEMALE / UNKNOWN
+  age              String? // 少年 / 青年 / 中年 / 老年
+  pose             String? // 站姿全身 / 坐姿全身 / 坐姿半身
+  background       String? // 透明 / 户外 / 室内
+  tags             Json? // 百度 tags 数组（日常休闲 / 职业商务 等）
+  templateImg      String?  @db.VarChar(1000) // 缩略图
+  templateVideoUrl String?  @db.VarChar(1000) // 底板视频
+  pictureUrl       String?  @db.VarChar(1000) // 参考图片（生成式数字人）
+  maskVideoUrl     String?  @db.VarChar(1000) // mask 视频
+  resolutionWidth  Int?
+  resolutionHeight Int?
+  aspectRatio      String? // 16:9 / 9:16 / 1:1（派生自分辨率，便于索引过滤）
+  humanType        String? // 2D / 3D（从 item 派生）
+  keepBackground   Boolean?
+  isActive         Boolean  @default(true) // 下次刷新未返回则置 false（软失效，不物理删，绑定已在用的行靠此字段展示"已下架"）
+  syncedAt         DateTime // 最近一次从百度拉取的时间
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, gender, age])
+  @@index([isActive, humanType, aspectRatio])
+}
+
+// 公共音色镜像表
+// 百度 /tts/persons?isSystem=true 只返回 6 个字段；age/style/language/capability/feature/latency
+// 由 voice-tagger.ts 启发式从 name/describe/version 抽取（方案 C）
+model PublicVoice {
+  id              Int      @id @default(autoincrement())
+  perId           String   @unique // 百度主业务键
+  name            String
+  describe        String?
+  version         String? // 百度 version：V2 / LITE 等
+  gender          String? // male / female / unknown
+  exampleAudioUrl String?  @db.VarChar(1000)
+  // 以下 6 字段为启发式标签，百度不返回
+  age             String? // 少年 / 青少年 / 青年 / 中年
+  style           String? // 权威专业 / 活力激情 / 亲和陪伴
+  language        Json? // ["中文", "方言", "粤语", ...]
+  capability      String? // 超拟 / 精品
+  feature         String? // 温润柔和 / 清透明亮 / 低沉磁性
+  latency         String? // 超低时延 / 低时延
+  isActive        Boolean  @default(true)
+  syncedAt        DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, gender])
+}
+
+enum ProjectStatus {
+  DRAFT // 草稿
+  PRODUCING // 生产中
+  COMPLETED // 已完成
+  PUBLISHED // 已发布
+}
+
+// 项目表
+model Project {
+  id     Int           @id @default(autoincrement())
+  name   String // 项目名称
+  status ProjectStatus @default(DRAFT) // 项目状态
+
+  publishedAt DateTime? // 发布时间（精确到分钟，PUBLISHED 时填入）
+  publishUrl  String?   @db.VarChar(1000) // 发布链接（PUBLISHED 时填入）
+
+  customerId Int
+  customer   Customer @relation(fields: [customerId], references: [id])
+  accountId  Int
+  account    Account  @relation(fields: [accountId], references: [id])
+
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  deletedAt  DateTime?
+  source     Source?
+  strategy   Strategy?
+  production Production?
+}
+
+enum SourceType {
+  HOT_TOPIC // 热点抓取
+  CLIENT_BRIEF // 甲方文案
+  DEEP_RESEARCH // 深度调研
+}
+
+// 来源层（一对一）
+model Source {
+  id           Int        @id @default(autoincrement())
+  type         SourceType // 来源类型
+  content      String     @db.Text // 内容（DEEP_RESEARCH 类型为调研结果，SUCCESS 后填充）
+  query        String?    @db.Text // 调研问题（仅 DEEP_RESEARCH 使用）
+  status       String     @default("SUCCESS") // GENERATING / SUCCESS / FAILED，非 DEEP_RESEARCH 恒为 SUCCESS
+  errorMessage String?    @db.Text // 失败原因（仅 DEEP_RESEARCH 使用）
+  projectId    Int        @unique
+  project      Project    @relation(fields: [projectId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+}
+
+// 方案层（一对一）
+model Strategy {
+  id                Int       @id @default(autoincrement())
+  integrationType   String // 业务结合方式
+  targetDurationSec Int // 目标时长（秒）
+  content           String    @db.Text // 方案内容
+  projectId         Int       @unique
+  project           Project   @relation(fields: [projectId], references: [id])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+}
+
+// 生产层（一对一）
+model Production {
+  id        Int       @id @default(autoincrement())
+  topic     String // 项目主题
+  projectId Int       @unique
+  project   Project   @relation(fields: [projectId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  scripts        Script[]
+  copyWritings   CopyWriting[]
+  storyboards    Storyboard[]
+  materialImages MaterialImage[]
+}
+
+// 口播稿
+model Script {
+  id      Int    @id @default(autoincrement())
+  content String @db.Text // 口播稿
+
+  avatarId Int?
+  avatar   Avatar? @relation(fields: [avatarId], references: [id])
+  voiceId  Int?
+  voice    Voice?  @relation(fields: [voiceId], references: [id])
+
+  videoTaskId       String?    @unique // 百度曦灵视频合成任务 ID
+  videoStatus       String? // GENERATING / SUCCESS / FAILED（null 表示尚未发起合成任务）
+  videoUrl          String?    @db.VarChar(1000) // 合成视频 URL
+  videoDuration     Int? // 视频时长（毫秒）
+  videoErrorMessage String?    @db.Text // 合成失败原因（videoStatus=FAILED 时填充）
+  speed             Int? // 语速（0-15，5 为正常值），历史数据为空
+  volume            Int? // 音量（0-15，5 为正常值），历史数据为空
+  pitch             Int? // 语调（0-15，5 为正常值），历史数据为空
+  productionId      Int
+  production        Production @relation(fields: [productionId], references: [id])
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  deletedAt         DateTime?
+  videoMeta Json? // 预览墙公开生成/交付元信息
+
+}
+
+// 发布文案
+model CopyWriting {
+  id           Int        @id @default(autoincrement())
+  title        String // 标题
+  content      String     @db.Text // 正文
+  tags         String // 标签
+  productionId Int
+  production   Production @relation(fields: [productionId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deletedAt    DateTime?
+}
+
+// 分镜头
+model Storyboard {
+  id            Int     @id @default(autoincrement())
+  shot          String  @db.Text // 镜头描述
+  duration      Int     @default(4) // 时长（秒，客户分镜模型支持 4 / 6 / 8）
+  prompt        String  @db.Text // 视频生成 prompt
+  motion        String // 运镜描述
+  firstFrameUrl String? @db.VarChar(1000) // 首帧垫图 URL
+  lastFrameUrl  String? @db.VarChar(1000) // 尾帧垫图 URL
+  order         Int     @default(0) // 排序
+
+  productionId Int
+  production   Production        @relation(fields: [productionId], references: [id])
+  videos       StoryboardVideo[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+// 分镜头席位（每个分镜头最多 2 个席位，通过 AI Gateway 异步生成）
+model StoryboardVideo {
+  id               Int     @id @default(autoincrement())
+  url              String? @db.VarChar(1000) // 生成的视频 URL（Gateway 已存储到 Space）
+  approved         Boolean @default(false) // 是否采纳（占用席位）
+  status           String  @default("GENERATING") // GENERATING / SUCCESS / TIMEOUT / CANCELLED / FAILED
+  generationParams Json? // 实际提交给 AI Gateway 的生成参数快照
+  gatewayTaskId    String? @unique @map("taskId") @db.VarChar(255) // AI Gateway Task ID
+  gatewayEventId   String? @unique @db.VarChar(255) // 已处理的 AI Gateway 回调事件 ID
+  errorMessage     String? @db.Text // 失败原因（用户侧中文文案）
+  gatewayError     Json? // 网关终态失败原始错误 { code, type, message, requestId }，排查用
+
+  storyboardId Int
+  storyboard   Storyboard @relation(fields: [storyboardId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  generationMeta Json? // 预览墙公开生成/交付元信息
+
+}
+
+// 素材图片
+model MaterialImage {
+  id          Int     @id @default(autoincrement())
+  purpose     String  @db.VarChar(200) // 用途（封面图/知识卡片/产品主图/对比图等）
+  ratio       String // 比例（16:9 / 3:4 / 1:1 等）
+  prompt      String  @db.Text // AI 生图 prompt
+  refImageUrl String? @db.VarChar(1000) // 垫图 URL（可选）
+  order       Int     @default(0) // 排序
+
+  productionId Int
+  production   Production             @relation(fields: [productionId], references: [id])
+  variants     MaterialImageVariant[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+// 素材图片席位（每个素材图最多 4 个席位，调 Nano Banana 异步生成）
+model MaterialImageVariant {
+  id              Int           @id @default(autoincrement())
+  url             String?       @db.VarChar(1000) // 生成的图片 URL（SUCCESS 后填充）
+  approved        Boolean       @default(false) // 是否采纳（占用席位）
+  status          String        @default("GENERATING") // GENERATING / SUCCESS / FAILED
+  errorMessage    String?       @db.Text // 失败原因
+  materialImageId Int
+  materialImage   MaterialImage @relation(fields: [materialImageId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  generationMeta Json? // 预览墙公开生成/交付元信息
+
+}
+
+/// AI 模型模态，用于区分文本、图片和视频模型
+enum AiModelModality {
+  /// 文本生成模型
+  TEXT
+  /// 图片生成或编辑模型
+  IMAGE
+  /// 视频生成或编辑模型
+  VIDEO
+}
+
+/// AI 模型执行方式
+enum AiModelExecMode {
+  /// 请求内同步返回结果
+  SYNC
+  /// 先返回任务，再异步查询结果
+  ASYNC
+}
+
+/// 本项目使用的 AI Gateway 模型及类别配置
+model AiGatewayModel {
+  /// 数据库自增主键
+  id              Int             @id @default(autoincrement())
+  /// AI Gateway 对外提供的稳定模型 ID
+  publicId        String          @db.VarChar(100)
+  /// 本项目使用的模型类别，由业务自行定义
+  category        String          @db.VarChar(50)
+  /// AI Gateway 返回的模型展示名称
+  displayName     String          @db.VarChar(200)
+  /// 模型模态：TEXT、IMAGE 或 VIDEO
+  modality        AiModelModality
+  /// 模型执行方式：SYNC 或 ASYNC
+  execMode        AiModelExecMode
+  /// AI Gateway 模型能力、operation 及请求参数 Schema
+  gatewayConfig   Json
+  /// 模型定价配置
+  quoteConfig     Json?
+  /// 价格倍率：网关 usage 与报价统一乘以该倍率后计费/展示（视频 2、图片 3，TEXT 默认 1）
+  priceMultiplier Decimal         @default(1) @db.Decimal(5, 2)
+  /// 图片固定一口价（积分/张）：配置后该类别生图按「fixedCredits × 成功张数」精确扣费，
+  /// 不应用折扣；AI_SPLIT 行为组合价（含拆图分析费）。NULL = 回落按量计费（网关账单 × priceMultiplier）。
+  /// 扣费时实时读库，改库即时生效
+  fixedCredits    Decimal?        @db.Decimal(8, 2)
+  /// 模型当前是否仍在 AI Gateway 可用目录中
+  gatewayActive   Boolean         @default(false)
+  /// 最近一次成功同步模型基础信息的时间
+  syncedAt        DateTime?
+  /// 该模型在当前类别中是否启用
+  enabled         Boolean         @default(false)
+  /// 模型在当前类别列表中的展示顺序
+  sortOrder       Int             @default(0)
+
+  /// 记录创建时间
+  createdAt DateTime @default(now())
+  /// 记录最后更新时间
+  updatedAt DateTime @updatedAt
+
+  @@unique([publicId, category])
+  @@index([modality, category, enabled, gatewayActive])
+}
+
+/// 视频模型一口价与展示成本：一行 = (publicId, category, mode, resolution) 一档价格，通过
+/// publicId 关联 AiGatewayModel（同 publicId 可按业务类别分别定价，与其 publicId_category 唯一键同构）。
+/// 配置后该档视频生成仅 SUCCESS 按「creditsPerSec × 实际时长秒」精确扣费（exactCredits，不打折不乘倍率；
+/// 时长 0/缺失按 1 秒保底计）；无行/缺档 = 回落按量（网关账单 × priceMultiplier）。扣费时实时读库，改库即时生效。
+/// mode = 网关请求的生成模式（reference_to_video / video_to_video 等），空串 = 通配该类别全部模式；
+/// 匹配优先精确 mode 行，无命中再退通配行（同模型同分辨率可按模式配不同价）。
+/// resolution = `flat` 为「按次一口价」档：带分辨率的请求未命中精确档时兜底命中（如动作复刻不分时长/
+/// 分辨率一口价），SUCCESS 固定扣 creditsPerSec 一笔，不乘时长；精确档优先于 flat 档。
+/// resolution = `adaptive` 为无分辨率自适应模型的保留兜底档（请求/终态均无 resolution 时才命中），
+/// 该档同为「按次一口价」语义：SUCCESS 固定扣 creditsPerSec 一笔，不乘时长
+model AiGatewayVideoFixedPrice {
+  /// 数据库自增主键
+  id            Int     @id @default(autoincrement())
+  /// 关联 AiGatewayModel.publicId
+  publicId      String  @db.VarChar(100)
+  /// 业务类别：NORMAL（常规模式）/ REFERENCE（全能参考）/ MOTION_CONTROL / STORYBOARD / BEAUTY 等
+  category      String  @db.VarChar(50)
+  /// 生成模式（小写归一存储）：网关请求 mode 原值（如 reference_to_video / video_to_video）；空串 = 通配
+  mode          String  @default("") @db.VarChar(50)
+  /// 分辨率档（小写归一存储）：360p / 480p / 720p / 720p-sr / 1080p / 1080p-sr / 1440p-sr
+  resolution    String  @db.VarChar(50)
+  /// 固定一口价：积分/秒（>0）；NULL = 按网关实际账单计费，成本字段不参与扣费
+  creditsPerSec Decimal? @db.Decimal(8, 2)
+  /// 预估成本下限/上限（人民币）；固定成本两者相同，必须成对配置。
+  /// costPerRequest=false 为元/秒，true 为元/次。仅用于展示报价。
+  costMinCny    Decimal? @db.Decimal(12, 6)
+  costMaxCny    Decimal? @db.Decimal(12, 6)
+  /// 按次展示成本，可为不同分辨率独立配置，不影响一口价扣费。
+  costPerRequest Boolean @default(false)
+
+  /// 记录创建时间
+  createdAt DateTime @default(now())
+  /// 记录最后更新时间
+  updatedAt DateTime @updatedAt
+
+  @@unique([publicId, category, mode, resolution])
+  @@index([publicId, category])
+}
+
+// 用量定价配置（支持后台管理调整）
+enum PricingCategory {
+  TOKEN_INPUT
+  TOKEN_OUTPUT
+  MCP
+}
+
+enum PricingTier {
+  LOW
+  HIGH
+  SINGLE
+}
+
+model PricingConfig {
+  id               Int             @id @default(autoincrement())
+  key              String          @unique @db.VarChar(100)
+  name             String          @db.VarChar(200)
+  category         PricingCategory
+  tier             PricingTier
+  threshold        Int?
+  originalPriceUsd Decimal         @db.Decimal(12, 6)
+  markupPriceUsd   Decimal         @db.Decimal(12, 6)
+  markupPriceCny   Decimal         @db.Decimal(12, 6)
+  unit             String          @db.VarChar(20)
+  active           Boolean         @default(true)
+  description      String?         @db.VarChar(500)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+// 用量流水
+enum UsageType {
+  TOKEN
+  MCP
+}
+
+model UsageLog {
+  id               Int       @id @default(autoincrement())
+  userId           Int
+  user             User      @relation(fields: [userId], references: [id])
+  type             UsageType
+  promptTokens     Int?
+  completionTokens Int?
+  thinkingTokens   Int?
+  mcpCalls         Int?
+  inputCost        Decimal?  @db.Decimal(12, 6)
+  outputCost       Decimal?  @db.Decimal(12, 6)
+  cost             Decimal   @db.Decimal(12, 6) // 人民币成本（成本基准/对账）
+  credits          Decimal?  @db.Decimal(18, 4) // 本次实扣积分（含折扣）；积分看板按此聚合，旧数据为 null
+  balanceAfter     Decimal   @db.Decimal(12, 4) // 扣后积分余额
+  source           String?   @db.VarChar(100)
+  meta             Json?
+  requestParams    Json? // 调用方本次请求的参数快照（与 meta 解耦，便于日志排查）
+  requestId        String?   @unique @db.VarChar(64) // 幂等键（公共扣费 v2/对外开放扣费传入；重复提交按此去重）
+  createdAt        DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, type])
+}
+
+// ==================== 公共扣费 v2 / 对外开放 ====================
+
+// 功能模块注册表（扣费/统计的功能口径单一事实来源）：用量分析「功能」维度、积分明细「项目」列、
+// v2/对外扣费的 source 校验全部从这里派生。seed 维护：`tsx prisma/seed.ts features`（勿手删行，历史数据引用 source）。
+model FeatureModule {
+  id          Int      @id @default(autoincrement())
+  source      String   @unique @db.VarChar(50) // 功能 key，如 listing.generate（其他项目的功能也可注册，不限本平台菜单）
+  label       String   @db.VarChar(50) // 中文名，如 "Listing 生成"
+  module      String?  @db.VarChar(30) // 一级目录 key（selection/listing/...；null=未归类的历史功能）
+  moduleLabel String?  @db.VarChar(50) // 一级目录中文名（冗余存储，免 join）
+  active      Boolean  @default(true) // false=下线（拒绝新扣费，历史数据仍可见）
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([module, active])
+}
+
+// 对外开放接口的接入方（其他项目服务间调用扣费系统）：AppId + HMAC-SHA256 签名鉴权。
+// 接入方用 scripts/create-open-api-app.ts 创建（secret 只在创建时打印一次）。
+model OpenApiApp {
+  isNiuniuOperationPlanEnabled Boolean  @default(false) // 是否允许调用牛牛运营计划（固定专用账号扣费）
+  id                           Int      @id @default(autoincrement())
+  appId                        String   @unique @db.VarChar(32)
+  appSecret                    String   @db.VarChar(64) // 明文存储（HMAC 验签必须可还原；DB 内敏感，勿外泄）
+  name                         String   @db.VarChar(50) // 接入方名（如「ERP 系统」）
+  status                       String   @default("ACTIVE") @db.VarChar(20) // ACTIVE / DISABLED
+  perCallMaxCny                Decimal? @db.Decimal(10, 2) // 单笔扣费上限（元），null=不限
+  keybProjectCodes             Json     @default("[]") // 获准 KeyB 扣费的接入项目代码；空数组=未授权，逐请求读取
+  createdAt                    DateTime @default(now())
+  updatedAt                    DateTime @updatedAt
+}
+
+// 牛牛单链接运营计划：请求、扣费归属和交付快照；逻辑关联保留审计记录。
+model OpenOperationPlanRequest {
+  id            Int      @id @default(autoincrement()) @db.UnsignedInt // 内部主键
+  appId         String   @db.VarChar(32) // OpenApiApp.appId，接入方隔离
+  requestId     String   @db.VarChar(64) // 每次生成的随机64位十六进制请求号；兼容历史链接SHA256请求号
+  sourceUrl     String   @db.VarChar(1000) // 规范化后的商品详情链接
+  billingUserId Int // 首次受理时的 User.id（沿用现有有符号 Int）
+  runId         String   @unique @db.VarChar(100) // BusinessAiRun运行号
+  input         Json // 自动解析的商品资料及默认编排参数
+  aiRequest     Json // 本次生成的模型、提示词及运行号快照
+  result        Json? // 业务校验及扣费成功后与流水同事务落存
+  createdAt     DateTime @default(now()) // 首次受理时间
+  updatedAt     DateTime @updatedAt // 交付更新时间
+
+  @@unique([appId, requestId])
+  @@index([billingUserId, createdAt])
+}
+
+// ==================== 会员 / 积分体系 ====================
+
+// 接入项目凭证，与客户工作台 Project 无关；不存 KeyA 或 KeyB 明文。
+enum SkillsKeyStatus {
+  ROTATING
+  ACTIVE
+  SYNC_UNKNOWN
+}
+
+model SkillsKeyCredential {
+  id                 Int             @id @default(autoincrement())
+  userId             Int
+  user               User            @relation(fields: [userId], references: [id])
+  projectCode        String          @db.VarChar(50)
+  externalProjectId  String          @db.VarChar(128)
+  issuedPhone        String          @db.VarChar(11)
+  keyCiphertext      String?         @db.Text
+  keyHash            String?         @unique @db.VarChar(64)
+  encryptionVersion  String?         @db.VarChar(16)
+  maskedKey          String?         @db.VarChar(32)
+  status             SkillsKeyStatus
+  operationId        String          @db.VarChar(36)
+  operationKind      String          @db.VarChar(10) // GENERATE / RESET
+  // 仅保存已使用操作 UUID，不保存历史 Key；防止旧操作在新重置完成后再次签发。
+  usedOperationIds   Json
+  operationStartedAt DateTime
+  activatedAt        DateTime?
+  lastErrorCode      String?         @db.VarChar(50) // 仅服务端固定错误码
+  revision           Int             @default(0) // 凭证行 CAS；不参与业务扣费去重
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@unique([userId, projectCode])
+  @@unique([externalProjectId, issuedPhone])
+}
+
+enum MembershipLevel {
+  NONE
+  LV1
+  LV2
+  LV3
+  FOUNDER // LV4：被邀请人
+  INVITER // LV5：邀请人
+}
+
+enum CreditBucket {
+  RECHARGE // 充值积分(LV1/2/3) / 余额积分(LV4/5)：永不清零，可消费
+  PACKAGE // 套餐 / 赠送积分：发放后 30 天过期，可消费
+  GIFT // 注册赠送积分（送 200）：注册起 30 天过期，可消费
+  REBATE // 返利积分（仅 LV5）：不可消费，仅提现
+}
+
+enum CreditLotStatus {
+  ACTIVE
+  EXHAUSTED
+  EXPIRED
+}
+
+enum CreditDirection {
+  CREDIT // 入账
+  DEBIT // 出账
+}
+
+enum CreditTxnType {
+  RECHARGE_PLAN // 会员套餐订阅
+  RECHARGE_PACK // 固定充值包
+  RECHARGE_CUSTOM // 自定义充值
+  SIGNUP_BONUS // 注册赠送 200
+  MANUAL_ADJUST // LV4/5 手动调额 / 历史迁移
+  CONSUME // 消费扣减
+  EXPIRE // 周期清零
+  REBATE_IN // 返利入账
+  REBATE_WITHDRAW // 返利提现
+  TEAM_RECHARGE // 企业共享池非付款入账（平台定制开通/个人余额注入；团队付款走 RECHARGE_PLAN/PACK/CUSTOM）
+  TEAM_CONSUME // 企业共享池消耗扣减
+  TEAM_ARCHIVE_RETURN // 企业归档时充值包批次退回管理员个人户
+}
+
+// 调用方式：平台内使用（默认）/ 开放平台服务间扣费（/api/open/credit/* 与 KeyB 入口）
+enum InvokeType {
+  PLATFORM
+  API
+}
+
+enum InviteAppStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// 积分批次：消费与清零的最小单位（PACKAGE 按每笔各自 30 天过期，故用批次台账而非单一余额）
+model CreditLot {
+  id         Int             @id @default(autoincrement())
+  userId     Int
+  user       User            @relation(fields: [userId], references: [id])
+  bucket     CreditBucket
+  amount     Decimal         @db.Decimal(18, 4) // 发放额
+  remaining  Decimal         @db.Decimal(18, 4) // 剩余（消费/清零递减）
+  expiresAt  DateTime? // null=永不过期(RECHARGE/REBATE)；PACKAGE/GIFT(注册送)=grantedAt+30d
+  grantedAt  DateTime        @default(now())
+  sourceType CreditTxnType
+  sourceRef  String?         @db.VarChar(100) // 订单号 / 操作引用
+  status     CreditLotStatus @default(ACTIVE)
+  teamId     Int? // 归属企业共享池（弱引用 Team.id）；null=个人批次
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([userId, bucket, status, expiresAt])
+  @@index([teamId, bucket, status])
+}
+
+// 积分流水 / 明细 / 清零记录 / 审计：所有积分变动各记一条（lotId / relatedUserId 为弱引用，不建外键）
+model CreditTransaction {
+  id            Int             @id @default(autoincrement())
+  userId        Int
+  user          User            @relation(fields: [userId], references: [id])
+  direction     CreditDirection
+  bucket        CreditBucket? // 一次消费跨桶 → 拆多条
+  type          CreditTxnType
+  amount        Decimal         @db.Decimal(18, 4)
+  balanceAfter  Decimal?        @db.Decimal(18, 4) // 该桶扣后余额
+  source        String?         @db.VarChar(100) // 业务来源：listing.generate 等
+  invokeType    InvokeType      @default(PLATFORM) // 调用方式：PLATFORM=平台使用 / API=开放平台扣费（meta.appId 存量回填）
+  lotId         Int? // 关联批次
+  relatedUserId Int? // 返利 / 共享扣费：与本人相关的另一方（被邀请人）id
+  teamId        Int? // 企业池扣费留痕（弱引用 Team.id）
+  meta          Json?
+  createdAt     DateTime        @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, type])
+  @@index([relatedUserId]) // 反查：邀请人「使用用户」明细 / 被邀请人「动用邀请人额度」明细
+  @@index([teamId, createdAt])
+}
+
+// LV1/2/3 会员套餐配置
+model MembershipPlan {
+  id               Int      @id @default(autoincrement())
+  tier             Int      @unique // 1/2/3
+  name             String   @db.VarChar(50) // Explorer/Plus/Ultra
+  priceCny         Decimal  @db.Decimal(10, 2) // 人民币定价（元）
+  originalPriceCny Decimal? @db.Decimal(10, 2) // 划线价（元）
+  packageCredits   Int // 套餐积分 → PACKAGE(30d)
+  giftCredits      Int // 赠送积分 → PACKAGE(30d)
+  periodDays       Int      @default(30)
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// 续费「排队生效」队列：未到期续费先入队，当前订阅到期后按 activateAt 顺序激活
+// 激活时才发积分 / 切等级（下单时只占位、下单即锁定，不可取消）。存套餐快照防配置变动影响已下单。
+model ScheduledPlan {
+  id             Int                 @id @default(autoincrement())
+  userId         Int
+  user           User                @relation(fields: [userId], references: [id])
+  tier           Int // 续费目标档 1/2/3（可降/平/升）
+  activateAt     DateTime // 计划激活时刻 = 当前订阅 + 已排队套餐的队尾到期时刻
+  status         ScheduledPlanStatus @default(PENDING)
+  // 套餐快照（下单即锁定，激活时按此发放，不受 MembershipPlan 后续改动影响）
+  planName       String              @db.VarChar(50)
+  priceCny       Decimal             @db.Decimal(10, 2)
+  packageCredits Int
+  giftCredits    Int
+  periodDays     Int
+  createdAt      DateTime            @default(now())
+  activatedAt    DateTime?
+  teamId         Int? // 团队续费排队（弱引用 Team.id）；null=个人续费
+
+  @@index([status, activateAt])
+  @@index([userId, status])
+  @@index([teamId, status])
+}
+
+enum ScheduledPlanStatus {
+  PENDING // 待生效（排队中）
+  ACTIVATED // 已激活
+  CANCELLED // 已取消（加入团队/个人转团队时作废排队单）
+}
+
+// 固定充值包配置
+model RechargePack {
+  id           Int      @id @default(autoincrement())
+  priceCny     Decimal  @db.Decimal(10, 2) // 30/100/500（元）
+  baseCredits  Int // → RECHARGE（永不过期）
+  bonusCredits Int // → PACKAGE(30d)
+  active       Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// 邀请注册申请：提交即 PENDING，邀请人审核通过才建/启用账号
+model InviteApplication {
+  id           Int             @id @default(autoincrement())
+  inviterId    Int
+  inviter      User            @relation(fields: [inviterId], references: [id])
+  username     String?         @db.VarChar(50) // 注册时填写的称谓（真人名），审核通过后作为用户名；旧数据可空
+  email        String          @db.VarChar(120)
+  phone        String          @db.VarChar(20)
+  passwordHash String // argon2，审核通过才落用户表
+  inviteCode   String          @db.VarChar(32)
+  status       InviteAppStatus @default(PENDING)
+  // 「待审手机号」条件唯一：PENDING 时 = phone、审批/拒绝时置 null（MySQL 唯一索引允许多 NULL）。
+  // 借此在 DB 层强制「同一手机号至多一份待审申请」，又不影响拒绝后用同号再次申请。
+  pendingPhone String?         @unique @db.VarChar(20)
+  createdAt    DateTime        @default(now())
+  reviewedAt   DateTime?
+
+  @@index([inviterId, status])
+  @@index([status])
+}
+
+// 邮箱验证码（镜像 SmsCode，用于邀请注册）
+model EmailCode {
+  id        Int      @id @default(autoincrement())
+  email     String   @db.VarChar(120)
+  code      String
+  used      Boolean  @default(false)
+  attempts  Int      @default(0) // 连续校验失败次数，≥5 作废当前码（防爆破）
+  expiredAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email])
+}
+
+// 邮箱登录账号（邮箱注册/登录/找回密码通道专用；与 User.email 通知字段无关，互不影响）
+model EmailAccount {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique @db.VarChar(120) // 一律小写归一存储，库级唯一防并发注册撞车
+  userId    Int      @unique
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// 邮箱认证验证码（与邀请注册的 EmailCode 完全隔离；purpose 区分场景，注册码/重置码互不通用）
+model EmailAuthCode {
+  id        Int      @id @default(autoincrement())
+  email     String   @db.VarChar(120)
+  purpose   String // REGISTER | RESET
+  code      String
+  used      Boolean  @default(false)
+  attempts  Int      @default(0) // 连续校验失败次数，≥5 作废当前码（防爆破）
+  expiredAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([email, purpose])
+}
+
+// 跨域登录交接码（海外首页 → Seller 主站）：sha256 哈希落库不存明文，60s 有效、单次原子核销
+model AuthHandoffCode {
+  id        Int       @id @default(autoincrement())
+  codeHash  String    @unique @db.VarChar(64) // sha256(code) 十六进制
+  userId    Int
+  usedAt    DateTime? // 非空 = 已核销（条件 updateMany 原子单次）
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ==================== RBAC 权限系统 ====================
+
+model RoleModel {
+  id          Int              @id @default(autoincrement())
+  code        String           @unique @db.VarChar(50)
+  name        String           @db.VarChar(100)
+  description String?          @db.VarChar(500)
+  color       String?          @db.VarChar(20)
+  isSystem    Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("Role")
+}
+
+model UserRole {
+  userId    Int
+  roleId    Int
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      RoleModel @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model Organization {
+  id        Int                @id @default(autoincrement())
+  name      String             @unique @db.VarChar(100)
+  note      String?            @db.VarChar(500)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  users     UserOrganization[]
+}
+
+model UserOrganization {
+  userId    Int
+  orgId     Int
+  createdAt DateTime     @default(now())
+  user      User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@id([userId, orgId])
+  @@index([orgId])
+}
+
+/// 菜单/权限分组：Permission.groupCode 的管理实体（code 创建后不可改；内置组不可删）
+model PermissionGroup {
+  id        Int      @id @default(autoincrement())
+  /// 分组编码，全局唯一，如 tools / management
+  code      String   @unique @db.VarChar(50)
+  /// 分组名（前端展示用），如「工具」
+  label     String   @db.VarChar(100)
+  /// 内置分组（seed 初始化），不可删除
+  isBuiltin Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sortOrder])
+}
+
+model Permission {
+  id        Int              @id @default(autoincrement())
+  key       String           @unique @db.VarChar(100)
+  label     String           @db.VarChar(200)
+  groupCode String           @db.VarChar(50)
+  parentKey String?          @db.VarChar(100)
+  route     String?          @db.VarChar(200)
+  subRoutes Json?
+  sortOrder Int              @default(0)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  roles     RolePermission[]
+
+  @@index([groupCode, sortOrder])
+}
+
+model RolePermission {
+  roleId       Int
+  permissionId Int
+  createdAt    DateTime   @default(now())
+  role         RoleModel  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+enum CrawlOutcome {
+  SUCCESS
+  FAILED
+}
+
+model Product {
+  id        Int        @id @default(autoincrement())
+  url       String     @db.Text
+  urlHash   String     @unique @db.VarChar(64)
+  platform  String     @db.VarChar(50)
+  name      String     @db.VarChar(500)
+  data      Json
+  fetchedAt DateTime
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  crawlLogs CrawlLog[]
+
+  @@index([platform])
+}
+
+model CrawlLog {
+  id           Int          @id @default(autoincrement())
+  userId       Int
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url          String       @db.Text
+  outcome      CrawlOutcome
+  productId    Int?
+  product      Product?     @relation(fields: [productId], references: [id], onDelete: SetNull)
+  errorCode    String?      @db.VarChar(100)
+  errorMessage String?      @db.Text
+  durationMs   Int?
+  createdAt    DateTime     @default(now())
+
+  @@index([userId, createdAt])
+  @@index([productId])
+}
+
+// ASIN 审计商品详情：与 Product 完全隔离的独立缓存表（字段比 Product 多 qa/review/product_information_hhl
+// 等，结构也可能不同；独立存表避免污染 products/detail 的前端渲染）。urlHash=sha256(最终URL) 唯一缓存键，
+// 传 ASIN 时按 country 域名拼出 URL 再算 hash。data 原样存爬虫返回的审计富数据。不参与软删除。
+model AuditProduct {
+  id        Int      @id @default(autoincrement())
+  url       String   @db.Text
+  urlHash   String   @unique @db.VarChar(64)
+  platform  String   @db.VarChar(50)
+  country   String   @db.VarChar(10)
+  asin      String?  @db.VarChar(32)
+  name      String   @db.VarChar(500)
+  data      Json
+  fetchedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([platform])
+  @@index([asin])
+}
+
+/// 用户 ASIN 审计记录状态
+enum AsinAuditRecordStatus {
+  /// 已保存取证与评分结果，尚未生成优化方案
+  SCORED
+  /// 已至少生成一次优化方案
+  OPTIMIZED
+}
+
+/// 用户的一轮 ASIN 审计；只保存列表和检索需要的摘要字段
+model AsinAuditRecord {
+  /// 对外暴露的审计记录 UUID
+  id     String @id @default(uuid()) @db.VarChar(36)
+  /// 所属用户，从 JWT 获取
+  userId Int
+  user   User   @relation(fields: [userId], references: [id])
+
+  /// 前端创建请求 UUID，用于避免网络重试产生重复记录
+  clientRequestId   String @db.VarChar(36)
+  /// 规范化创建内容的 SHA-256，用于识别幂等键误复用
+  createFingerprint String @db.Char(64)
+
+  /// 商品和类目摘要
+  asin           String @db.Char(10)
+  marketplace    String @db.VarChar(16)
+  country        String @db.VarChar(16)
+  productTitle   String @db.VarChar(1000)
+  categoryNodeId String @db.VarChar(255)
+  categoryName   String @db.VarChar(500)
+  categoryPath   String @db.VarChar(1000)
+
+  /// 列表展示需要的评分摘要；完整结果在 AsinAuditScoreSnapshot
+  adIncluded   Boolean
+  overallScore Float
+  grade        String  @db.VarChar(16)
+  contentScore Float
+  trafficScore Float
+  adScore      Float?
+
+  /// 主记录状态和乐观锁版本
+  status                     AsinAuditRecordStatus @default(SCORED)
+  version                    Int                   @default(1)
+  /// 0 表示尚未优化，否则指向当前最新的优化 revision
+  latestOptimizationRevision Int                   @default(0)
+  optimizedAt                DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  /// 第一步固定快照及历次优化结果
+  scoreSnapshot         AsinAuditScoreSnapshot?
+  optimizationRevisions AsinAuditOptimizationRevision[]
+
+  @@unique([userId, clientRequestId])
+  @@index([userId, deletedAt, createdAt])
+  @@index([userId, marketplace, deletedAt, createdAt], map: "AsinAuditRecord_user_marketplace_created_idx")
+  @@index([userId, asin, deletedAt, createdAt], map: "AsinAuditRecord_user_asin_created_idx")
+}
+
+/// 一轮审计的取证与评分固定快照；recordId 同时作为主键以保证严格一对一
+model AsinAuditScoreSnapshot {
+  recordId String          @id @db.VarChar(36)
+  record   AsinAuditRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  schemaVersion Int
+  /// A/P/B/C/D/E 六卡证据及 meta
+  evidence      Json
+  /// 完整十维评分、criteria、问题及建议
+  scoreResult   Json
+  /// 规范化快照内容的 SHA-256
+  payloadHash   String @db.Char(64)
+  /// evidence + scoreResult 的 UTF-8 JSON 字节数
+  payloadBytes  Int
+
+  createdAt DateTime @default(now())
+}
+
+/// 一轮审计的单次 AI 优化结果；每次不同的优化产生一个新 revision
+model AsinAuditOptimizationRevision {
+  id Int @id @default(autoincrement())
+
+  recordId           String
+  record             AsinAuditRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  /// 当前审计记录内从 1 开始递增的优化版本
+  revision           Int
+  schemaVersion      Int
+  optimizationResult Json
+  /// 规范化优化内容的 SHA-256，用于重复提交幂等
+  payloadHash        String          @db.Char(64)
+  /// optimizationResult 的 UTF-8 JSON 字节数
+  payloadBytes       Int
+
+  createdAt DateTime @default(now())
+
+  @@unique([recordId, revision])
+  @@index([recordId, createdAt])
+}
+
+/// ASIN 取证记录（取证模块）：一次取证一条，取证结果 JSON 原样保存；软删除
+model AsinEvidenceRecord {
+  /// 对外暴露的取证记录 UUID
+  id     String @id @default(uuid()) @db.VarChar(36)
+  /// 所属用户，从 JWT 获取
+  userId Int
+  user   User   @relation(fields: [userId], references: [id])
+
+  /// 前端创建请求 UUID，用于避免网络重试产生重复记录
+  clientRequestId   String @db.VarChar(36)
+  /// 规范化创建内容的 SHA-256，用于识别幂等键误复用
+  createFingerprint String @db.Char(64)
+
+  /// Amazon ASIN（trim + 大写）
+  asin         String  @db.Char(10)
+  /// 站点（US | UK | DE，与取证接口 country 同枚举）
+  country      String  @db.VarChar(16)
+  /// 商品名摘要：优先取前端传入，缺省时从取证结果提取，取不到置 null
+  productTitle String? @db.VarChar(1000)
+  /// 取证完整结果（六卡 A/P/B/C/D/E + meta + richPainPoints/highlights + reviewSamples）
+  evidence     Json
+  /// B 卡评论分析模型
+  model        String  @db.VarChar(64)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([userId, clientRequestId])
+  @@index([userId, deletedAt, createdAt])
+  @@index([userId, country, deletedAt, createdAt])
+  @@index([userId, asin, deletedAt, createdAt])
+}
+
+// ============================================================
+// 图片创作模块（独立于 customer 模块）
+// 业务结构：ImageProject → { ProductProfile, BrandIdentity, ProductImage[], TaskCenter[] → GeneratedImage[] }
+// 设计要点：
+//   - preset / model / designStyle 等枚举值前端写死，后端用 String 存（保留扩展性）
+//   - TaskCenter.refImageUrls 存 URL 快照，避免 ProductImage 软删后任务历史断链
+//   - GeneratedImage 沿用 MaterialImageVariant 的「席位」模式：父级聚合 status，子级独立 status
+// ============================================================
+
+model ImageProject {
+  id     Int    @id @default(autoincrement())
+  // 项目来源：platform 本平台 / vidflowos VidFlowOS 代办容器项目（列表默认过滤）
+  source String @default("platform") @db.VarChar(20)
+  name   String @db.VarChar(200)
+  type   String @default("ECOMMERCE") @db.VarChar(20) // GENERAL 通用 / ECOMMERCE 电商 / PORTRAIT 人像
+  status String @default("DRAFT") // DRAFT / GENERATING / COMPLETED / ARCHIVED
+  userId Int
+  user   User   @relation(fields: [userId], references: [id])
+
+  productProfile     ProductProfile?
+  brandIdentity      BrandIdentity?
+  productImages      ProductImage[]
+  tasks              GenerationTask[]
+  productPublishTask ProductPublishTask?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+  @@index([userId, type])
+  @@index([status])
+}
+
+enum ProductPublishTaskStatus {
+  DRAFT
+  COMPLETED
+  PUBLISHING
+}
+
+enum ProductPublishType {
+  SINGLE
+  VARIANT
+}
+
+enum ProductPublishTemplateStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum ProductPublishOutcome {
+  SUCCESS
+  PARTIAL_SUCCESS
+  FAILED
+  TIMEOUT
+}
+
+enum ProductPublishRpaOperation {
+  FETCH_TEMPLATE
+  SUBMIT_PUBLISH
+  QUERY_RESULT
+}
+
+enum ProductPublishRpaLogSource {
+  API
+  CRON
+}
+
+enum ProductPublishRpaLogStatus {
+  DISPATCHING
+  WAITING_CALLBACK
+  PROCESSING_CALLBACK
+  SUCCESS
+  FAILED
+  TIMEOUT
+}
+
+enum ProductPublishRpaRunStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL_FAILED
+  FAILED
+  SKIPPED
+}
+
+enum ProductPublishFeishuSyncTrigger {
+  SCHEDULED
+  MANUAL
+}
+
+enum ProductPublishFeishuSyncStatus {
+  RUNNING
+  SUCCESS
+  PARTIAL_FAILED
+  FAILED
+  SKIPPED
+}
+
+enum ProductPublishFeishuSyncRecordStatus {
+  SUCCESS
+  SKIPPED
+  FAILED
+}
+
+enum ProductPublishFeishuSyncAction {
+  CREATED
+  UPDATED
+  SKIPPED
+}
+
+// 一次飞书店铺同步的批次汇总，手动触发与定时触发使用同一套审计模型。
+model ProductPublishFeishuSyncRun {
+  id           Int                              @id @default(autoincrement())
+  trigger      ProductPublishFeishuSyncTrigger
+  status       ProductPublishFeishuSyncStatus   @default(RUNNING)
+  startedAt    DateTime                         @default(now())
+  finishedAt   DateTime?
+  durationMs   Int?
+  totalCount   Int                              @default(0)
+  successCount Int                              @default(0)
+  failedCount  Int                              @default(0)
+  skippedCount Int                              @default(0)
+  errorMessage String?                          @db.Text
+  records      ProductPublishFeishuSyncRecord[]
+  createdAt    DateTime                         @default(now())
+  updatedAt    DateTime                         @updatedAt
+
+  @@index([status, startedAt])
+  @@index([trigger, startedAt])
+}
+
+// 飞书同步批次内每一行的处理结果；失败记录也保留原始定位信息。
+model ProductPublishFeishuSyncRecord {
+  id              Int                                  @id @default(autoincrement())
+  runId           Int
+  run             ProductPublishFeishuSyncRun          @relation(fields: [runId], references: [id], onDelete: Cascade)
+  feishuRecordId  String?                              @db.VarChar(100)
+  externalStoreId String?                              @db.VarChar(32)
+  status          ProductPublishFeishuSyncRecordStatus
+  action          ProductPublishFeishuSyncAction?
+  message         String?                              @db.Text
+  durationMs      Int?
+  sourceUpdatedAt DateTime?
+  createdAt       DateTime                             @default(now())
+
+  @@index([runId, status])
+  @@index([feishuRecordId, createdAt])
+  @@index([externalStoreId, createdAt])
+}
+
+// 飞书同步的上架店铺。externalStoreId 是业务店铺 ID，不参与数值计算。
+model ProductPublishStore {
+  id              Int       @id @default(autoincrement())
+  externalStoreId String    @unique @db.VarChar(32)
+  feishuRecordId  String    @db.VarChar(100)
+  sourceUuid      String?   @db.VarChar(100)
+  name            String    @db.VarChar(200)
+  shortName       String?   @db.VarChar(100)
+  companyName     String?   @db.VarChar(200)
+  platform        String    @default("AMAZON") @db.VarChar(50)
+  storeType       String?   @db.VarChar(50)
+  accountType     String?   @db.VarChar(50)
+  childStore      String?   @db.VarChar(200)
+  site            String?   @db.VarChar(50)
+  remark          String?   @db.Text
+  disabled        Boolean   @default(false)
+  sourceUpdatedAt DateTime?
+  lastSyncedAt    DateTime  @default(now())
+
+  classifications ProductPublishStoreClassification[]
+  publishTasks    ProductPublishTask[]
+  rpaLogs         ProductPublishRpaLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([disabled, platform])
+  @@index([feishuRecordId])
+}
+
+// 全局分类目录。店铺同步时从目录复制分类映射；导入脚本会同步既有映射的名称和排序。
+model ProductPublishClassificationCatalog {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique @db.VarChar(100)
+  name      String   @db.VarChar(100)
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active, sortOrder])
+}
+
+// 每个店铺的分类模板；模板链接由 RPA 定期刷新并持久化。
+model ProductPublishStoreClassification {
+  id                 Int                          @id @default(autoincrement())
+  storeId            Int
+  store              ProductPublishStore          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  classification     String                       @db.VarChar(100)
+  classificationName String                       @db.VarChar(100)
+  sortOrder          Int                          @default(0)
+  templateUrl        String?                      @db.VarChar(1000)
+  templateStatus     ProductPublishTemplateStatus @default(PENDING)
+  templateSyncedAt   DateTime?
+  lastSyncError      String?                      @db.Text
+  rpaTaskUuid        String?                      @db.VarChar(100)
+  templateRequestId  String?                      @unique @db.VarChar(100)
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+
+  @@unique([storeId, classification])
+  @@index([storeId, sortOrder])
+  @@index([templateStatus, templateSyncedAt], map: "PPSC_templateStatus_syncedAt_idx")
+}
+
+// 一键上架任务。草稿可暂不关联图片项目，完成时由业务层保证已关联。
+model ProductPublishTask {
+  id                   Int                      @id @default(autoincrement())
+  taskId               String                   @unique @db.VarChar(36)
+  userId               Int
+  user                 User                     @relation(fields: [userId], references: [id])
+  imageProjectId       Int?                     @unique
+  imageProject         ImageProject?            @relation(fields: [imageProjectId], references: [id], onDelete: SetNull)
+  publishStoreId       Int?
+  publishStore         ProductPublishStore?     @relation(fields: [publishStoreId], references: [id], onDelete: SetNull)
+  productName          String?                  @db.VarChar(200)
+  brand                String?                  @db.VarChar(200)
+  classification       String?                  @db.VarChar(100)
+  category             String?                  @db.VarChar(500)
+  data                 Json?
+  status               ProductPublishTaskStatus @default(DRAFT)
+  store                String?                  @db.VarChar(200)
+  type                 ProductPublishType?
+  productImages        Json?
+  progress             Int                      @default(0)
+  spreadsheetUrl       String?                  @db.VarChar(1000)
+  spreadsheetKey       String?                  @db.VarChar(1000)
+  uploadId             String?                  @unique @db.VarChar(100) // Amazon 服务生成的文件批次 ID，不是 RPA 标识
+  rpaTaskUuid          String?                  @db.VarChar(100)
+  rpaJobUuidList       Json?
+  submitRequestId      String?                  @unique @db.VarChar(100)
+  submitCorrelationKey String?                  @unique @db.VarChar(64)
+  resultRequestId      String?                  @unique @db.VarChar(100)
+  successCount         Int                      @default(0)
+  failedCount          Int                      @default(0)
+  submittedFileUrl     String?                  @db.VarChar(1000)
+  resultFileUrl        String?                  @db.VarChar(1000)
+  skus                 Json? // 首次提交上架时冻结的原始 SKU 字符串列表
+  skuAsinMapping       Json?
+  publishOutcome       ProductPublishOutcome?
+  publishSubmittedAt   DateTime?
+  publishCompletedAt   DateTime?
+  lastPolledAt         DateTime?
+  nextPollAt           DateTime?
+  pollAttempts         Int                      @default(0)
+  publishErrorMessage  String?                  @db.Text
+  rpaLogs              ProductPublishRpaLog[]
+  completedAt          DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+  deletedAt            DateTime?
+
+  @@index([userId, status, updatedAt])
+  @@index([userId, store])
+  @@index([userId, classification])
+  @@index([userId, type])
+  @@index([userId, deletedAt])
+  @@index([status, nextPollAt])
+  @@index([publishStoreId, status, createdAt])
+}
+
+// 模板刷新与结果轮询 Cron 的执行批次；即使没有待处理数据，也保留一次运行记录。
+model ProductPublishRpaRun {
+  id           Int                        @id @default(autoincrement())
+  operation    ProductPublishRpaOperation
+  status       ProductPublishRpaRunStatus @default(RUNNING)
+  startedAt    DateTime                   @default(now())
+  finishedAt   DateTime?
+  durationMs   Int?
+  totalCount   Int                        @default(0)
+  successCount Int                        @default(0)
+  failedCount  Int                        @default(0)
+  skippedCount Int                        @default(0)
+  errorMessage String?                    @db.Text
+  logs         ProductPublishRpaLog[]
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  @@index([operation, startedAt])
+  @@index([status, startedAt])
+}
+
+// 影刀请求审计日志。密钥、Token 和 Authorization 请求头不得写入 payload。
+model ProductPublishRpaLog {
+  id                      Int                        @id @default(autoincrement())
+  operation               ProductPublishRpaOperation
+  source                  ProductPublishRpaLogSource
+  runId                   Int?
+  run                     ProductPublishRpaRun?      @relation(fields: [runId], references: [id], onDelete: SetNull)
+  taskId                  Int?
+  task                    ProductPublishTask?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  storeId                 Int?
+  store                   ProductPublishStore?       @relation(fields: [storeId], references: [id], onDelete: SetNull)
+  classification          String?                    @db.VarChar(100)
+  requestId               String?                    @unique @db.VarChar(100)
+  idempotentUuid          String?                    @db.VarChar(100)
+  rpaTaskUuid             String?                    @db.VarChar(100)
+  rpaJobUuidList          Json?
+  uploadId                String?                    @db.VarChar(100) // Amazon 业务文件批次 ID
+  requestPayload          Json?
+  status                  ProductPublishRpaLogStatus @default(DISPATCHING)
+  dispatchResponsePayload Json?
+  responsePayload         Json? // RPA 业务回调 payload，保留结构并移除 URL 签名参数
+  dispatchedAt            DateTime?
+  callbackReceivedAt      DateTime?
+  expiresAt               DateTime?
+  httpStatus              Int?
+  success                 Boolean                    @default(false)
+  durationMs              Int                        @default(0)
+  dispatchDurationMs      Int?
+  attempt                 Int                        @default(1)
+  errorMessage            String?                    @db.Text
+  createdAt               DateTime                   @default(now())
+
+  @@index([taskId, createdAt])
+  @@index([runId, createdAt])
+  @@index([storeId, operation, createdAt])
+  @@index([operation, success, createdAt])
+  @@index([status, expiresAt])
+  @@index([uploadId])
+}
+
+model ProductProfile {
+  id        Int          @id @default(autoincrement())
+  projectId Int          @unique
+  project   ImageProject @relation(fields: [projectId], references: [id])
+
+  // 商品资料语言：旧字段始终保存 defaultLocale 对应版本，兼容现有前端和生成链路
+  sourceLocale  String? @db.VarChar(20)
+  defaultLocale String  @default("zh-CN") @db.VarChar(20)
+
+  // 基础信息
+  productName String? @db.VarChar(200)
+  sku         String? @db.VarChar(100)
+  brandName   String? @db.VarChar(200)
+
+  // 类目 3 级
+  categoryL1 String? @db.VarChar(100)
+  categoryL2 String? @db.VarChar(100)
+  categoryL3 String? @db.VarChar(100)
+
+  // 目标国家/地区 & 电商平台（前端多选）
+  targetCountries    Json? // string[]
+  ecommercePlatforms Json? // string[]
+
+  // 商业数据（URL 抓取后自动填充：售价 / 评分 / BSR / 变体数 / 履约方式）
+  commerce Json? // { price?, rating?, bsr?, variantCount?, fulfillment? }
+
+  // 结构化字段（Json 承载数组 / KV）
+  attributes     Json? // [{ key, value }]
+  sellingPoints  Json? // string[]
+  certifications Json? // string[]
+  audience       Json? // { portrait, ageRange, consumptionTier }
+  extra          String? @db.Text
+
+  // 三件套来源（前端解析后写回，仅做审计）
+  manualPdfUrl String? @db.VarChar(1000)
+  sourceUrl    String? @db.VarChar(1000)
+
+  localizations ProductProfileLocalization[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+model ProductProfileLocalization {
+  id               Int            @id @default(autoincrement())
+  productProfileId Int
+  productProfile   ProductProfile @relation(fields: [productProfileId], references: [id], onDelete: Cascade)
+
+  locale         String    @db.VarChar(20)
+  content        Json
+  translatedFrom String?   @db.VarChar(20)
+  translatedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([productProfileId, locale])
+}
+
+model BrandIdentity {
+  id        Int          @id @default(autoincrement())
+  projectId Int          @unique
+  project   ImageProject @relation(fields: [projectId], references: [id])
+
+  brandNameZh     String? @db.VarChar(200)
+  brandNameEn     String? @db.VarChar(200)
+  primaryColors   Json? // string[]（HEX，最多 5 个）
+  applyBrandColor Boolean @default(false) // 生成时应用品牌色（品牌级开关，默认关；注入逻辑在前端拼 prompt）
+  designStyles    Json? // string[]（前端 16 选项 + 自定义，可多选）
+  patterns        Json? // string[]（前端 8 选项 + 自定义，可多选）
+  font            String? @db.VarChar(50) // 单选
+  logoUrl         String? @db.VarChar(1000)
+  brandImageUrl   String? @db.VarChar(1000) // 品牌图片（前端 Canvas 取色源，独立于 LOGO）
+  tone            String? @db.VarChar(50) // 调性
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+}
+
+// 品牌库：品牌基因的跨项目复用库（userId 维度，允许同名，故不加唯一约束）。
+// 字段镜像 BrandIdentity 的可复用部分；保存=快照当前品牌基因，导入=前端读列表回填表单后再 upsert。
+model BrandKit {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  brandNameZh     String? @db.VarChar(200)
+  brandNameEn     String? @db.VarChar(200)
+  primaryColors   Json? // string[]（HEX，最多 5 个）
+  applyBrandColor Boolean @default(false)
+  designStyles    Json? // string[]
+  patterns        Json? // string[]
+  font            String? @db.VarChar(50)
+  logoUrl         String? @db.VarChar(1000)
+  brandImageUrl   String? @db.VarChar(1000)
+  tone            String? @db.VarChar(50)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+}
+
+model ProductImage {
+  id        Int          @id @default(autoincrement())
+  projectId Int
+  project   ImageProject @relation(fields: [projectId], references: [id])
+
+  url       String  @db.VarChar(1000)
+  tag       String? @db.VarChar(50) // 主图 / 细节图 / 场景图 / 包装图
+  purpose   String? @db.VarChar(30) // PRODUCT_MAIN / PRODUCT_DETAIL / PACKAGING / ACCESSORY / USAGE_SCENE / LABEL_LOGO / OTHER
+  note      String? @db.VarChar(500)
+  isPrimary Boolean @default(false)
+  order     Int     @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([projectId, deletedAt])
+}
+
+model GenerationTask {
+  id        Int          @id @default(autoincrement())
+  projectId Int
+  project   ImageProject @relation(fields: [projectId], references: [id])
+  userId    Int
+  user      User         @relation(fields: [userId], references: [id])
+  // 任务来源：platform 本平台 / vidflowos VidFlowOS 代办（对账/取消按此选网关 Key；列表默认过滤）
+  source    String       @default("platform") @db.VarChar(20)
+
+  // 创作类型（与所属项目一致，建任务时从项目继承），便于任务中心按类型直接筛选
+  type String @default("ECOMMERCE") @db.VarChar(20) // GENERAL 通用 / ECOMMERCE 电商 / PORTRAIT 人像
+
+  // 生成模式与 AI 拆图任务编排字段。普通/人像任务保持 STANDARD，AI_SPLIT 按 groupId 聚合。
+  generationMode  String  @default("STANDARD") @db.VarChar(30) // STANDARD / AI_SPLIT
+  groupId         String? @db.VarChar(64)
+  clientRequestId String? @db.VarChar(64)
+  directionIndex  Int?
+  aiSplitStage    String? @default("QUEUED") @db.VarChar(32)
+
+  retryOfTaskId Int?
+  retryOfTask   GenerationTask?  @relation("GenerationTaskRetry", fields: [retryOfTaskId], references: [id], onDelete: SetNull)
+  retryTasks    GenerationTask[] @relation("GenerationTaskRetry")
+
+  // 生图配置（多数为前端写死的枚举常量，存 String）
+  presetCategory String  @db.VarChar(50) // 白底 / 场景 / 尺寸 / 卖点 / 细节 / 包装
+  presetOption   String? @db.VarChar(100)
+  model          String  @db.VarChar(100) // AI Gateway 模型 publicId
+  prompt         String  @db.Text
+  textAmount     String? @db.VarChar(20) // 无 / 少 / 中 / 多
+  language       String? @db.VarChar(20)
+  aspectRatio    String? @db.VarChar(20)
+  n              Int     @default(4)
+  imageLabelBase String? @db.VarChar(128) // 套图板块命名基名；为空时前端回退为“图 N”
+
+  // 垫图 URL 快照（解耦 ProductImage 删除）
+  refImageUrls Json?
+
+  // 人像创作提示词配置快照；创作类型保存在 promptConfig.creation_type
+  promptConfig Json?
+  // 人像创作视角配置快照（单角度说明 / 四视角明细）
+  viewConfig   Json?
+  // 人像创作尺寸适配快照：用户目标 / 模型实际参数 / 最终交付策略与提示
+  deliveryPlan Json?
+
+  // AI Gateway 异步图片任务关联与终态回调幂等（与 VideoTask 保持一致）
+  gatewayTaskId  String? @unique @db.VarChar(255)
+  gatewayEventId String? @unique @db.VarChar(255)
+
+  // generate 管线全量网关任务关联（审计/对账；2026-09-11）：1 任务 N 图 = N 网关任务，
+  // 单值 gatewayTaskId 装不下，此列存 [{ gatewayTaskId, imageId, attemptNo }]；
+  // 恰好 1 个网关任务时单值列同步冗余。结算闸门仍是执行器 CAS，此列纯审计。
+  gatewayTaskIds Json?
+
+  // 成品入库快照行的来源 ImageGenJob.id（2026-09-11）：批量改图等 t2i/i2i 生成完成后
+  // 归档到项目时经 createTask 落的行。生成记录视图据此把扣费积分（流水盖
+  // meta.jobId）挂到本行，并隐藏已归档的原始 IMAGEGEN 行（去重不双计）。
+  sourceJobId String? @db.VarChar(64)
+
+  // 整体状态（前端聚合后写入），与任务中心 Tab 一一对应
+  // GENERATING=运行中 / SUCCESS=已完成 / FAILED=失败 / TIMEOUT=超时 / CANCELLED=已取消
+  status       String  @default("GENERATING")
+  errorMessage String? @db.Text
+
+  // ── 通用生图后端迁移(Track A):执行侧字段,只增不改 ──
+  // 冻结的执行规格:编译后 prompt、尺寸计划、引用图 Spaces key、provider 配置版本
+  executionSpec   Json?
+  // 取消标记(取消事务写入;执行器各阶段检查)
+  cancelRequested Boolean   @default(false)
+  // 任务 deadline(创建时间 + 10 分钟 + 5 分钟宽限;对账超时收敛用)
+  deadlineAt      DateTime?
+
+  generatedImages GeneratedImage[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([userId, clientRequestId, directionIndex])
+  @@index([projectId, deletedAt])
+  @@index([userId, status, createdAt])
+  @@index([userId, type, createdAt])
+  @@index([userId, generationMode, groupId])
+  @@index([generationMode, aiSplitStage, updatedAt])
+  @@index([retryOfTaskId])
+}
+
+model GeneratedImage {
+  id     Int            @id @default(autoincrement())
+  taskId Int
+  task   GenerationTask @relation(fields: [taskId], references: [id])
+  // 席位来源：跟随任务行 source（冗余存储，便于对账按席位选 Key）
+  source String         @default("platform") @db.VarChar(20)
+
+  url            String? @db.VarChar(1000)
+  /// 模型原始输出图；人像创作永久保留，用于后续重新裁切而不重新生成
+  originalUrl    String? @db.VarChar(1000)
+  status         String  @default("GENERATING") // GENERATING / SUCCESS / FAILED
+  providerJobId  String? @db.VarChar(255) // Flux / Qwen 异步任务 ID
+  // 管线(imggen:)终态回调事件 id（审计：哪个事件终态了这张图；同图重试覆盖最新，
+  // 结算幂等不依赖它——闸门是执行器 CAS settle）
+  gatewayEventId String? @db.VarChar(255)
+  errorMessage   String? @db.Text
+  adopted        Boolean @default(false)
+  order          Int     @default(0)
+  width          Int? // 最终交付宽度
+  height         Int? // 最终交付高度
+  nativeWidth    Int? // 模型原生输出宽度
+  nativeHeight   Int? // 模型原生输出高度
+  deliveryMeta   Json? // 后处理策略、原生清晰度标记、降级原因
+
+  // ── 通用生图后端迁移(Track A):执行租约字段,只增不改 ──
+  leaseOwner     String?   @db.VarChar(64)
+  leaseExpiresAt DateTime?
+  attemptNo      Int       @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([taskId, deletedAt])
+  @@index([status, leaseExpiresAt])
+}
+
+// ── 通用生图(t2i/i2i)异步 Job ─────────────────────────────────────────────
+// 迁移自 Next 进程内 job store(globalThis Map + 30 分钟保留),行为契约一致:
+// 对外快照分别是 t2i {status,url,usage} 与 i2i I2IJobSnapshot,内部状态不穿透。
+model ImageGenJob {
+  source String @default("platform") @db.VarChar(20)
+  id     String @id // uuid,即返回给前端的 jobId
+  userId Int
+  user   User   @relation(fields: [userId], references: [id])
+
+  kind   String @db.VarChar(20) // TEXT_TO_IMAGE / IMAGE_TO_IMAGE
+  status String @default("QUEUED") // QUEUED / RUNNING / COMPLETED / FAILED(对外投影小写)
+
+  request    Json? // 请求快照(prompt、provider、尺寸、引用图 Spaces key、i2i mode 等)
+  taskId     Int? // i2i 且带 projectId 时关联的 image-project 任务 id
+  traceId    String? @db.VarChar(64)
+  tokenUsage Json? // 快照回传的用量(i2i 字段名 tokenUsage 保持一致)
+
+  // 审计快照（生成记录视图）：从 request 提列，便于 SQL 筛选/分组（MySQL 下
+  // Prisma 不支持 JSON path 过滤）。写入路径 t2i/i2i service 落库时同步盖。
+  model  String? @db.VarChar(100) // request.provider（逻辑 id 或网关 model id）
+  prompt String? @db.Text // request.prompt（keyword 检索面）
+
+  // ── 车泰斗工作台复用（2026-09-28）──────────────────────────────────────
+  // businessType：业务来源隔离。旧 t2i/i2i 管线 = IMAGE_CREATIVE（默认），
+  // 车泰斗素材工作台 = CHETAIDOU（后端赋值，客户端不可传）。两条线的
+  // 认领/对账/清理 runner 互不触碰对方行。
+  businessType      String  @default("IMAGE_CREATIVE") @db.VarChar(32)
+  businessTaskId    String? @unique @db.VarChar(36) // 指向车泰斗 GENERATE 根 ChetaidouTask.id；IMAGE_CREATIVE 恒 null
+  cancelRequestedAt DateTime? // CHETAIDOU 取消标记
+
+  expiresAt DateTime? // 创建 + 30 分钟;过期 GET 返回 404(对齐 Next 内存保留窗口);CHETAIDOU 恒 null 不套 30 分钟规则
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items ImageGenItem[]
+
+  @@index([userId, kind, createdAt])
+  @@index([status, createdAt])
+  @@index([businessType, status, createdAt])
+  @@index([businessType, userId, createdAt])
+}
+
+model ImageGenItem {
+  id    Int         @id @default(autoincrement())
+  jobId String
+  job   ImageGenJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  idx   Int
+  label String?
+
+  status       String  @default("QUEUED") // QUEUED / RUNNING / SUCCEEDED / FAILED → 对外 pending/ready/failed
+  url          String? @db.VarChar(1000)
+  errorMessage String? @db.Text
+  usage        Json?
+  gatewayImage Json? // Gateway 实际尺寸及 requested/actual/changes 回显
+
+  providerJobId  String?   @db.VarChar(255)
+  // 管线(imggen:)终态回调事件 id（审计，同 GeneratedImage.gatewayEventId 语义）
+  gatewayEventId String?   @db.VarChar(255)
+  leaseOwner     String?   @db.VarChar(64)
+  leaseExpiresAt DateTime?
+  attemptNo      Int       @default(0)
+
+  // ── 车泰斗工作台复用（2026-09-28）：私有产物持久化 + 当前调用关联 ──────
+  currentCallId String?   @db.VarChar(36) // 该图当前有效 ChetaidouCall.id
+  fileKey       String?   @db.VarChar(1000) // 私有转存 key（CHETAIDOU 不写公开 url）
+  mime          String?   @db.VarChar(100)
+  width         Int?
+  height        Int?
+  errorCode     String?   @db.VarChar(64)
+
+  // 通用软删除时间；执行/结算保留完整席位，展示、下载、重试显式排除已删除项。
+  deletedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([jobId, idx])
+  @@index([status, leaseExpiresAt])
+}
+
+// 图片创作 — 内置提示词（管理员可动态增删改，前端 Composer / SceneConfig 拉取渲染）
+model ImagePromptTemplate {
+  id        Int      @id @default(autoincrement())
+  dimension String   @db.VarChar(50) // 白底 / 场景 / 尺寸 / 卖点 / ... admin 自由填
+  name      String   @db.VarChar(100) // 功能名称：正面 / 客厅 / 三视图
+  prompt    String   @db.Text
+  enabled   Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([dimension, name])
+  @@index([dimension, enabled, sortOrder])
+}
+
+// 图片创作 — 模板库分组（系统分组 + 个人分组，统一外键 ImageTemplate.groupId 关联）
+// 个人分组：userId 指向归属用户、isSystem=false，可单独管理（新建空组 / 重命名 / 删除连带模板）。
+// 系统分组：userId=null、isSystem=true，由管理员侧维护。
+// 重命名只改本行（模板按 groupId 关联，名称随关系取），删除时连带软删组内模板。
+// 硬删除（不进 SOFT_DELETE_MODELS），与 PricingConfig 一致。
+// userId 可空，故个人分组唯一性由 @@unique([userId, name]) 约束，系统分组名唯一性由应用层保证。
+model ImageTemplateGroup {
+  id        Int     @id @default(autoincrement())
+  userId    Int? // 个人分组归属用户；系统分组为 null
+  user      User?   @relation(fields: [userId], references: [id])
+  isSystem  Boolean @default(false)
+  name      String  @db.VarChar(50)
+  sortOrder Int     @default(0)
+
+  templates ImageTemplate[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, name])
+  @@index([userId, sortOrder])
+}
+
+// 图片创作 — 模板库
+// 个人模板（isSystem=false，仅创建者可见）+ 系统模板（isSystem=true，管理员维护、全员可见）。
+// 用户可见集合 = 自己的个人模板 ∪ 全部系统模板。
+// 一个模板含 1..N 张图片条目，每条独立 prompt / 尺寸 / 文字量（沿用「父聚合 + 子席位」模式）。
+model ImageTemplate {
+  id       Int     @id @default(autoincrement())
+  userId   Int // 创建者；系统模板记录创建它的管理员
+  user     User    @relation(fields: [userId], references: [id])
+  isSystem Boolean @default(false) // true=系统模板（全员可见），false=个人模板（仅本人可见）
+
+  name    String              @db.VarChar(200) // 模板名
+  groupId Int? // 分组外键：个人模板指向个人分组、系统模板指向系统分组（详见 ImageTemplateGroup）
+  group   ImageTemplateGroup? @relation(fields: [groupId], references: [id])
+  tags    Json? // 标签数组，如 ["A+","Amazon","官方推荐"]
+  note    String?             @db.VarChar(500) // 备注
+
+  items ImageTemplateItem[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([isSystem, deletedAt])
+  @@index([userId, deletedAt])
+  @@index([groupId])
+}
+
+model ImageTemplateItem {
+  id         Int           @id @default(autoincrement())
+  templateId Int
+  template   ImageTemplate @relation(fields: [templateId], references: [id])
+
+  name        String  @default("默认") @db.VarChar(100) // 图片名称：标题图 / 默认
+  prompt      String? @db.Text // 该张图的 prompt（选填）
+  refImageUrl String? @db.VarChar(1000) // 参考/示例图
+  aspectRatio String? @db.VarChar(20) // 尺寸：null=不指定，否则如 1:1 / 3:4 / 16:9
+  textAmount  String? @db.VarChar(20) // 文字量：无文字 / 极少 / 常规 / 丰富
+
+  // 分辨率（分字段存储，便于生图任务信息统一）
+  resolutionTier String? @db.VarChar(20) // 分辨率档位：1K / 2K / 4K
+  customAspectW  Int? // 自定义宽度
+  customAspectH  Int? // 自定义高度
+  customSizeMode String? @db.VarChar(20) // 自定义尺寸模式：pixels / ratio
+
+  // AI 拆图模板快照：保留竞品结构和生图配置，后续换 SKU 复用时仍以新商品事实为准。
+  competitorTemplate Json?
+  generationSettings Json?
+  site               String? @db.VarChar(30)
+  promptVersion      String? @db.VarChar(20)
+  promptHash         String? @db.Char(64)
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([templateId, sortOrder])
+  sourceMeta Json? // 预览墙公开生成/交付元信息
+
+}
+
+// ============================================================
+// 敏感词提示库
+// 管理员手工维护 + 后续 Listing 生成/AI 判定自动入库；按 (platform, word) 唯一。
+// 物理删除（不挂软删扩展）：删了就真删了，新建同 (platform, word) 直接 create 即可。
+// ============================================================
+
+enum SensitiveWordRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum SensitiveWordSource {
+  MANUAL // 后台管理员手动录入
+  LISTING_GENERATION // Listing 生成流程自动入库
+  AI_DETECTION // AI 判定后入库
+}
+
+model SensitiveWord {
+  id         Int                    @id @default(autoincrement())
+  word       String                 @db.VarChar(255)
+  platform   String                 @db.VarChar(50) // 平台标识，小写归一：amazon / walmart / ...
+  category   Json // 商品分类数组（自由文本，前端给候选）：["保健品", "美容"]
+  riskLevel  SensitiveWordRiskLevel
+  source     SensitiveWordSource
+  suggestion String?                @db.Text // 建议替代 / 风险说明
+  userId     Int? // 创建人；为 null 时来源必须是 AI_DETECTION（用于初始库导入等无归属场景）
+  user       User?                  @relation(fields: [userId], references: [id])
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@unique([platform, word])
+  @@index([userId])
+  @@index([platform])
+  @@index([source])
+}
+
+// =========================================================
+// 视频创作 - 通用创作
+// =========================================================
+
+model VideoProject {
+  id     Int    @id @default(autoincrement())
+  name   String @default("未命名项目") @db.VarChar(200)
+  type   String @default("GENERAL") @db.VarChar(20) // GENERAL 通用创作 / ECOMMERCE 带货创作
+  // 任务来源：platform 本平台 / vidflowos VidFlowOS 代办的容器项目（列表默认过滤）
+  source String @default("platform") @db.VarChar(20)
+  userId Int
+  user   User   @relation(fields: [userId], references: [id])
+
+  tasks         VideoTask[]
+  salesWorkflow SalesWorkflow? // 带货创作向导状态（仅 type=ECOMMERCE 时存在）
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+  @@index([userId, type, deletedAt])
+}
+
+// 一个 VideoTask = 任务中心一条 = 一个输出视频（后端驱动，单视频，无席位子表）
+model VideoTask {
+  id        Int          @id @default(autoincrement())
+  projectId Int
+  project   VideoProject @relation(fields: [projectId], references: [id])
+  userId    Int
+  user      User         @relation(fields: [userId], references: [id])
+
+  // 生成入参
+  mode        String  @db.VarChar(50) // 模型业务分类，如 NORMAL / REFERENCE
+  prompt      String  @db.Text
+  model       String  @db.VarChar(100) // AI Gateway 模型 publicId
+  modelName   String? @db.VarChar(200) // 创建任务时的模型展示名称快照
+  durationSec Int     @default(6) // 3–15
+  aspectRatio String? @db.VarChar(20) // 16:9 / 9:16 / 1:1；null=自动
+  resolution  String? @db.VarChar(20) // 分辨率档位；null=自动
+
+  // 声音
+  generateAudio   Boolean @default(false) // 生成音频
+  keepSourceAudio Boolean @default(false) // 保留参考视频原声
+
+  // 常规模式：首/尾帧
+  firstFrameUrl String? @db.VarChar(1000)
+  lastFrameUrl  String? @db.VarChar(1000)
+
+  // 参考素材快照
+  refMaterials     Json?
+  // 实际提交给 AI Gateway 的生成参数快照
+  generationParams Json?
+
+  // 异步状态
+  status         String  @default("GENERATING") // GENERATING / SUCCESS / TIMEOUT / CANCELLED / FAILED
+  providerJobId  String? @db.VarChar(255) // 旧动作复刻任务 ID，进程重启后续跑用
+  // 任务来源：platform 本平台 / vidflowos VidFlowOS 代办（对账/取消按此选网关 Key；列表默认过滤）
+  source         String  @default("platform") @db.VarChar(20)
+  gatewayTaskId  String? @unique @db.VarChar(255) // AI Gateway Task ID
+  gatewayEventId String? @unique @db.VarChar(255) // 已处理的 AI Gateway 回调事件 ID
+  resultUrl      String? @db.VarChar(1000) // 成功后的视频 URL（Gateway 已存储到 Space）
+  thumbnailUrl   String? @db.VarChar(1000) // 可选封面
+  errorMessage   String? @db.Text // 失败原因（用户侧中文文案）
+  gatewayError   Json? // 网关终态失败原始错误 { code, type, message, requestId }，排查用
+
+  // 带货创作：出片历史统一锚在 SalesWorkflow 上（稳定，不随脚本重建而丢）。
+  // salesBatchNo 标记「第几次成片」：同一次 generate 出的若干段共用一个批次号，
+  // 构成一份连贯整片；重新生成 = 新批次（新版本），失败重试填回当前批次。
+  // 分段生成用 segmentOrder 记录归属的分镜槽位；一键成片 segmentOrder 为 null。
+  salesWorkflowId Int?
+  salesWorkflow   SalesWorkflow? @relation("SalesWorkflowVideoTask", fields: [salesWorkflowId], references: [id])
+  segmentOrder    Int? // 分段生成：归属分镜 order；一键成片为 null
+  salesBatchNo    Int? // 成片批次号（同次 generate 共用；历史/旧数据为 null）
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([projectId, deletedAt])
+  @@index([userId, status, createdAt])
+  // 覆盖 loadHistory：按向导筛 + 按 createdAt 倒序取历史
+  @@index([salesWorkflowId, createdAt])
+  deliveryMeta Json? // 预览墙公开生成/交付元信息
+
+}
+
+// =========================================================
+// 影刀 RPA 图片 / 视频创作
+// 一个项目可同时包含图片和视频任务；一条任务按 quantity 拆成多个输出席位。
+// =========================================================
+
+model RpaCreationProject {
+  id     Int    @id @default(autoincrement())
+  name   String @default("未命名项目") @db.VarChar(200)
+  userId Int
+  user   User   @relation(fields: [userId], references: [id])
+
+  tasks RpaCreationTask[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+}
+
+model RpaCreationTask {
+  id              Int                @id @default(autoincrement())
+  requestId       String             @unique @db.VarChar(36)
+  clientRequestId String?            @db.VarChar(100)
+  projectId       Int
+  project         RpaCreationProject @relation(fields: [projectId], references: [id])
+  userId          Int
+  user            User               @relation(fields: [userId], references: [id])
+
+  mediaType   String  @db.VarChar(10) // IMAGE / VIDEO
+  inputMode   String? @db.VarChar(20) // 视频当前固定 INGREDIENTS
+  prompt      String  @db.Text
+  model       String  @db.VarChar(50)
+  aspectRatio String  @db.VarChar(10)
+  quantity    Int     @default(1)
+  durationSec Int?
+  resolution  String? @db.VarChar(10) // 视频 360p / 720p；旧视频为空时按 720p 下发
+
+  referenceImageUrls Json
+  referenceVideoUrls Json
+  paramsSnapshot     Json?
+
+  paramsFileKey      String? @db.VarChar(1000)
+  yingdaoTaskUuid    String? @db.VarChar(255)
+  yingdaoJobUuidList Json?
+
+  status          String    @default("PENDING") @db.VarChar(30) // PENDING / SUCCESS / TIMEOUT / CANCELLED
+  progressMessage String?   @db.VarChar(1000)
+  errorMessage    String?   @db.Text
+  startedAt       DateTime?
+  completedAt     DateTime?
+  expiresAt       DateTime?
+
+  outputs RpaCreationOutput[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([userId, clientRequestId])
+  @@index([projectId, createdAt])
+  @@index([userId, status, createdAt])
+}
+
+model RpaCreationOutput {
+  id     Int             @id @default(autoincrement())
+  taskId Int
+  task   RpaCreationTask @relation(fields: [taskId], references: [id])
+
+  order        Int
+  status       String  @default("PENDING") @db.VarChar(20) // PENDING / GENERATING / SUCCESS / FAILED
+  url          String? @db.VarChar(1000)
+  errorMessage String? @db.Text
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([taskId, order])
+  @@index([taskId, status])
+  deliveryMeta Json? // 预览墙公开生成/交付元信息
+
+}
+
+// =========================================================
+// 批量工作流 - 美妆创作
+// 独立于 VideoProject / VideoTask，便于后续整体迁移到其它系统。
+// 角色卡与数字人仍复用 DigitalHuman；任务仅保存来源 ID（无外键）和不可变快照。
+// =========================================================
+
+model BeautyProject {
+  id     Int    @id @default(autoincrement())
+  name   String @default("未命名美妆项目") @db.VarChar(200)
+  userId Int
+  user   User   @relation(fields: [userId], references: [id])
+
+  tasks BeautyTask[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+}
+
+model BeautyTask {
+  id        Int           @id @default(autoincrement())
+  projectId Int
+  project   BeautyProject @relation(fields: [projectId], references: [id])
+  userId    Int
+  user      User          @relation(fields: [userId], references: [id])
+
+  // 同一次批量提交共用 batchKey；前端调整参数重提时会创建新批次
+  batchKey      String @db.VarChar(36)
+  batchIndex    Int
+  attempt       Int    @default(1)
+  retryOfTaskId Int?
+
+  // 只保存来源数字人 ID，不建立跨域外键；真正用于生成和历史展示的是不可变快照
+  sourceDigitalHumanId Int?
+  digitalHumanSnapshot Json
+  beautyInput          Json
+
+  // 生成参数与参考素材快照
+  prompt             String  @db.Text
+  promptVersion      String? @db.VarChar(50)
+  model              String  @db.VarChar(100)
+  generationParams   Json? // 实际提交给 AI Gateway 的生成参数快照
+  durationSec        Int?
+  aspectRatio        String? @db.VarChar(20)
+  resolution         String? @db.VarChar(20)
+  generateAudio      Boolean @default(false)
+  referenceImageUrls Json?
+  referenceVideoUrls Json?
+  referenceAudioUrls Json?
+
+  // 任务中心状态：GENERATING / SUCCESS / TIMEOUT / CANCELLED / FAILED
+  status         String    @default("GENERATING") @db.VarChar(20)
+  gatewayTaskId  String?   @unique @map("providerJobId") @db.VarChar(255) // AI Gateway Task ID，复用原物理列
+  gatewayEventId String?   @unique @db.VarChar(255) // 已处理的 Gateway 终态事件 ID
+  resultUrl      String?   @db.VarChar(1000)
+  thumbnailUrl   String?   @db.VarChar(1000)
+  errorMessage   String?   @db.Text // 失败原因（用户侧中文文案）
+  gatewayError   Json? // 网关终态失败原始错误 { code, type, message, requestId }，排查用
+  startedAt      DateTime  @default(now())
+  submittedAt    DateTime?
+  finishedAt     DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([batchKey, batchIndex, attempt])
+  @@index([projectId, deletedAt])
+  @@index([userId, status, createdAt])
+  @@index([sourceDigitalHumanId])
+  @@index([retryOfTaskId])
+  deliveryMeta Json? // 预览墙公开生成/交付元信息
+
+}
+
+// =========================================================
+// 视频创作 - 带货创作（五步向导：产品&痛点 → 选素材 → 生成脚本 → 确认出片 → 成片预览）
+// 后端定位：向导状态存储 + 触发视频生成（复用 VideoTask 链路）。
+// 识图/手册/痛点/脚本等 AI 全在前端跑，后端只存其产出（productInfo / painPoints / segments）。
+// =========================================================
+
+// 带货创作向导状态：1:1 挂在 type=ECOMMERCE 的 VideoProject 上
+model SalesWorkflow {
+  id        Int          @id @default(autoincrement())
+  projectId Int          @unique
+  project   VideoProject @relation(fields: [projectId], references: [id])
+  userId    Int
+  user      User         @relation(fields: [userId], references: [id])
+
+  // Step1 产品图（上限 3，URL 快照；可来自上传或素材池）
+  productImages Json? // [{ url, name?, fromPoolImageId? }]
+
+  // Step1 产品信息：四选一信息源（互斥，只取一种），前端解析后写回
+  infoSource    String? @db.VarChar(20) // TEXT 文字描述 / URL Amazon链接 / IMAGE AI识图 / MANUAL 产品手册
+  textInput     String? @db.Text // 文字描述原文
+  sourceUrl     String? @db.VarChar(1000) // Amazon 链接
+  manualFileUrl String? @db.VarChar(1000) // 产品手册文件 URL
+  productInfo   Json? // 统一 schema 结构化商品信息（提取后可编辑）
+
+  // Step1 痛点（前端 AI 生成 + 可增删/编辑/勾选）
+  painPoints Json? // [{ text, selected }]
+
+  // Step2 选素材（各上限 1，拍平快照，与素材池解耦）
+  digitalHuman Json? // { id?, name, portraitUrl?, persona? } | null
+  scene        Json? // { id?, name, imageUrl?, desc? } | null
+
+  // Step3 脚本 / 出片参数（全能参考模式锁定）
+  model         String? @db.VarChar(100) // AI Gateway 模型 publicId
+  totalDuration Int? // 成片总时长（取所选模型支持档）
+  generateAudio Boolean @default(false)
+  aspectRatio   String? @db.VarChar(20) // 默认 9:16
+  resolution    String? @db.VarChar(20)
+
+  // Step4 成片方式：ONESHOT 一键成片（拼接成 1 个任务）/ SEGMENTED 分段生成（每段 1 个任务）
+  outputMode String      @default("ONESHOT") @db.VarChar(20)
+  // 出片历史统一锚点：一键成片 segmentOrder=null，分段生成 segmentOrder=分镜 order。
+  // 锚在向导上而非分镜行，脚本重建（saveScript 删分镜）不会丢历史。最新一条为当前成片。
+  videoTasks VideoTask[] @relation("SalesWorkflowVideoTask")
+
+  segments SalesSegment[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+}
+
+// 分镜脚本行：每行 = 一个视频片段（对应一个 VideoTask）
+model SalesSegment {
+  id         Int           @id @default(autoincrement())
+  workflowId Int
+  workflow   SalesWorkflow @relation(fields: [workflowId], references: [id])
+
+  order     Int // 分镜顺序（从 0 起）
+  startSec  Int // 区间起（0,4,8…）
+  endSec    Int // 区间止
+  vidPrompt String @db.Text // 视频提示词（参考生视频，可编辑）
+  voiceover String @db.Text // 口播文案 中文/English（可编辑）
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([workflowId, order])
+}
+
+// =========================================================
+// 素材池（素材图 / 数字人 / 场景）
+// =========================================================
+
+// 素材图：图片创作产出（变体 / 手动存入）的沉淀池
+model PoolImage {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  url         String? @db.VarChar(1000) // 真实图 URL；null → 前端用 hue 占位渲染
+  hue         Int     @default(0) // 占位渐变色相（0–360）
+  name        String  @db.VarChar(200) // 名称（搜索 + 去重键）
+  prompt      String? @db.Text // 搜索用，卡片不显示
+  sourceLabel String? @db.VarChar(100) // 派生来源标签（如「生成1·变体」）
+  tags        Json? // string[]
+  categories  Json? // string[]
+  kind        String  @default("image") @db.VarChar(20) // 素材类型：image=普通素材图 / competitor=AI 拆图竞品参考图
+
+  // 项目归属（软关联不做外键，素材池资产不随项目强绑定生命周期）：
+  // competitor 图按项目隔离；null = 公共库（存量数据、手动存入、分享码导入）
+  projectId Int?
+
+  // 分组归属（null = 不归组，对应 PRD group:''）
+  groupId Int?
+  group   PoolGroup? @relation(fields: [groupId], references: [id])
+
+  // 变体血缘：指向源图（同为 PoolImage）；源图常未入池则为 null，靠 sourceLabel 兜底
+  sourceImageId Int?
+  sourceImage   PoolImage?  @relation("ImageVariants", fields: [sourceImageId], references: [id])
+  variants      PoolImage[] @relation("ImageVariants")
+
+  order Int @default(0) // 排序（变体排在源图之后）
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+  @@index([userId, groupId])
+  @@index([sourceImageId])
+  sourceMeta Json? // 预览墙公开生成/交付元信息
+
+}
+
+// 素材图分组：纯用户自建，无默认分组
+model PoolGroup {
+  id        Int    @id @default(autoincrement())
+  userId    Int
+  user      User   @relation(fields: [userId], references: [id])
+  name      String @db.VarChar(50)
+  sortOrder Int    @default(0)
+
+  images PoolImage[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // 同名校验在 service 层做（尊重软删，删除后名字可复用）；DB 唯一索引会把软删行也算进去，故不建
+  @@index([userId, name])
+  @@index([userId, sortOrder])
+}
+
+// 数字人：可复用创作角色（人物图 + 视频 + 音色描述 + 隐藏人设），与曦灵 Avatar/Voice 无关
+model DigitalHuman {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  name       String  @db.VarChar(200)
+  portraits  Json? // [{ id, name, hue, img? }]
+  videos     Json? // [{ id, name }]
+  voiceDesc  String? @db.Text // 音色描述
+  voiceAudio String? @db.VarChar(1000) // 上传的音频 URL（可选）
+  persona    String? @db.Text // 人设/主体身份（隐藏字段，提交模型用，永不进可见 prompt）
+  purposes   Json? // string[]
+  tags       Json? // string[]
+  roleCard   Json? // AI 角色卡专属：{ direction, cardType, imageModel, modules:{...7段文本} }；手动数字人为 null
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+}
+
+// 场景：可复用拍摄/带货背景（场景图 + 视频 + 描述）
+model Scene {
+  id     Int  @id @default(autoincrement())
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  name       String  @db.VarChar(200)
+  images     Json? // [{ id, name, hue, img? }]
+  videos     Json? // [{ id, name }]
+  desc       String? @db.Text // 场景描述（生成时拼进可见 prompt）
+  categories Json? // string[]
+  tags       Json? // string[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([userId, deletedAt])
+}
+
+// 灵感雷达：用户订阅（关键词 + 平台选择 + 每平台抓取数）
+model InspirationSubscription {
+  id               Int       @id @default(autoincrement())
+  userId           Int
+  user             User      @relation(fields: [userId], references: [id])
+  name             String    @db.VarChar(100)
+  keywords         Json // String[]
+  keywordVariants  Json? // { "spring garden": ["garden ideas", ...], ... }
+  selectedVariants Json? // { "spring garden": ["garden ideas", "patio garden"], ... }
+  platforms        Json // ["PINTEREST","INSTAGRAM","TIKTOK"]
+  countPerPlatform Json // { "PINTEREST": 20, "INSTAGRAM": 30 }
+  lastRefreshedAt  DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  items InspirationItem[]
+
+  @@index([userId])
+}
+
+// 灵感雷达：抓取结果条目
+model InspirationItem {
+  id             Int                     @id @default(autoincrement())
+  subscriptionId Int
+  subscription   InspirationSubscription @relation(fields: [subscriptionId], references: [id])
+  platform       String                  @db.VarChar(20) // PINTEREST | INSTAGRAM | TIKTOK
+  mediaType      String                  @db.VarChar(10) // image | video
+  mediaUrl       String                  @db.Text
+  thumbnailUrl   String?                 @db.Text
+  sourceUrl      String?                 @db.Text
+  title          String?                 @db.Text
+  likes          Int                     @default(0)
+  comments       Int                     @default(0)
+  saves          Int                     @default(0)
+  views          Int                     @default(0)
+  durationSec    Float?
+  authorName     String?                 @db.VarChar(200)
+  authorUrl      String?                 @db.Text
+  externalId     String?                 @db.VarChar(200)
+  createdAt      DateTime                @default(now())
+
+  @@unique([subscriptionId, platform, externalId])
+  @@index([subscriptionId])
+}
+
+// AI 商品工厂：制作记录（软删除，读操作自动过滤 deletedAt）
+model ProductFactoryRecord {
+  id            Int       @id @default(autoincrement())
+  userId        Int // 用户隔离
+  sourceType    String    @db.VarChar(20) // competitor；own_product/selection/inspiration 预留
+  productName   String    @db.VarChar(200) // 默认 "竞品复刻 · {首个ASIN}"，分析后更新
+  market        String    @db.VarChar(20) // amazon_us / amazon_uk / amazon_de
+  status        String    @default("draft") @db.VarChar(20) // draft / in_progress / completed
+  currentStep   Int       @default(1)
+  totalSteps    Int       @default(6) // 创建时按 sourceType 定死
+  thumbnailUrl  String?   @db.VarChar(500)
+  sourceInput   Json // 来源原始输入
+  brandIdentity Json? // 品牌基因快照/覆盖
+  step1Data     Json? // DeconstructResult
+  step2Data     Json? // AnalysisResult
+  step3Data     Json? // { listingResult, scoreResult }
+  step4Data     Json? // ImageStepData
+  step5Data     Json? // AplusStepData
+  step6Data     Json? // SopResult
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([userId, status])
+}
+
+// ==================== 充值计费（订单 / 收据） ====================
+
+// 订单类型：个人订阅/续费/升档/充值 + 团队购买/续费/升席/充值 + 个人转团队
+enum BillingOrderType {
+  PLAN_NEW // 个人新订阅
+  PLAN_RENEW // 个人续费（排队）
+  PLAN_UPGRADE // 个人升档补差
+  PACK // 个人充值包
+  CUSTOM // 个人自定义充值
+  TEAM_PLAN // 团队版新购（自助）
+  TEAM_RENEW // 团队续费（排队/恢复）
+  TEAM_SEAT_UPGRADE // 团队升席位档（整月差价）
+  TEAM_PACK // 团队共享池充值包
+  TEAM_CUSTOM // 团队自定义充值
+  PERSONAL_TO_TEAM // 个人转团队（折抵）
+}
+
+enum BillingOrderStatus {
+  CREATED // 已创建（未发起支付）
+  PENDING // 支付中（已创建 PaymentIntent）
+  PAID // webhook 已确认收款（待入账）
+  SETTLED // 已入账（终态）
+  EXPIRED // 扫码超时（终态）
+  CANCELLED // 已取消（终态）
+  ABANDONED // 弃单/异常待人工（金额不符等）
+}
+
+enum PaymentChannel {
+  WECHAT // 微信（PaymentIntent 内嵌 QR）
+  ALIPAY // 支付宝（redirect 收银台）
+  CARD // 银行卡（Elements 卡表单）
+  ADMIN // 后台人工/定制开通（不走 Stripe）
+}
+
+model BillingOrder {
+  id                    Int                @id @default(autoincrement())
+  orderNo               String             @unique @db.VarChar(40) // SR 系规则，后端生成
+  userId                Int
+  user                  User               @relation(fields: [userId], references: [id])
+  type                  BillingOrderType
+  status                BillingOrderStatus @default(CREATED)
+  channel               PaymentChannel?
+  paymentProvider       String             @default("STRIPE") @db.VarChar(20) // STRIPE 海外 / ALLINPAY 国内，建单固定
+  allinpayReqsn         String?            @unique @db.VarChar(32) // 通联商户订单号，请求前绑定
+  allinpayTrxid         String?            @unique @db.VarChar(32) // 通联交易流水号，防串单
+  allinpayQrCode        String?            @db.Text // 支付二维码原串，仅待支付期间使用
+  paymentExpiresAt     DateTime?          // 支付截止时间，重复查询不延长
+  amountCny             Decimal            @db.Decimal(10, 2) // 应付人民币（元，后端重算）
+  fxRate                Decimal?           @db.Decimal(10, 4) // 汇率快照：1 USD = X CNY（发起支付时落库）
+  amountUsdCents        Int? // 实收美元（美分）= round(amountCny*100/fxRate)，发起支付时落库
+  creditsTotal          Int? // 到账积分合计（快照）
+  teamId                Int? // 团队订单（弱引用 Team.id）
+  packChoice            String?            @db.VarChar(20) // PERSONAL_TO_TEAM: inject | keep
+  receiptEmail          String?            @db.VarChar(100) // 下单时指定的收据接收邮箱（空则用账号邮箱）
+  stripePaymentIntentId String?            @db.VarChar(100)
+  stripeClientSecret    String?            @db.VarChar(255) // 卡表单用，不落日志
+  idempotencyKey        String?            @unique @db.VarChar(64)
+  snapshot              Json // 商品/价格/到账/有效期变化快照
+  paidAt                DateTime?
+  settledAt             DateTime?
+  expiredAt             DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  items                 BillingOrderItem[]
+  receipt               Receipt?
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([stripePaymentIntentId]) // 支付回跳丢 orderNo 时按 payment_intent 反查
+}
+
+model BillingOrderItem {
+  id        Int          @id @default(autoincrement())
+  orderId   Int
+  order     BillingOrder @relation(fields: [orderId], references: [id])
+  name      String       @db.VarChar(200) // 项目名（剔除"赠送"字样）
+  detail    String?      @db.VarChar(500)
+  qty       Int          @default(1)
+  amountCny Decimal      @db.Decimal(10, 2) // 人民币（元），折抵行为负
+  credits   Int?
+}
+
+// 收据：SETTLED 即开票（snapshot 冻结正文字段）；查看=网页渲染，下载=前端 PDF，邮件=后端 PDF 附件
+model Receipt {
+  id        Int           @id @default(autoincrement())
+  receiptNo String        @unique @db.VarChar(40) // SR+YYYYMMDDHHmmss+3位随机
+  orderId   Int?          @unique // 手工充值补开时为空 → 挂 manualRef
+  order     BillingOrder? @relation(fields: [orderId], references: [id])
+  manualRef String?       @db.VarChar(100) // 补开来源（creditTransaction 标识）
+  userId    Int
+  user      User          @relation(fields: [userId], references: [id])
+  email     String        @db.VarChar(120)
+  title     String?       @db.VarChar(100) // 预留（一期固定个人）
+  taxNo     String?       @db.VarChar(50) // 预留
+  amountCny Decimal       @db.Decimal(10, 2)
+  snapshot  Json // 收据全部正文字段（开票即冻结）
+  emailedAt DateTime?
+  createdAt DateTime      @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ==================== 企业团队 ====================
+
+enum TeamSource {
+  CUSTOM // 平台定制（后台手工开通）
+  SELF // 自助购买
+}
+
+enum TeamStatus {
+  ACTIVE
+  GRACE // 宽限（到期后 30 天，冻结消费）
+  ARCHIVED // 归档（套餐池清零/充值包退回管理员个人户/释放成员归属）
+  DISABLED // 平台停用
+}
+
+enum TeamQuotaMode {
+  SHARED // 共享池 + 成员月度封顶
+  INDEPENDENT // 成员独立配额
+}
+
+enum OverLimitPolicy {
+  BLOCK // 超额阻断
+  WARN // 超额告警放行
+}
+
+enum TeamRole {
+  ADMIN
+  MEMBER
+}
+
+model Team {
+  id                Int               @id @default(autoincrement())
+  name              String?           @db.VarChar(100)
+  nameFilled        Boolean           @default(false) // 企业名是否被显式设置过（false=系统落的默认名「{管理员用户名}的团队」，前端据此判"未命名"提示，不再比对字符串）
+  source            TeamSource
+  status            TeamStatus        @default(ACTIVE)
+  tier              Int? // 自助档：1=standard 2=flagship；CUSTOM 为空
+  seats             Int
+  adminId           Int
+  admin             User              @relation("TeamAdmin", fields: [adminId], references: [id])
+  invitedById       Int? // 企业邀请人快照 = 建队时管理员的 invitedById（企业池消费的返利沿此链结算；无 FK 纯快照，管理员变更/账号删除不影响历史归属；存量团队为空时结算回落当前管理员邀请关系）
+  discount          Decimal           @default(1) @db.Decimal(4, 3) // 共享池计价折扣；SELF 固定 1.00
+  expiresAt         DateTime
+  graceUntil        DateTime? // expiresAt+30d（快照）
+  dataKeepUntil     DateTime? // expiresAt+60d
+  archivedAt        DateTime?
+  quotaMode         TeamQuotaMode     @default(SHARED)
+  overLimitPolicy   OverLimitPolicy   @default(WARN)
+  defaultModelText  String?           @db.VarChar(50)
+  defaultModelImage String?           @db.VarChar(50)
+  defaultModelVideo String?           @db.VarChar(50)
+  contractAmountCny Decimal?          @db.Decimal(10, 2) // 平台定制：合同金额人民币（仅留痕）
+  contractNote      String?           @db.VarChar(500)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  members           TeamMember[]
+  modelConfigs      TeamModelConfig[]
+  auditLogs         TeamAuditLog[]
+
+  @@index([status, expiresAt])
+}
+
+model TeamMember {
+  teamId             Int
+  team               Team     @relation(fields: [teamId], references: [id])
+  userId             Int
+  user               User     @relation(fields: [userId], references: [id])
+  role               TeamRole @default(MEMBER)
+  monthlyQuota       Int? // 月度上限（SHARED 封顶 / INDEPENDENT 配额）
+  quotaUsedThisMonth Decimal  @default(0) @db.Decimal(18, 4)
+  quotaMonth         String?  @db.VarChar(7) // 懒重置标记 "2026-08"
+  status             String   @default("ACTIVE") @db.VarChar(20)
+  joinedAt           DateTime @default(now())
+
+  @@id([teamId, userId])
+  @@index([userId, status])
+}
+
+// 模型配置-按功能模块
+model TeamModelConfig {
+  id               Int     @id @default(autoincrement())
+  teamId           Int
+  team             Team    @relation(fields: [teamId], references: [id])
+  moduleKey        String  @db.VarChar(50)
+  allowedModels    Json
+  defaultModel     String  @db.VarChar(50)
+  memberSelectable Boolean @default(true)
+
+  @@unique([teamId, moduleKey])
+}
+
+enum AiModelKind {
+  TEXT
+  IMAGE
+  VIDEO
+}
+
+// AI 模型目录（模型配置 Tab 的可选池，seed 维护；active=false 即下架，不再出现在选项里）
+model AiModel {
+  id        Int         @id @default(autoincrement())
+  code      String      @unique @db.VarChar(50)
+  name      String      @db.VarChar(100)
+  kind      AiModelKind
+  active    Boolean     @default(true)
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@index([kind, active])
+}
+
+model TeamAuditLog {
+  id        Int      @id @default(autoincrement())
+  teamId    Int
+  team      Team     @relation(fields: [teamId], references: [id])
+  actorId   Int
+  action    String   @db.VarChar(50)
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([teamId, createdAt])
+}
+
+// 团队套餐档（种子）
+model TeamPlan {
+  id                 Int      @id @default(autoincrement())
+  tier               Int      @unique // 1 standard / 2 flagship
+  name               String   @db.VarChar(50)
+  priceCny           Decimal  @db.Decimal(10, 2)
+  originalPriceCny   Decimal? @db.Decimal(10, 2)
+  seats              Int
+  poolPackageCredits Int
+  poolGiftCredits    Int
+  periodDays         Int      @default(30)
+  active             Boolean  @default(true)
+}
+
+// 团队充值包（种子）
+model TeamPack {
+  id           Int     @id @default(autoincrement())
+  priceCny     Decimal @unique @db.Decimal(10, 2)
+  baseCredits  Int
+  bonusCredits Int
+  sortOrder    Int     @default(0)
+  active       Boolean @default(true)
+}
+
+// ==================== 自定义充值阶梯 / 全局返利规则 ====================
+
+// 自定义充值阶梯（配置化；scope=PERSONAL|TEAM）
+model CustomLadderTier {
+  id        Int     @id @default(autoincrement())
+  scope     String  @db.VarChar(20) // PERSONAL | TEAM
+  minCny    Decimal @db.Decimal(10, 2) // 门槛（元，含）
+  bonusRate Decimal @db.Decimal(4, 3) // 赠送比例
+  sortOrder Int     @default(0)
+
+  @@index([scope, sortOrder])
+}
+
+// 全局返利规则（单行配置，id 固定 1）
+model RebateRule {
+  id               Int      @id @default(autoincrement())
+  corpCounts       Boolean  @default(true) // 企业成员消耗走企业池时是否计入返利
+  maxLayers        Int?     @default(2) // 返利层数（null=不限层级，沿邀请链上溯到底）
+  perInviterCap    Int? // 邀请人单月返利封顶（积分，null=不限）
+  perConsumeCapPct Decimal? @db.Decimal(4, 3) // 单笔返利占消耗比例上限（null=不限）
+  updatedAt        DateTime @updatedAt
+}
+
+// ==================== Skill 市场 ====================
+
+// 技能主表（种子维护；download_count/download_event_count 是缓存字段，真实来源是下面两张表）
+model SkillMarketSkill {
+  id                 Int                    @id @default(autoincrement())
+  skillId            String                 @unique @db.VarChar(64) // 前后端稳定业务 ID：trending / listing-opt ...
+  name               String                 @db.VarChar(100) // 中文名（运营可读，接口不依赖前端元数据）
+  category           String                 @db.VarChar(50) // 运营场景分类
+  status             SkillMarketSkillStatus @default(ACTIVE)
+  fileUrl            String?                @db.VarChar(500) // 正文公开直链（Spaces public-read + Content-Disposition 烧入对象元数据）；null = 未上传，前端兜底本地拼装
+  downloadCount      BigInt                 @default(0) // 历史成功下载过的去重用户数（removedAt 不影响）
+  downloadEventCount BigInt                 @default(0) // 所有有效下载事件数（含重复下载）
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([status])
+}
+
+// 用户下载关系表：一名用户一个技能只有一行；移出列表只置 removedAt，永不删行（保住去重口径）
+model SkillMarketUserSkill {
+  id                Int       @id @default(autoincrement())
+  userId            Int
+  user              User      @relation(fields: [userId], references: [id])
+  skillId           String    @db.VarChar(64) // 技能业务 ID，与事件表一致
+  firstDownloadedAt DateTime // 第一次下载时间
+  lastDownloadedAt  DateTime // 最近一次下载时间
+  downloadTimes     Int       @default(1) // 该用户累计下载次数
+  removedAt         DateTime? // 非空 = 已移出个人列表；重新下载时清空
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([userId, skillId])
+  @@index([skillId, removedAt])
+}
+
+// 下载事件表：不可变审计日志；clientRequestId 唯一索引是幂等的最后防线
+model SkillMarketDownloadEvent {
+  id              Int      @id @default(autoincrement())
+  clientRequestId String   @unique @db.VarChar(36) // 前端生成的幂等键
+  userId          Int
+  skillId         String   @db.VarChar(64)
+  createdAt       DateTime @default(now())
+  ipHash          String?  @db.VarChar(64) // sha256(ip)，不存明文
+  userAgent       String?  @db.VarChar(255) // 截断存储
+
+  @@index([skillId, createdAt])
+  @@index([userId, createdAt])
+}
+
+enum SkillMarketSkillStatus {
+  ACTIVE
+  DISABLED
+}
+
+// ==================== 公告管理 ====================
+
+/// 平台公告；软删除（deletedAt），生效区间 [startAt, endAt]，边界相接不算重叠
+model Announcement {
+  id          Int       @id @default(autoincrement())
+  content     String    @db.Text // 公告正文
+  startAt     DateTime // 生效开始时间
+  endAt       DateTime // 生效结束时间（须晚于 startAt）
+  createdById Int // 创建人
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime? // 非空 = 已软删除
+
+  @@index([startAt, endAt])
+  @@index([createdById])
+}
+
+// ==================== 车泰斗 AI 商品素材工作台（2026-09-28）====================
+// 方案：docs/designs/2026-09-28-chetaidou-material-workbench-backend-implementation-plan.md
+// 8 张新业务表 + 复用 ImageGenJob/ImageGenItem（businessType=CHETAIDOU）。
+// 生图批次与逐张结果唯一落在 ImageGenJob/ImageGenItem，组合结果唯一保存在
+// COMPOSE 根 ChetaidouTask.output；Call 是逐次模型调用账本（执行恢复+对账）。
+
+/// SKU 目录（首期仅 CS1plus；由 scripts/init-chetaidou-production.mjs 初始化，不提供新增 SKU 接口）
+model ChetaidouSku {
+  id            Int      @id @default(autoincrement())
+  code          String   @unique @db.VarChar(50) // "CS1plus"
+  name          String   @db.VarChar(200)
+  enabled       Boolean  @default(false) // 资料未齐前不启用；非 ENABLED 服务端拒绝新任务
+  currentFactId Int? // 当前生效 ChetaidouFactCard.id
+  revision      Int      @default(0) // 维护端乐观锁
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/// SKU 事实卡（硬约束摘要），只追加不覆盖；任务快照按 id+version 冻结
+model ChetaidouFactCard {
+  id          Int      @id @default(autoincrement())
+  skuId       Int
+  version     Int // 发布时锁 SKU 行分配递增
+  content     Json // PRD §4.5 硬约束摘要（R1/R2/R4/R6/R7/R8/R9）+ 维护方确认的 scope
+  contentHash String   @db.VarChar(64)
+  confirmedBy Int // 审计人 = 登录用户 id
+  confirmedAt DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([skuId, version])
+}
+
+/// 母版图（预置 PRESET / 用户上传 USER_UPLOAD），文件不可变；重传创建新行
+model ChetaidouImage {
+  id                    Int      @id @default(autoincrement())
+  skuId                 Int // 归属服务端裁定
+  sourceType            String   @db.VarChar(20) // PRESET / USER_UPLOAD
+  ownerId               Int? // PRESET=null；上传图=本人
+  createdBy             Int
+  title                 String   @db.VarChar(200)
+  number                String?  @db.VarChar(100) // 母版编号（搜索用）
+  fileKey               String   @db.VarChar(1000) // Spaces 私有 key
+  mime                  String   @db.VarChar(100)
+  width                 Int
+  height                Int
+  checksum              String   @db.VarChar(64) // sha256 防重复登记（不做跨用户唯一）
+  enabled               Boolean  @default(true)
+  revision              Int      @default(0)
+  currentBreakdownId    Int? // 当前生效 ChetaidouBreakdown.id
+  activeBreakdownTaskId String?  @db.VarChar(36) // 拆解任务执行中占位
+  importKey             String?  @unique @db.VarChar(191) // 导入命名空间幂等键
+  sourceMetadata        Json? // 旧系统来源、原验收状态、历史提示词等审计
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([skuId, sourceType, ownerId, enabled, id])
+}
+
+/// 母版拆解，只追加版本；异步执行状态在 Task，不放这里
+model ChetaidouBreakdown {
+  id             Int       @id @default(autoincrement())
+  imageId        Int
+  version        Int
+  factId         Int // 依据的 ChetaidouFactCard.id
+  source         String    @db.VarChar(10) // PRESET（人工确认稿）/ AI（未预验收稿）
+  qualityStatus  String    @db.VarChar(20) // CONFIRMED / AI_UNREVIEWED / INVALID
+  payload        Json // elements/textInventory/persons/pets/baskets/hardConstraints/uncertainties
+  schemaVersion  Int
+  contentHash    String    @db.VarChar(64)
+  confirmedBy    Int?
+  confirmedAt    DateTime?
+  importKey      String?   @unique @db.VarChar(191)
+  sourceMetadata Json?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([imageId, version])
+}
+
+/// 个人草稿（每用户每图一份）；确认状态/任务指针只存这一处，所有写入 CAS revision
+model ChetaidouDraft {
+  id                       Int      @id @default(autoincrement())
+  ownerId                  Int
+  imageId                  Int
+  revision                 Int      @default(0) // 乐观锁
+  workspaceId              String?  @default(uuid()) @db.VarChar(36)
+  activeAdjustmentId       String?  @db.VarChar(36)
+  restoredFromAdjustmentId String?  @db.VarChar(36)
+  settings                 Json // {site,textMode,personMode,personText,customText}
+  selections               Json // [{groupId,optionKeys[],customText?}]
+  customDimensions         Json // [{id,label,selectionMode,guidance,options[],selectedKeys[]}]
+  acknowledgedBreakdownId  Int? // 用户已确认的拆解版本
+  activeIdeationTaskId     String?  @db.VarChar(36) // 当前联想根任务
+  activeCompositionTaskId  String?  @db.VarChar(36) // 当前组合根任务
+  activeGroupRefs          Json? // 当前联想各组有序 {groupId} 引用（刷新只替换其一）
+  pendingRefreshTaskId     String?  @db.VarChar(36) // 同草稿最多一个未终结刷新
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([ownerId, imageId])
+}
+
+/// 每用户每母版的调整历史；恢复后提交新任务分叉，不覆盖来源记录。
+model ChetaidouAdjustment {
+  id                 String   @id @default(uuid()) @db.VarChar(36)
+  ownerId            Int
+  skuId              Int
+  imageId            Int
+  parentAdjustmentId String?  @db.VarChar(36)
+  state              Json
+  schemaVersion      Int      @default(1)
+  revision           Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([ownerId, imageId, createdAt, id])
+  @@index([ownerId, skuId, createdAt, id])
+}
+
+/// 工作流任务（BREAKDOWN/IDEATION/REFRESH_GROUP/DIVERGE/COMPOSE 文本阶段；
+/// GENERATE 只存命令与关联，执行状态由 ImageGenJob 投影）
+model ChetaidouTask {
+  id                    String    @id @default(uuid()) @db.VarChar(36)
+  rootTaskId            String    @db.VarChar(36) // 根任务 rootTaskId=id
+  parentTaskId          String?   @db.VarChar(36) // 问答轮次指向被回答的 COMPOSE 根任务
+  retryOfTaskId         String?   @db.VarChar(36) // 失败重试指向原根任务
+  imageGenJobId         String?   @db.VarChar(36) // GENERATE 关联 ImageGenJob.id
+  ownerId               Int
+  skuId                 Int
+  imageId               Int
+  workspaceId           String?   @db.VarChar(36)
+  adjustmentId          String?   @db.VarChar(36)
+  site                  String?   @db.VarChar(30)
+  type                  String    @db.VarChar(20)
+  operation             String    @default("PRIMARY") @db.VarChar(10) // PRIMARY / RETRY
+  status                String?   @db.VarChar(32) // QUEUED/RUNNING/WAITING_RECONCILIATION/SUCCEEDED/PARTIAL/FAILED/CANCELLED；GENERATE 为 null（Job 投影）
+  stage                 String?   @db.VarChar(64)
+  idempotencyKey        String    @db.VarChar(36)
+  requestHash           String    @db.VarChar(64) // 标准化请求 SHA-256；同键异 hash 409
+  contextHash           String?   @db.VarChar(64) // 分阶段上下文指纹
+  snapshot              Json // 完整冻结输入（image/facts/breakdown/settings/…）
+  input                 Json // 本次命令入参
+  output                Json? // COMPOSE 组合产物 / REFRESH 应用状态 / BREAKDOWN breakdownId
+  progress              Json? // {total,processed,succeeded,failed}
+  acceptedDraftRevision Int? // 提交时的草稿 revision
+  appliedDraftRevision  Int? // 异步写回成功后的 revision
+  appliedAt             DateTime?
+  cancelRequestedAt     DateTime?
+  errorCode             String?   @db.VarChar(64)
+  errorMessage          String?   @db.VarChar(1000)
+  finishedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@unique([ownerId, idempotencyKey])
+  @@index([status, createdAt])
+  @@index([ownerId, createdAt, id])
+  @@index([rootTaskId])
+  @@index([imageGenJobId])
+  @@index([parentTaskId])
+  @@index([ownerId, imageId, type, createdAt])
+  @@index([ownerId, skuId, site, createdAt, id])
+  @@index([adjustmentId, createdAt, id])
+}
+
+/// 维度组（不可变版本：每次刷新分配新 groupId，成功行永不改写）
+model ChetaidouGroup {
+  id             String    @id @default(uuid()) @db.VarChar(36)
+  taskId         String    @db.VarChar(36) // 产出该版本的根任务（IDEATION 或 REFRESH_GROUP）
+  parentGroupId  String?   @db.VarChar(36) // 刷新产物指向被刷新的旧组
+  key            String    @db.VarChar(100)
+  definition     Json // targetElementId/attribute/selectionMode/kind/purpose/currentValue 等冻结元数据
+  options        Json? // 30–60 项（刷新=保留项+新增项），含服务端分配的 selectionId
+  status         String    @db.VarChar(20) // PENDING/RUNNING/SETTLING/SUCCEEDED/FAILED/CANCELLED/UNKNOWN
+  currentCallId  String?   @db.VarChar(36)
+  errorCode      String?   @db.VarChar(64)
+  errorMessage   String?   @db.VarChar(1000)
+  order          Int
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([taskId, key])
+  @@index([taskId, order])
+}
+
+/// 逐次模型调用账本：识别/修复/每维扩展/组合检查/每张图各一行；执行恢复与费用对账的唯一事实源
+model ChetaidouCall {
+  id                      String    @id @default(uuid()) @db.VarChar(36)
+  taskId                  String    @db.VarChar(36)
+  rootTaskId              String    @db.VarChar(36)
+  ownerId                 Int
+  targetKey               String    @db.VarChar(100) // breakdown/identify/repair:identify/group:<id>/compose/image:<itemId>
+  groupId                 String?   @db.VarChar(36)
+  imageGenItemId          Int?
+  attempt                 Int // 同任务同 targetKey 内新收费调用才递增
+  kind                    String    @db.VarChar(10) // TEXT / IMAGE
+  source                  String    @db.VarChar(50) // chetaidou.breakdown/ideation/diverge/compose/image
+  model                   String    @db.VarChar(100)
+  category                String?   @db.VarChar(50)
+  promptVersion           String    @db.VarChar(100)
+  request                 Json? // 最终供应商请求（发出前保存；含签名 URL 仅限受限读取）
+  requestHash             String?   @db.VarChar(64)
+  providerIdempotencyKey  String    @db.VarChar(100) // chetaidou:call:<callId>
+  gatewayTaskId           String?   @unique @db.VarChar(191)
+  gatewayRequestId        String?   @unique @db.VarChar(191)
+  state                   String    @db.VarChar(20) // PREPARED/SUBMITTING/WAITING/RECEIVED/UNKNOWN/FINISHED
+  outcome                 String?   @db.VarChar(20) // ACCEPTED/INVALID/PROVIDER_FAILED/CANCELLED/DELIVERY_FAILED
+  billingStatus           String    @default("PENDING") @db.VarChar(20) // PENDING/SETTLED/FREE/REVIEW
+  gatewayResponse         Json? // 受限原始回执（恢复时按冻结解析规则重校验）
+  usage                   Json?
+  estimatedSaleCny        Decimal   @default(0) @db.Decimal(18, 8)
+  gatewayAmountCny        Decimal?  @db.Decimal(18, 8)
+  pricing                 Json? // 首次结算定价快照（模式/模型/倍率/fixedCredits/时间）
+  chargedCredits          Decimal?  @db.Decimal(18, 4)
+  artifactFileKey         String?   @db.VarChar(1000)
+  submittedAt             DateTime?
+  receivedAt              DateTime?
+  finishedAt              DateTime?
+  errorCode               String?   @db.VarChar(64)
+  errorMessage            String?   @db.VarChar(1000)
+  resolution              Json? // 人工核对记录（操作人/凭据/原因/时间）
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@unique([taskId, targetKey, attempt])
+  @@unique([providerIdempotencyKey])
+  @@index([state, createdAt])
+  @@index([billingStatus, createdAt])
+  @@index([rootTaskId])
+  @@index([imageGenItemId])
+}
+
+/// 车泰斗结果导入成功记录；与目标记录同事务提交，不参与任务调度。
+model ChetaidouResultImport {
+  id             Int      @id @default(autoincrement())
+  ownerId        Int
+  idempotencyKey String   @db.VarChar(36)
+  action         String   @db.VarChar(20)
+  sourceResultId Int
+  requestHash    String   @db.Char(64)
+  response       Json
+  createdAt      DateTime @default(now())
+
+  @@unique([ownerId, idempotencyKey])
+  @@index([ownerId, sourceResultId, action])
+}

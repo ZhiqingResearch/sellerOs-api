@@ -1,0 +1,97 @@
+{
+  "summary": "已验收成品为一张4:5竖版生活方式性能信息图：黑色紧凑型载物电动踏车从左后侧偏后机位骑行在海岸上坡公路上，1名成年男性骑手背对镜头，1只柯基样犬坐在中部载物围栏内。车辆保留中部开放式管状货篮、后货篮、宽座垫、后减震、后挡泥板、后尾灯、轮圈蓝色识别线与独立矩形脚踏等身份特征。画面叠加了左上坡度/载重营销文案、右上‘AS SEEN IN’样式徽章、人物与宠物重量标注、底部说明文字，以及从后轮轮毂向左展开的蓝色概念性电机爆炸/X光效果与‘REAR HUB MOTOR’标签。与历史提示词相比，当前成品未见前灯细节与前制动细节证据，且电机爆炸效果中出现偏铜色绕组；但这些不自动构成已确认硬事实冲突，需按当前成品拆解。",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": true,
+  "persons": [
+    {
+      "personId": "p1",
+      "observedAppearance": "1名成年人，背对镜头骑行；短发，后脑和部分胡须边缘可见；穿灰色短袖T恤、深色短裤、灰蓝色运动鞋。面部基本不可见。"
+    }
+  ],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "Conquers\n15° Hills",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "Max Load\n265 lbs",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "AS SEEN IN",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "178 lbs",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "42 lbs",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "REAR HUB MOTOR",
+      "category": "unknown",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t7",
+      "sourceText": "Illustrative load scenario:\n178 lbs rider + 42 lbs pet = 220 lbs.\nMaximum load capacity: 265 lbs.",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "竖版4:5构图，车辆位于右下至中部，左后偏后跟拍机位；道路向左上延伸，左侧大面积留白承载文案，右上放置竖向徽章。",
+    "sceneLightColor": "暖色傍晚海岸阳光为主，天空和海面偏柔和蓝色；车辆后轮区域叠加冷蓝色技术光效。",
+    "peoplePetsStory": "一名骑手载着一只犬只沿海岸上坡道路骑行，呈轻度性能展示与出行陪伴叙事。",
+    "propsOcclusion": "骑手身体遮挡把立和前部区域；近侧腿部与脚遮挡中部围栏部分管件；犬只遮挡部分远侧围栏；后轮电机爆炸效果遮挡后轮左侧下方区域。当前遮挡关系总体自然，未要求整根远侧管件全露。",
+    "graphicsText": "包含绿色坡度图标、绿色载重图标、白色圆角标注卡、右上白色编辑风徽章、底部白色说明文字、白色虚线引导线、后轮蓝色爆炸技术示意和白底标签。",
+    "effects": "背景和路面有轻度运动模糊；后轮外侧有蓝色发光轮廓；后轮轮毂向左展开的X光/爆炸示意含半透明蓝色光环与机械部件。",
+    "rendering": "整体为高质感商业合成/写实渲染风格，主体较清晰，背景浅景深虚化明显。"
+  },
+  "hardConstraints": [
+    "当前成品明确包含1名骑手与1只犬只，不能误判为无人图。",
+    "车辆为紧凑型黑色坐骑式载物电动踏车，不是自行车踏板车混型中的脚踏自行车；不可改成带自行车曲柄/脚蹬结构。",
+    "可见独立矩形脚踏，且脚踏与停车脚撑不是同一部件。",
+    "中部开放式管状货篮存在，犬只位于其中；后部还存在独立后货篮，两者数量与连接关系不可改。",
+    "后部可见双后减震，其中近侧减震弹簧为蓝色识别特征，应保留。",
+    "后轮、后挡泥板、尾灯、轮圈蓝色识别线均为当前可见实物身份特征，应保留。",
+    "当前机位为左后偏后视角，近侧为车身右后区域更显著；不可无证据镜像整车。",
+    "近侧人体和近侧构件可遮挡主体，主体只遮住重叠的远侧管件，不应因此删除整根远侧栏杆。",
+    "右上黑红抽象编辑标记属于营销叠加图形，不等同于真实品牌标识；但实物车身若有真实标识，不应因去字规则被误删。",
+    "蓝色后轮电机爆炸/X光效果是叠加概念示意，不代表出现第二辆车或第二个完整后轮。"
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "前部车头、前灯、前制动与前轮完整结构被骑手和机位严重遮挡，当前图中证据不足，不能据此重建隐藏侧细节。",
+    "停车脚撑在当前画面中不可见；不可据此断言已收起或已放下，需要额外可见证据。",
+    "中部货篮远侧管件有部分被犬只与骑手腿部遮挡，不能把不可见段当作不存在。",
+    "历史提示词提到的某些细节如低位圆灯、具体前制动呈现、更多机械连接，在本成品中并非都可见；这属于历史描述与当前可见证据差异，不自动视为硬冲突。",
+    "后轮爆炸示意中可见偏铜色线圈样细节，但该区域属于概念技术特效，不应直接当作实物材质事实。",
+    "人物具体年龄、身份、国籍不可从画面确认；仅能确认其为成年外观骑手。",
+    "犬只品种只能描述为柯基样/短腿竖耳小中型犬，不能绝对确认纯种品类。"
+  ],
+  "version": "7c8a3822-5df4-41f8-99cd-6c3242505f46",
+  "imageId": "img-12-1",
+  "sourceHash": "0ff3e51e911aff107987f2626697b11d82f8c1f7b634364568b0cafb1bfd31a6",
+  "createdAt": "2026-09-27T11:50:05.413Z"
+}

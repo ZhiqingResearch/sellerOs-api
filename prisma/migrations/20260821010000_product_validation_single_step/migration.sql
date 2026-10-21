@@ -1,0 +1,10 @@
+-- 产品验证是单步流程，与类目选品的五步类型分开记录
+ALTER TABLE `SelectionAnalysisStep`
+MODIFY `stepType` ENUM(
+  'CATEGORY_DIAGNOSIS',
+  'TRACK_VALIDATION',
+  'COMPETITOR_POOL',
+  'TRAFFIC_AD_VALIDATION',
+  'PRODUCT_LIST',
+  'PRODUCT_VALIDATION'
+) NOT NULL COMMENT '步骤业务类型；PRODUCT_VALIDATION 为产品验证单步结果';

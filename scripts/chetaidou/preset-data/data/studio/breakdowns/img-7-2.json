@@ -1,0 +1,49 @@
+{
+  "summary": "A wide lifestyle banner shows the confirmed C1Splus scooter parked or paused outside a modern supermarket entrance. One adult woman is seated upright on the scooter, smiling toward camera, with one hand on the handlebar and the other raised in a wave. Two large kraft paper grocery bags with visible produce are placed inside the integrated middle cargo enclosure. The rear cargo basket appears empty. The scooter faces toward image-left and retains visible identity cues including black frame, step-through layout, middle cargo enclosure, rear basket, wide saddle, cyan-blue rim accents, blue rear coil suspension, visible brake discs, low front headlight, and a small cyan-blue circular marking on the lower steering stem.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": true,
+  "persons": [
+    {
+      "personId": "p1",
+      "observedAppearance": "One adult woman with light skin and shoulder-length light brown to dark blonde hair, smiling. She wears a light blue long-sleeve blouse, dark navy pants, and white low-top sneakers. She is seated upright on the saddle, with one hand on the handlebar and the other hand raised in a wave."
+    }
+  ],
+  "textInventory": [],
+  "softFeatures": {
+    "composition": "Wide panoramic commercial lifestyle composition. Scooter and rider are placed slightly right of center, with open supermarket frontage and pavement providing negative space. Product shown in three-quarter view with front wheel toward image-left and rear wheel toward image-right.",
+    "sceneLightColor": "Bright natural daytime lighting with neutral-warm tones. Soft shadows on pale pavement. Overall clean, airy retail exterior look.",
+    "peoplePetsStory": "Single adult woman appears to be grocery shopping and pausing outside a supermarket with groceries loaded in the middle cargo area. No pets visible.",
+    "propsOcclusion": "Two large kraft grocery bags occupy most of the middle cargo enclosure and occlude interior structure behind them. Near-side enclosure rails remain visible in front of the bags. Rider's near-side leg and shoe partially occlude lower central frame area. Some lower mechanical details are partially obscured by angle, rider, and cargo. Rear basket remains visibly empty.",
+    "graphicsText": "No readable overlaid marketing text, labels, infographic elements, or annotation marks visible in the final image.",
+    "effects": "Photorealistic shallow-to-moderate depth of field. Background storefront and carts are somewhat softened while scooter and rider remain the primary focus. No dramatic motion effects.",
+    "rendering": "Photorealistic lifestyle rendering/retouch style with clean commercial finish. Modern supermarket background, realistic reflections in glass, and believable contact shadows."
+  },
+  "hardConstraints": [
+    "Confirmed SKU geometry should be preserved: black step-through cargo scooter with integrated middle cargo enclosure and separate rear cargo basket.",
+    "Do not change visible component count, connection logic, or overall frame layout of the confirmed scooter.",
+    "Front wheel remains toward image-left and rear wheel toward image-right; do not mirror the vehicle.",
+    "Preserve visible identity cues present in this image: wide saddle, cyan-blue rim accents, blue rear coil suspension, visible brake discs, low-mounted front headlight, and small cyan-blue circular marking on the lower steering stem.",
+    "The integrated middle cargo enclosure contains two kraft paper grocery bags; near-side rails remain in front of the bags, and hidden rear/internal rails should not be shown through opaque bags.",
+    "Rear cargo basket is empty and should remain structurally unchanged.",
+    "Foot support visible in current image is a footrest, not a bicycle pedal; do not convert it into pedals or a floorboard.",
+    "Parking kickstand and riding footrest are separate mechanical parts and must not be fused; current image evidence does not clearly expose the kickstand shape, so it should not be invented or contradicted without evidence.",
+    "Do not add a front handlebar basket, extra supports, extra footrests, or duplicate frame tubes.",
+    "Do not remove or alter real product markings visible on the scooter while also not adding unrelated logos or model text.",
+    "Scene currently includes one seated rider; any edits should respect the existing seated interaction and not force full-vehicle unobstructed exposure where naturally occluded.",
+    "No added certification claims, performance specs, carrying capacity claims, service promises, or new model wording."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "No clearly readable text is visible in the image; text inventory is therefore empty.",
+    "The exact state and geometry of the parking kickstand are not clearly verifiable in this composed scene because the lower area is partially occluded by angle, rider foot placement, and frame components; close-up evidence would be needed for strict validation.",
+    "The detailed topology of some far-side and internal cargo-enclosure wires is partially hidden by the grocery bags, so those hidden segments should not be reconstructed without source evidence.",
+    "The exact footrest geometry is only partially visible under the rider's shoe; the image supports shoe-to-footrest contact generally, but close-up evidence would be needed to verify fine shape details.",
+    "Some rear basket mounting-gap details are not clearly resolvable at this viewing distance and angle; additional evidence would be needed for strict structural auditing.",
+    "Brake hardware is visible on the near side, but hidden-side hardware is not evidenced and should not be inferred.",
+    "Seven-dimensional feature breakdown is not fully applicable beyond the provided softFeatures fields because this is a single finished lifestyle image rather than a multi-view technical proof set."
+  ],
+  "version": "5ec9ac6a-7337-487f-9ba7-aee0a613727c",
+  "imageId": "img-7-2",
+  "sourceHash": "062741b78a1b87f06fb0f2cd8730218f9b8b8c89277388e84d536a3103105266",
+  "createdAt": "2026-09-27T11:48:59.278Z"
+}

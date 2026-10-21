@@ -1,0 +1,1 @@
+export const MAX_LISTING_DOCUMENT_BYTES = 200 * 1024 * 1024

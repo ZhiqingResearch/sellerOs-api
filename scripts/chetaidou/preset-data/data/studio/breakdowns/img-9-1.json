@@ -1,0 +1,90 @@
+{
+  "summary": "A vertical comparison poster shows the accepted C1Splus cargo scooter in the upper color scene on a sunny seaside boardwalk, ridden by one adult woman with a dog seated inside the central cargo enclosure. Large marketing text promotes the upper scene. A diagonal white divider separates a lower black-and-white comparison scene showing another adult woman walking a dog on a leash in a park-like setting.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": true,
+  "persons": [
+    {
+      "personId": "p1",
+      "observedAppearance": "Adult woman in the upper scene, smiling, wearing an orange cap, orange sleeveless top, light beige shorts, and light-colored sneakers, seated on the scooter with both hands on the handlebar."
+    },
+    {
+      "personId": "p2",
+      "observedAppearance": "Adult woman in the lower scene, grayscale, neutral to tired expression, wearing a sleeveless top and fitted pants, walking while holding a dog leash."
+    }
+  ],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "PET-FRIENDLY CABIN",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "Ours",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "Share The Wind, Not The Strain",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "Other",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "Exhausted Before You Arrive",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "Steering-tube logo present as a small cyan mark, exact text unreadable",
+      "category": "product_mark",
+      "editable": false,
+      "readability": "unclear"
+    }
+  ],
+  "softFeatures": {
+    "composition": "4:5 vertical split-comparison layout; upper larger color lifestyle scene and lower smaller grayscale comparison scene, separated by a white diagonal divider descending from left to right.",
+    "sceneLightColor": "Upper scene uses warm late-afternoon sunlight with bright natural color; lower scene is desaturated grayscale with softer, subdued contrast.",
+    "peoplePetsStory": "Upper scene presents a cheerful rider commuting with a dog safely seated in the scooter’s central cabin; lower scene presents a more tiring alternative of a woman walking a dog.",
+    "propsOcclusion": "Rider legs partially overlap and occlude parts of the scooter midsection naturally; the dog overlaps only the central enclosure area; some lower-scene subjects are partially cropped by the frame edges.",
+    "graphicsText": "Large bold black headline at upper left, green rounded 'Ours' label with black supporting copy at upper right, red rounded 'Other' label and white supporting copy in the lower section.",
+    "effects": "Clean commercial compositing, mild depth separation, warm sunlight flare/glow in the upper right, no heavy motion effects visible.",
+    "rendering": "Photorealistic premium e-commerce style. The seven-dimension breakdown is only partly applicable here because some dimensions concern editable style choices rather than fixed product facts."
+  },
+  "hardConstraints": [
+    "Keep the accepted C1Splus scooter identity consistent with this image: compact cargo scooter layout with central cargo enclosure, rear basket, single saddle, handlebar, two wheels, fenders, and visible blue rear suspension spring.",
+    "Do not change confirmed SKU geometry, component count, or mechanical connections of the central cargo enclosure and rear basket.",
+    "Preserve the bright cyan-blue wheel rim accents visible on both wheels.",
+    "Preserve the visible front disc brake and caliper on the shown side; do not invent hidden-side hardware.",
+    "Preserve the real rear basket and central cargo enclosure structure; do not add a handlebar/front basket.",
+    "Treat the underframe rectangular part as a footrest, not a bicycle pedal.",
+    "Near-side parts may occlude far-side tubing only at true overlap; do not delete entire far-side bars just to simplify visibility.",
+    "Do not add new model text, specs, certifications, carrying-capacity claims, or service promises.",
+    "The small real steering-tube product mark/logo is a physical product marking and should not be erased as if it were editable marketing text."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "Exact content of the small cyan steering-tube logo/text is not readable from this image.",
+    "Parking-stand state is not clearly verifiable in this composition; the visible underframe protrusion reads more clearly as a footrest than as a deployed parking stand.",
+    "Only the shown side and angle are evidenced here; any reconstruction of unseen opposite-side structure would require additional product evidence.",
+    "Some lower-scene body details are limited by grayscale treatment and partial cropping, so only visible appearance should be relied on."
+  ],
+  "version": "b1f9f5f2-8849-4b9c-b918-6d2a5ab07bcc",
+  "imageId": "img-9-1",
+  "sourceHash": "9e96dde8e87301320018f6847c6279cad1605e7de36044bc6995aacd5b3a32c0",
+  "createdAt": "2026-09-27T11:49:20.590Z"
+}

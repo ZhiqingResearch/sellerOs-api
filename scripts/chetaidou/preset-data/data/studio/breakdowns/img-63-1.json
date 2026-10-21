@@ -1,0 +1,105 @@
+{
+  "summary": "A wide premium technical infographic showing the scooter's rear wheel area from a left-rear three-quarter view. The intact rear wheel assembly remains on the right, with a stylized exploded hub-motor visualization extending horizontally toward the left. Visible real exterior elements include the black rear fender, rectangular red tail light, thick black tire, cyan-blue rim accent, rear disc brake and caliper, black frame tubes, and blue rear suspension springs. The background is a pale white-to-ice-blue studio gradient with large semi-transparent marketing text and decorative tech-line graphics.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "POWERFUL MOTOR",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "650W",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "High-Performance Drive",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "MAX SPEED",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "12 MPH",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "CLIMBING POWER",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t7",
+      "sourceText": "15°",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t8",
+      "sourceText": "MOTOR",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t9",
+      "sourceText": "650W",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "Wide 5:3-like layout; text blocks across the upper left/center/right; oversized translucent background typography on the left; intact rear wheel cropped large on the right; exploded motor parts aligned horizontally from wheel hub toward the left; decorative green line element along the bottom.",
+    "sceneLightColor": "Bright studio lighting with a white-to-pale-ice-blue gradient background, soft floor haze, black and silver product materials, cyan-blue energy glow, green text accents, and authentic red tail light color.",
+    "peoplePetsStory": "No people or pets present. Pure product-tech advertising scene.",
+    "propsOcclusion": "Rear wheel and frame occupy the right side. The exploded hub-motor components overlap visually with the wheel hub area through glowing energy effects. Foreground/near-side frame and brake hardware partially obscure some far-side wheel structure naturally; no separate props beyond infographic graphics.",
+    "graphicsText": "Prominent marketing typography and infographic styling: three top spec-style text groups, one oversized translucent 'MOTOR' in the background, one oversized pale '650W' at lower left, and a thin green decorative interface line with circular endpoints near the bottom.",
+    "effects": "Stylized exploded-view presentation, cyan energy beams/glow through the axle axis, subtle transparent motion/energy trails, soft atmospheric haze, and semi-transparent oversized background text.",
+    "rendering": "High-end commercial CGI/product-visual style rather than a plain documentary photo; polished but realistic materials on the wheel area combined with conceptual internal motor visualization."
+  },
+  "hardConstraints": [
+    "Confirmed visible product identity on this image should be preserved: rear wheel area only, left-rear three-quarter orientation, black rear fender, rectangular red tail light, thick black tire, cyan-blue rim accent, visible rear disc brake and caliper, black frame tubes, and blue suspension springs.",
+    "Do not change confirmed SKU geometry, part counts, or mounting relationships of visible exterior components.",
+    "Retain the visible brake disc and caliper; do not invent hidden-side brake or drivetrain hardware.",
+    "Exploded motor visualization is conceptual and should not be treated as proven exact internal engineering of the real hub motor.",
+    "No people or pets are present in this accepted finished image.",
+    "No full scooter view is shown; this accepted composition is a cropped rear-wheel technology graphic.",
+    "No bicycle pedals are present; footrests are not shown in this crop and should not be inferred from this image.",
+    "Parking kickstand is not visible in this crop; riding/parking state cannot be established from this image alone.",
+    "No added handlebar basket is visible.",
+    "Source-real product markings are not clearly visible in this image; none should be invented or erased without evidence.",
+    "Marketing text in the current image consists only of the visible infographic wording and can be treated separately from physical product markings."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "The crop does not show the full vehicle, so footrests, parking kickstand state, seat, baskets, and broader frame layout are not fully verifiable from this image alone.",
+    "The exploded motor internals are a stylized concept graphic; exact real internal structure is not evidenced by the image.",
+    "Some wheel/frame structure on the far side is occluded by the near-side wheel, brake hardware, and frame members, so hidden geometry should not be reconstructed without additional evidence.",
+    "No readable physical brand/model/product-mark text is visible on the scooter itself in this frame.",
+    "Because this is a rendered/marketing composite, distinctions between photographed exterior parts and fully synthetic visualization effects should be preserved carefully when editing."
+  ],
+  "version": "d5a7a0e0-94f4-4d4e-be89-ad6b797b2d42",
+  "imageId": "img-63-1",
+  "sourceHash": "daf485d3506958b939e5b80e7a892ea702bb0595de247cc6387ecae63674e5a6",
+  "createdAt": "2026-09-27T11:51:43.516Z"
+}

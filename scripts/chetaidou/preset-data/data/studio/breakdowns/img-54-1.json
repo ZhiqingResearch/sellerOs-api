@@ -1,0 +1,154 @@
+{
+  "summary": "Vertical infographic showing a macro close-up of the scooter's right handlebar control area. Visible are a curved black handlebar tube entering from left, a compact rectangular black control/display module mounted above the bar, a textured black right grip extending to the right edge, visible cable(s) from the left, and a large glossy red circular button below the module on the mounting structure. The background is a soft pale blue-gray studio gradient. Large marketing headline and feature labels are overlaid above, with three mode bars at the bottom.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "INTELLIGENT LED CONTROL",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "01",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "Battery Status",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "02",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "Total Mileage",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "03",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t7",
+      "sourceText": "Speed Status",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t8",
+      "sourceText": "04",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t9",
+      "sourceText": "Speed Modes",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t10",
+      "sourceText": "MODE 1",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t11",
+      "sourceText": "MODE 2",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t12",
+      "sourceText": "MODE 3",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t13",
+      "sourceText": "00",
+      "category": "unknown",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t14",
+      "sourceText": "km/h",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t15",
+      "sourceText": "1000",
+      "category": "unknown",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t16",
+      "sourceText": "M",
+      "category": "unknown",
+      "editable": false,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "4:5 vertical layout with centered macro product close-up in lower-middle area; headline spans top; four feature callouts arranged in two columns above the product; three compact mode bars aligned along the bottom. Only the right-handlebar control detail is shown, not the full vehicle.",
+    "sceneLightColor": "Soft cool studio lighting with pale blue-gray background gradient; controlled highlights on matte black parts and glossy red button.",
+    "peoplePetsStory": "No people or pets present; product-only feature infographic.",
+    "propsOcclusion": "Handlebar tube partially enters from left and is cropped; right grip is cropped by the right edge; cables appear from left/lower-left and are partially cropped. The mount structure partially occludes the bar where it wraps around it. No unrelated props.",
+    "graphicsText": "Clean marketing infographic overlay with large white uppercase title, bright green rounded number blocks, black feature labels, and dark slate-blue bottom mode bars with green end accents. Small illuminated UI icons/text appear within the control display.",
+    "effects": "Shallow depth-of-field style, smooth background blur, subtle glow from display graphics, polished commercial retouching.",
+    "rendering": "High-end product render or heavily polished product composite look with crisp surfaces, realistic textures, and restrained technical-graphic styling."
+  },
+  "hardConstraints": [
+    "Confirmed visible product area is the right-handlebar control assembly only; do not expand to full vehicle without separate image evidence.",
+    "Preserve the compact rectangular control/display module geometry and its mounting relationship above the handlebar.",
+    "Preserve the textured black right grip extending to the right edge; do not replace with a different grip style without evidence.",
+    "Preserve the visible curved black handlebar tube entering from the left in an oblique side view.",
+    "Preserve the visible cable routing entering from the left/lower-left; do not invent additional unrelated handlebar hardware.",
+    "Preserve the large red circular button below the module and its connection to the mounting structure.",
+    "Do not add unrelated scooter components, rider, pet, road, basket, footrests, kickstand, wheels, saddle, or frame into this macro composition unless a new target explicitly changes scope and has evidence.",
+    "Do not invent brand marks, model text, performance numbers, certifications, or service claims.",
+    "Visible on-screen UI text/icons inside the module are part of the depicted display area in the current image; treat as non-editable unless separately confirmed as removable overlay rather than product content.",
+    "No clear real-world brand/product_mark is visible on the hardware exterior in this image."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "Cannot verify from this single close-up whether the module screen graphics are true product UI, composited enhancement, or conceptual display styling.",
+    "Cannot verify whether the red circular button is a power/horn/control button; function is not evidenced by the image alone.",
+    "Cannot verify exact material specifications or finish types beyond visible matte/satin/gloss appearance.",
+    "Cannot verify whether the display numerals/icons ('00', '1000', 'M', battery/symbols) are actual device interface states or illustrative graphics.",
+    "Historical prompt mentions using only the exact right-handlebar detail; current image matches that scope, but no source-vs-final provenance can be proven from the final image alone.",
+    "Seven-dimensional product structure rules about footrests, kickstand, baskets, brake disc, etc. are not applicable in this crop because those parts are not visible."
+  ],
+  "version": "59631172-099c-42b9-9c8a-d7b97f9c1ebe",
+  "imageId": "img-54-1",
+  "sourceHash": "8379474cd6d1bd0fa0099bfcc6bde9b89fcac7d9b6d808988bd7391a037d2e6f",
+  "createdAt": "2026-09-27T11:30:47.723Z"
+}

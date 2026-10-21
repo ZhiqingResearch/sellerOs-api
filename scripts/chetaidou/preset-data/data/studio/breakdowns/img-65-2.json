@@ -1,0 +1,135 @@
+{
+  "summary": "一张品牌实力展示风格的电商成品图。画面为浅蓝到白色渐变棚拍背景，顶部有大弧形半透明白蓝色光带。右侧主体为黑色坐骑式电动货运踏板车，浅前左三分之二视角，前轮在左、后轮在右，停车脚撑放下。可见中部低位开放式管状货篮、后置货篮、宽座垫、蓝色后减震弹簧、蓝色轮圈识别色、前后挡泥板、前灯、可见刹车盘与卡钳。左侧为大字文案与评论卡片，下方有透明证书牌与展示方块；右上有两枚蓝色月桂徽章。",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "Feel The Difference",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "#1",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "Sit & Ride Scooter",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "Brand in the US*",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "Pioneer of Pet Scooters",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "Gyroor C1 electric scooter review — You can sit and ride on this scooter!",
+      "category": "model",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t7",
+      "sourceText": "Like",
+      "category": "unknown",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t8",
+      "sourceText": "Share",
+      "category": "unknown",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t9",
+      "sourceText": "12 Years",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t10",
+      "sourceText": "of R&D Excellence",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t11",
+      "sourceText": "SGS",
+      "category": "certification",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t12",
+      "sourceText": "Certification",
+      "category": "certification",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t13",
+      "sourceText": "SGS",
+      "category": "certification",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t14",
+      "sourceText": "证书正文其余内容过小，无法逐项辨认",
+      "category": "certification",
+      "editable": false,
+      "readability": "unclear"
+    }
+  ],
+  "softFeatures": {
+    "composition": "4:3 横版构图，信息区在左、产品主体在右。车辆占据右半幅并略向下落位，左侧留出大面积标题与卡片空间，右上布置两枚徽章，左下有证书牌与半透明展示块。",
+    "sceneLightColor": "浅冰蓝、粉蓝、白色的高亮棚拍配色。整体光线柔和均匀，黑色车身有干净的缎面高光，底部有轻微接地阴影与弱反射。",
+    "peoplePetsStory": "无人、无宠物、无装载。叙事重点是品牌与资质感展示，而非使用场景。",
+    "propsOcclusion": "车辆前轮和下部被画面边缘轻微裁切；中部货篮与车架、座杆、后轮存在正常前后遮挡。未见因遮挡而整根删除远侧管件的明显问题。左下证书牌与展示块独立存在，不遮挡主体关键结构。",
+    "graphicsText": "含大标题、#1 宣称、两行副文案、评论卡片、两枚月桂徽章以及左下证书牌。文字与图形均为营销叠加元素，不等同于产品实物标识。",
+    "effects": "背景带有一条大弧形半透明白蓝光带/弧线；整体有轻微玻璃亚克力通透感与干净反射效果，无运动模糊。",
+    "rendering": "高精修电商合成/渲染质感，边缘干净，材质表现偏商业CG或重修图风格。七维中与人物相关维度不适用，因为画面无人。"
+  },
+  "hardConstraints": [
+    "当前成品展示的是单车，无人物、无宠物、无额外车辆。",
+    "车辆朝向为前轮在左、后轮在右，未镜像翻转。",
+    "停车脚撑处于放下状态；骑行脚撑状态未同时出现，符合互斥要求。",
+    "可见独立矩形脚踏与停车脚撑为分离部件，未被改成自行车脚踏。",
+    "保留中部低位开放式管状货篮与后部货篮，两者均为空。",
+    "保留可见刹车盘和卡钳，不需要臆造被遮挡侧硬件。",
+    "保留宽座垫、蓝色后减震弹簧、蓝色轮圈识别色、挡泥板、前灯等SKU识别特征。",
+    "主体结构、部件数量与主要连接关系在当前成品中连贯可辨。"
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "左下证书牌除“SGS”外，其余正文过小，无法基于当前图像逐项核读。",
+    "车身上存在小型实物标识/图形，但未见清晰可读文字，不能据此确认品牌文字标识内容。",
+    "受当前机位与裁切影响，脚踏与部分下部连接细节不是完全正视展示；如需逐一核对具体管件或远侧结构，需更高分辨率或补充原始产品证据。"
+  ],
+  "version": "029613ce-68fc-44eb-8208-f9785c3f2f45",
+  "imageId": "img-65-2",
+  "sourceHash": "baeef87b446acafccae90e5bef6157ba8aafa1a718d662b7f7d60d147f69cdf0",
+  "createdAt": "2026-09-27T11:52:27.327Z"
+}

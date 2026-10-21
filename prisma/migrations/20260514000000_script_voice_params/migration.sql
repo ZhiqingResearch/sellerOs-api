@@ -1,0 +1,5 @@
+-- AlterTable
+ALTER TABLE `Script`
+  ADD COLUMN `speed` INTEGER NULL,
+  ADD COLUMN `volume` INTEGER NULL,
+  ADD COLUMN `pitch` INTEGER NULL;

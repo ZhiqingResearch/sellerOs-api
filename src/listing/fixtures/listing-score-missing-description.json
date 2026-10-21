@@ -1,0 +1,264 @@
+{
+  "historyTitle": "Listing评分回归样例",
+  "mode": "standard",
+  "scoreVersion": "cdq-2026-09-16",
+  "total": 61.6429,
+  "dimensions": [
+    {
+      "name": "CDQ完整性",
+      "subtitle": "折算分 · 证据覆盖率 80.00%",
+      "weight": 40,
+      "maxScore": 40,
+      "score": 24.0,
+      "color": "#FF9500",
+      "criteria": [
+        {
+          "name": "结构化属性",
+          "description": "属性存在大量填错与非事实话术，且必填项缺失严重",
+          "maxScore": 30,
+          "score": 6.0,
+          "source": "操作建议",
+          "deductions": [
+            {
+              "reason": "Printer Model Compatibility 属性填写了不相关的 HP 型号，属填错，该项不得分",
+              "points": 24.0
+            }
+          ],
+          "status": "VERIFIED"
+        },
+        {
+          "name": "标题质量",
+          "description": "标题长度符合要求，但存在品牌与产品重复词",
+          "maxScore": 25,
+          "score": 21.25,
+          "source": "操作建议",
+          "deductions": [
+            {
+              "reason": "标题中 '502' 和 'Bottles' 出现次数超标，降级扣分",
+              "points": 3.75
+            }
+          ],
+          "status": "VERIFIED"
+        },
+        {
+          "name": "变体质量",
+          "description": "未获取变体矩阵数据",
+          "maxScore": 20,
+          "score": null,
+          "source": "操作建议",
+          "deductions": [],
+          "status": "UNAVAILABLE"
+        },
+        {
+          "name": "图片质量",
+          "description": "主图合规，副图共5张，覆盖度缺失包装清单与尺寸对比",
+          "maxScore": 15,
+          "score": 9.0,
+          "source": "操作建议",
+          "deductions": [
+            {
+              "reason": "副图数量不足6张",
+              "points": 0.5
+            },
+            {
+              "reason": "副图未展示尺寸对比",
+              "points": 0.75
+            },
+            {
+              "reason": "副图未展示包装清单",
+              "points": 0.75
+            }
+          ],
+          "status": "VERIFIED"
+        },
+        {
+          "name": "A+ 内容",
+          "description": "提供5张A+图片，已获取但未见完整模块数据",
+          "maxScore": 5,
+          "score": 5.0,
+          "source": "操作建议",
+          "deductions": [],
+          "status": "VERIFIED"
+        },
+        {
+          "name": "五点描述",
+          "description": "五点描述共7条，满足数量要求",
+          "maxScore": 5,
+          "score": 5.0,
+          "source": "操作建议",
+          "deductions": [],
+          "status": "VERIFIED"
+        }
+      ],
+      "cdq": {
+        "applicableMax": 100,
+        "effectiveMax": 80,
+        "earnedScore": 48.0,
+        "normalizedScore": 60.0,
+        "evidenceCoverage": 0.8
+      }
+    },
+    {
+      "name": "关键词覆盖",
+      "subtitle": "覆盖率评估",
+      "weight": 25,
+      "maxScore": 25,
+      "score": 21.0,
+      "color": "#007AFF",
+      "criteria": [
+        {
+          "name": "核心关键词进入标题前 75 字符",
+          "description": "核心词 MC SUPRINT Replacement for 502 Ink 已覆盖",
+          "maxScore": 7,
+          "score": 7.0,
+          "source": "官方",
+          "deductions": []
+        },
+        {
+          "name": "S/A 级关键词覆盖标题 + Bullet",
+          "description": "S/A 级关键词覆盖基本良好，部分缺失",
+          "maxScore": 7,
+          "score": 6.0,
+          "source": "行业研究",
+          "deductions": [
+            {
+              "reason": "缺失部分同品类关键词",
+              "points": 1.0
+            }
+          ]
+        },
+        {
+          "name": "B/C 级长尾词在 Bullet / 描述 / 后台词中覆盖",
+          "score": 4.0,
+          "maxScore": 5,
+          "source": "操作建议",
+          "deductions": [
+            {
+              "reason": "覆盖率未达70%",
+              "points": 1.0
+            }
+          ]
+        },
+        {
+          "name": "后台搜索词写满且与标题不重复",
+          "description": "SEARCH TERMS未获取",
+          "maxScore": 4,
+          "score": 4,
+          "source": "官方",
+          "deductions": [],
+          "status": "UNAVAILABLE"
+        },
+        {
+          "name": "关键词真实可承接，无虚假不相关高流量词",
+          "description": "无发现硬蹭流量的不相关高搜索词",
+          "maxScore": 2,
+          "score": 2.0,
+          "source": "操作建议",
+          "deductions": []
+        }
+      ]
+    },
+    {
+      "name": "COSMO 关系覆盖",
+      "subtitle": "语义关系分析",
+      "weight": 20,
+      "maxScore": 20,
+      "score": 15.0,
+      "color": "#5856D6",
+      "criteria": [
+        {
+          "name": "通用高优先级 4 类全部覆盖",
+          "description": "已覆盖USED_FOR_FUNC等关系",
+          "maxScore": 10,
+          "score": 10.0,
+          "source": "官方",
+          "deductions": []
+        },
+        {
+          "name": "品类驱动关系已覆盖",
+          "description": "部分关系未明确体现",
+          "maxScore": 6,
+          "score": 4.5,
+          "source": "官方",
+          "deductions": [
+            {
+              "reason": "缺少针对此品类的特定关系描述",
+              "points": 1.5
+            }
+          ]
+        },
+        {
+          "name": "中优先级关系覆盖 ≥3 类",
+          "description": "关系覆盖尚可",
+          "maxScore": 4,
+          "score": 0.5,
+          "source": "操作建议",
+          "deductions": [
+            {
+              "reason": "中优先级关系覆盖不足3类",
+              "points": 3.5
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Alexa 语义质量",
+      "subtitle": "语义解析评估",
+      "weight": 15,
+      "maxScore": 15,
+      "score": 1.6429,
+      "color": "#AF52DE",
+      "criteria": [
+        {
+          "name": "标题语义连贯性",
+          "description": "标题符合三要素，但存在关键词堆砌感",
+          "maxScore": 7,
+          "score": 3.0,
+          "source": "行业研究",
+          "deductions": [
+            {
+              "reason": "存在明显的关键词堆砌",
+              "points": 4.0
+            }
+          ]
+        },
+        {
+          "name": "每条 Bullet 包含 ≥1 个可验证数据点",
+          "description": "部分Bullet内容空洞",
+          "maxScore": 5,
+          "score": 0.7143,
+          "source": "行业研究",
+          "deductions": [
+            {
+              "reason": "Bullet 4-7 缺乏硬核规格数据",
+              "points": 4.2857
+            }
+          ]
+        },
+        {
+          "name": "描述包含具体使用场景与结构化规格",
+          "description": "严重缺失结构化规格与产品总览叙事",
+          "maxScore": 3,
+          "score": 0.0,
+          "source": "操作建议",
+          "deductions": [
+            {
+              "reason": "缺失PRODUCT OVERVIEW与结构化规格段",
+              "points": 3.0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "suggestions": [
+    "修正结构化属性：Printer Model Compatibility 字段中删除不相关的 HP 型号，填入 EcoTank 系列准确型号。",
+    "优化标题：将 '502' 和 'Bottles' 的重复出现缩减为 1 次，移除冗余描述以符合语义规范。",
+    "完善图片：补充展示产品包装清单照片及产品尺寸对比图，并增加一张副图达到6张以上。",
+    "增强 Alexa 语义：在 Bullet 4-7 中补充具体的物理尺寸、兼容性认证及性能测试数据；重写产品描述增加 PRODUCT OVERVIEW 和结构化规格段。",
+    "SEARCH TERMS未获取 · CDQ不扣分。",
+    "CDQ权重为内部整理口径，不是Amazon官方评分算法。"
+  ],
+  "potential": "C"
+}

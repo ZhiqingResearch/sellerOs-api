@@ -1,0 +1,80 @@
+{
+  "summary": "A wide battery-technology marketing visual showing a semi-abstract underside/x-ray style view of the C1Splus lower chassis. The dominant subject is a dark rectangular enclosed battery module with glowing blue cylindrical cells, seen from a close oblique underbody angle. The surrounding scooter structure is rendered as translucent white/ice-blue tubing and wheel outlines rather than a full opaque product view. Large marketing text appears at lower left and upper/right areas, with some right-side text cropped by the frame. Compared with the historical prompt, the overall concept, camera direction, translucent chassis treatment, central battery focus, and main battery headline match closely; however, the right-side text is partially cut off in the delivered image, and no full clear view of detailed SKU geometry is provided because this is an abstract technical illustration rather than a full product evidence shot.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "tA",
+      "sourceText": "ENCLOSED BATTERY",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tB",
+      "sourceText": "Protected Power System",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tC",
+      "sourceText": "LONG-RANGE",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tD",
+      "sourceText": "Electric Mobility",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tE",
+      "sourceText": "EFFICIE",
+      "category": "marketing",
+      "editable": false,
+      "readability": "unclear"
+    },
+    {
+      "textId": "tF",
+      "sourceText": "Charging D",
+      "category": "marketing",
+      "editable": false,
+      "readability": "unclear"
+    }
+  ],
+  "softFeatures": {
+    "composition": "Wide 5:3 style layout. Battery pack is the dominant subject, placed slightly left of center and angled diagonally from upper left to lower right. Right side reserved for marketing text, though part of that text is cropped by the frame. Lower area includes a thin decorative green line with circular endpoints.",
+    "sceneLightColor": "Clean studio-like cool palette with pale gray/white background, translucent ice-blue chassis glow, black battery housing, electric cyan-blue internal illumination, and green accent text/line.",
+    "peoplePetsStory": "No people or pets. Pure technical/marketing infographic scene with no lifestyle narrative.",
+    "propsOcclusion": "Battery module overlaps translucent chassis tubes and wheel silhouettes. Chassis is ghosted and atmospheric; no complex foreground obstruction by separate props. Some marketing text on the right is cropped by the canvas edge.",
+    "graphicsText": "Large bold black sans-serif headline at lower left, smaller green subheadline below, additional bold black and green marketing copy at upper/right side, plus a thin decorative green technical line near the bottom.",
+    "effects": "X-ray/cutaway presentation, glass-like transparency, soft bloom, blue edge glow around the battery enclosure, luminous battery-cell rendering, subtle volumetric haze, and controlled shadow/reflection treatment.",
+    "rendering": "Polished 3D illustrative render, semi-abstract and premium advertising style rather than photorealistic product photography."
+  },
+  "hardConstraints": [
+    "No people or pets are present; keep this as a non-human technical graphic unless separately requested.",
+    "The current approved image uses a close oblique underbody viewpoint with the battery bay as the dominant central subject.",
+    "The battery is depicted as an enclosed rectangular module integrated into the lower chassis, not an exploded assembly.",
+    "The surrounding vehicle structure is shown as translucent abstract chassis and wheel context rather than a full opaque scooter shot.",
+    "No readable real-world brand, model, certification badge, or performance-number claim is visible in this image.",
+    "Do not add invented numerical specifications, certification marks, service promises, or new model naming.",
+    "Because the chassis is abstract/ghosted here, unshown SKU geometry, part counts, and exact connections require separate visual evidence before reconstruction or change."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "This image is an abstract technical illustration, so it does not provide reliable evidence for exact C1Splus underbody tube routing, fasteners, footrests, kickstand state, brake hardware, basket structure, or full wheel-side geometry.",
+    "The right-side marketing text is partially cropped; only fragments of the lower item are readable in-frame.",
+    "No visible product mark, model mark, certification label, or specification label can be confirmed on the battery housing from this image.",
+    "Historical prompt references exact approved text including 'EFFICIENT' and 'Charging Design', but the delivered image only shows partial cropped text for that section; this is a delivery difference, not a confirmed SKU-structure conflict.",
+    "Because this is not a full product evidence shot, any edit that reveals unseen sides or exact mechanical structure would need new evidence rather than inferred reconstruction."
+  ],
+  "version": "fccc4809-784b-46ed-bc07-aca9bc9275d9",
+  "imageId": "img-64-1",
+  "sourceHash": "d411c375662c2739c37c145daa7602ca0a619f84c2d56228b8b134c9669feac6",
+  "createdAt": "2026-09-27T11:52:01.691Z"
+}

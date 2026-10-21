@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "sku": {
+    "code": "CS1plus",
+    "name": "C1S Plus"
+  },
+  "imageCount": 25,
+  "catalogFile": "data/catalog.json",
+  "breakdownsDir": "data/studio/breakdowns",
+  "factsFile": "docs/c1splus-library-preparation.md",
+  "factCardFile": "facts/cs1plus.json",
+  "factCardHash": "77d3943a9709a9dcdb81981a055b42330aa6d94dad93e123237fc5c9f20b1954",
+  "breakdownAcceptance": {
+    "status": "confirmed",
+    "confirmedOn": "2026-10-08",
+    "basis": "用户确认初始化母版及配套拆解均已确认，导入后直接使用。"
+  }
+}

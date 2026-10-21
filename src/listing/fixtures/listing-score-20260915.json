@@ -1,0 +1,52 @@
+{
+  "historyTitle": "Canon 260XL 261XL 墨盒评分",
+  "mode": "standard",
+  "total": 76,
+  "dimensions": [
+    {
+      "name": "CDQ 健康度", "subtitle": "属性缺失与图片一致性风险", "weight": 40, "maxScore": 40, "score": 26, "color": "#FF9500",
+      "criteria": [
+        { "name": "结构化属性完整、准确且一致", "description": "未提供结构化属性列表，无法评估完整性与准确性。", "score": 7, "maxScore": 12, "source": "官方", "deductions": [{ "reason": "未提供结构化属性数据，按中等水平起评，建议补全后台属性", "points": 5 }] },
+        { "name": "标题质量、合规性与属性一致性", "description": "标题长度 61 字符，符合新政要求；但标题中包含“Replacement for”等非核心属性描述，且未包含品牌名开头。", "score": 8, "maxScore": 10, "source": "官方", "deductions": [{ "reason": "标题未以品牌名开头，且包含冗余描述", "points": 2 }] },
+        { "name": "变体关系、配置值与子体一致性", "description": "未提供变体数据，按单品处理。", "score": 8, "maxScore": 8, "source": "官方", "deductions": [] },
+        { "name": "图片数量、主图合规与信息一致性", "description": "主/副图共 7 张（主图+6张副图），符合数量要求。主图白底合规。副图 1 中明确标注了兼容型号，与文本一致。副图 3 标注 550/400 页，与 Bullet 2 一致。", "score": 3, "maxScore": 6, "source": "官方", "deductions": [{ "reason": "主图原始像素 357×355，远低于亚马逊建议的 1000 像素以上，无法满足放大查看需求", "points": 3 }] },
+        { "name": "A+ 是否激活且内容一致", "description": "A+ 内容存在严重一致性问题：A+4、A+12、A+13 图片中显示的包装盒型号为 275XL/276XL，与本 Listing 销售的 260XL/261XL 型号完全不符。", "score": 0, "maxScore": 2, "source": "官方", "deductions": [{ "reason": "A+ 图片中出现错误型号（275XL/276XL），与产品不一致", "points": 2 }] },
+        { "name": "Bullet 数量与基础合规性", "description": "提供 7 条 Bullet，均以加粗标签开头，内容详实。", "score": 0, "maxScore": 2, "source": "官方", "deductions": [{ "reason": "Bullet 数量超过 5 条，虽不违规但建议精简以提升阅读体验", "points": 0 }] }
+      ]
+    },
+    {
+      "name": "关键词覆盖", "subtitle": "核心词覆盖良好，后台词需优化", "weight": 25, "maxScore": 25, "score": 20, "color": "#007AFF",
+      "criteria": [
+        { "name": "核心关键词进入标题前 75 字符", "maxScore": 7, "score": 7, "source": "官方", "deductions": [] },
+        { "name": "S/A 级关键词覆盖标题 + Bullet", "maxScore": 7, "score": 7, "source": "行业研究", "deductions": [] },
+        { "name": "B/C 级长尾词在 Bullet / 描述 / 后台词中覆盖", "maxScore": 5, "score": 3, "source": "操作建议", "deductions": [{ "reason": "后台搜索词未提供，长尾词覆盖率不足", "points": 2 }] },
+        { "name": "后台搜索词写满且与标题不重复", "maxScore": 4, "score": 1, "source": "官方", "deductions": [{ "reason": "未提供后台搜索词", "points": 3 }] },
+        { "name": "关键词真实可承接，无虚假不相关高流量词", "maxScore": 2, "score": 2, "source": "操作建议", "deductions": [] }
+      ]
+    },
+    {
+      "name": "COSMO 关系覆盖", "subtitle": "语义关系覆盖完整", "weight": 20, "maxScore": 20, "score": 18, "color": "#5856D6",
+      "criteria": [
+        { "name": "通用高优先级 4 类全部覆盖", "maxScore": 10, "score": 10, "source": "官方", "deductions": [] },
+        { "name": "品类驱动关系已覆盖", "maxScore": 6, "score": 6, "source": "官方", "deductions": [] },
+        { "name": "中优先级关系覆盖 ≥3 类", "maxScore": 4, "score": 2, "source": "操作建议", "deductions": [{ "reason": "部分中优先级关系描述不够明确", "points": 2 }] }
+      ]
+    },
+    {
+      "name": "Alexa 语义质量", "subtitle": "结构化程度高，符合 NPO 范式", "weight": 15, "maxScore": 15, "score": 12, "color": "#AF52DE",
+      "criteria": [
+        { "name": "标题语义连贯性", "maxScore": 7, "score": 6, "source": "行业研究", "deductions": [{ "reason": "标题缺乏品牌名开头", "points": 1 }] },
+        { "name": "每条 Bullet 包含 ≥1 个可验证数据点", "maxScore": 5, "score": 5, "source": "行业研究", "deductions": [] },
+        { "name": "描述包含具体使用场景与结构化规格", "maxScore": 3, "score": 1, "source": "操作建议", "deductions": [{ "reason": "描述段落结构未完全遵循 PRODUCT OVERVIEW 格式", "points": 2 }] }
+      ]
+    }
+  ],
+  "suggestions": [
+    "【硬合规】A+ 图片（A+4, A+12, A+13）中显示的包装型号为 275XL/276XL，与本产品 260XL/261XL 不符，请立即更换 A+ 图片以避免误导消费者及违规风险。",
+    "主图分辨率仅 357×355，远低于亚马逊要求的 1000 像素以上，请上传高清原图以支持放大功能。",
+    "标题建议优化为：EaseFusion 260XL 261XL Ink Cartridges Replacement for Canon PIXMA TS6420a TS5320 Printers (61 字符，≤75)。",
+    "请在后台补全结构化属性（如：墨水类型、兼容打印机系列、页产量等），并确保后台搜索词（Search Terms）已填满 249 字节。",
+    "Bullet 数量建议精简至 5 条以内，将重复的安装指南（Bullet 7）整合进描述或 A+ 页面中。"
+  ],
+  "potential": "B级 · 优化后上线"
+}

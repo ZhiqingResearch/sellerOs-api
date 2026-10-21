@@ -1,0 +1,102 @@
+{
+  "summary": "Rear-wheel technology infographic showing a close-up of the scooter's rear wheel and suspension on the right, with a stylized exploded hub-motor visualization extending left from the wheel hub. White to pale ice-blue studio background, large translucent 'MOTOR' and pale '650W' graphics, plus three spec-style text callouts across the top.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "POWERFUL MOTOR",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "650W",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "High-Performance Drive",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "MAX SPEED",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "12 MPH",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "CLIMBING POWER",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t7",
+      "sourceText": "15°",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t8",
+      "sourceText": "MOTOR",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t9",
+      "sourceText": "650W",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "Wide 5:3 infographic layout. Rear wheel and rear suspension occupy the right half; exploded motor components align horizontally from the wheel hub toward the left. Top row contains three text groups; lower left contains oversized pale background numerals. No full vehicle shown.",
+    "sceneLightColor": "Bright studio-style lighting with white, pale ice-blue, cyan glow accents, black and metallic product surfaces, and a red tail light accent.",
+    "peoplePetsStory": "No people or pets. Pure product technology/feature presentation.",
+    "propsOcclusion": "Rear wheel is partially overlapped by conceptual transparent/glowing motor-explosion rings and components near the hub area. Large translucent background text sits behind product and exploded parts. No meaningful scene props beyond decorative interface line.",
+    "graphicsText": "Prominent marketing/spec typography at top; oversized translucent 'MOTOR' behind the center; oversized pale '650W' at lower left; thin green line graphic with circular endpoints near bottom.",
+    "effects": "Cyan energy glow through the exploded motor axis, light streaks/motion trails, soft haze, subtle floor reflection/shadow, translucent background typography.",
+    "rendering": "Polished commercial 3D render / composited technical advertising style rather than plain product photography."
+  },
+  "hardConstraints": [
+    "Visible real product identity cues in this image should be preserved where shown: rear wheel close-up, black rear fender, rectangular red tail light, cyan-blue rim accent, perforated rear disc brake, black caliper area, black frame tubes, and blue rear suspension springs.",
+    "Current accepted composition is a partial rear-wheel close-up, not a full scooter view.",
+    "No people or pets are present in the current image.",
+    "No kickstand or footrests are visible in this crop; do not infer or invent them from outside the frame.",
+    "Do not add or remove wheel-related hardware that is not evidenced here; preserve visible brake disc and caliper-side hardware.",
+    "Exploded hub-motor assembly is shown as a conceptual graphic extending horizontally from the hub toward image left; if edited, keep it clearly separate from claims of exact internal engineering unless evidence is provided.",
+    "Do not erase actual visible product marks or hardware under a generic 'no logos/text' instruction; separate real product elements from marketing overlay text.",
+    "No extra full-vehicle parts should be invented outside this crop without evidence, especially unseen opposite-side structure."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "The exploded motor internals are a stylized conceptual visualization, not evidence of exact internal hub-motor construction.",
+    "Some cable routing and mounting details near the hub/suspension junction are partially occluded by exploded graphics and perspective, so exact attachment relationships are not fully verifiable from this image alone.",
+    "Only the rear wheel area is shown; footrests, parking kickstand state, basket structures, seat, and wider frame layout are outside this crop and cannot be confirmed from this image.",
+    "The image shows marketing/spec numbers ('650W', '12 MPH', '15°'), but whether these are approved factual product specs versus graphic overlay cannot be verified from the image alone.",
+    "Seven-dimension breakdown is only partially applicable here because this is a cropped product infographic with no people, pets, or full-scene narrative."
+  ],
+  "version": "9b9b4d0d-25df-4ba2-8d58-160973ee5586",
+  "imageId": "img-63-2",
+  "sourceHash": "05610afbdc3099b75c7759d5470fb765c6dc4b1e640613d4766529d2aae268b7",
+  "createdAt": "2026-09-27T11:51:51.192Z"
+}

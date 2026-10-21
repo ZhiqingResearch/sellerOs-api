@@ -1,0 +1,94 @@
+{
+  "summary": "一张客服支持主题的电商信息图。画面中央是一位佩戴黑色耳麦、微笑面向镜头的女性客服形象，位于明亮柔和的现代办公室环境中。顶部有品牌字样“GYROOR”和大标题“WE’VE GOT YOUR BACK”。底部是一张白色圆角信息卡，左侧包含售后支持文案与邮箱地址，右侧为耳机与盾牌对勾图标。未见车辆、宠物或与SKU结构相关实物。",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": true,
+  "persons": [
+    {
+      "personId": "p1",
+      "observedAppearance": "一名可见上半身的成年女性外观人物，深棕色中长直发，中分，微笑表情，佩戴黑色头戴式客服耳麦，穿浅米白色西装外套和白色内搭，坐在办公椅前，正面看向镜头。"
+    }
+  ],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "GYROOR",
+      "category": "brand",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "WE’VE GOT YOUR BACK",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "QUALITY GUARANTEE",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "AFTER-SALES SUPPORT",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "Need help with your C1 Plus?",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "Product support for eligible issues under normal use.",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t7",
+      "sourceText": "csscooter@8nd8.com",
+      "category": "unknown",
+      "editable": true,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "竖版信息图构图，人物居中偏上，顶部为品牌与主标题，底部大面积白色圆角信息卡承载文字和图标；人物为胸部以上近中景。",
+    "sceneLightColor": "整体为明亮暖白色调，办公室背景柔和偏米白，采光充足，带自然日光感。",
+    "peoplePetsStory": "单人客服接待场景，无宠物，无明确叙事动作，传达友好、支持、售后服务氛围。",
+    "propsOcclusion": "左下前景可见一块显示器边缘；人物坐在桌前，底部信息卡覆盖了人物下半身与桌面区域；背景有模糊办公设备与绿植。",
+    "graphicsText": "包含品牌字样、大号营销标题、底部说明文字，以及右侧耳机+盾牌对勾的矢量风格图形图标。",
+    "effects": "浅景深背景虚化，干净商业修图风格，柔和阴影，信息卡带轻微立体感。",
+    "rendering": "偏写实商业广告视觉，人物肤质与办公室环境为照片感，图标和文字为后期叠加信息图元素。"
+  },
+  "hardConstraints": [
+    "当前图已验收成品应按现画面拆解，不按历史提示词补想其他内容。",
+    "图中存在1名人物，后续编辑若延续该画面不应误判为无人图。",
+    "品牌字样“GYROOR”为清晰可读品牌文本，不可作为可编辑营销文案处理。",
+    "顶部主标题“WE’VE GOT YOUR BACK”为清晰可读营销文案，可编辑。",
+    "底部信息卡中的“QUALITY GUARANTEE”“AFTER-SALES SUPPORT”“Need help with your C1 Plus?”“Product support for eligible issues under normal use.”以及邮箱文字当前均清晰可读。",
+    "画面中的“C1 Plus”仅作为文案内容出现，不构成可新增型号事实依据，也不应据此扩展任何性能、认证、承诺信息。",
+    "右侧耳机盾牌图形属于营销图标叠加元素，不是实物产品结构证据。",
+    "本图未出现SKU车辆实物，因此不得从本图推断或改动车辆几何、部件数量连接、脚踏/脚撑状态、篮筐结构、刹车盘卡钳等硬结构事实。",
+    "源图中的品牌文字与营销叠加文字应区分处理，不应因去logo类要求误删真实品牌展示。"
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "无法仅凭画面确认人物真实身份、年龄、职业背景或是否为真实员工，只能描述可见外观。",
+    "邮箱地址在本流程分类集中无专门类别，暂归为unknown；其是否允许业务上修改需另行确认规则。",
+    "本图不含车辆实物，关于C1Splus的任何结构、配件、停车/骑行状态在该图内均无新增证据。",
+    "顶部品牌字样是否属于实拍后期合成无法仅凭当前图完全确认，但可确定为清晰可读品牌展示。",
+    "底部白色信息卡及右侧图标为后期设计元素的可能性很高，但非逐像素证据级判断。"
+  ],
+  "version": "f8635a53-97ee-42c7-ad19-f90435ec2b13",
+  "imageId": "img-18-1",
+  "sourceHash": "f0e3a2709d5458832a28187790b80ce865e914a33ca227b28132e492d11d2c28",
+  "createdAt": "2026-09-27T11:50:26.355Z"
+}

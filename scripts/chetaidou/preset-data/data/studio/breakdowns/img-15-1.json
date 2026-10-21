@@ -1,0 +1,125 @@
+{
+  "summary": "A premium CGI-style battery technology infographic on a black background. The main subject is a transparent rectangular battery housing filled with glowing green cylindrical cells, shown in close-up perspective. Large marketing headline text appears at upper left, a feature card sits below it, a gold shield/check graphic floats above the battery, and a right-side info panel lists battery-related claims. No people, pets, or vehicle body are visible.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "Reliable Lithium Power",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "Integrated Battery System",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "20 Miles",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "Range",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "36V 7.8Ah",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "Lithium-Ion Battery",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t7",
+      "sourceText": "*Range may vary based on rider weight, terrain, temperature, road conditions, and battery charge.",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t8",
+      "sourceText": "C1S Lithium Battery",
+      "category": "model",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t9",
+      "sourceText": "36V DC · 7.8Ah",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t10",
+      "sourceText": "Approx. 20 Miles Range",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t11",
+      "sourceText": "Approx. 5 Hours Charging",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t12",
+      "sourceText": "Built-in Battery Design",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "Wide close-up infographic layout. Upper-left headline block, left-center feature card, center-right battery module hero, floating shield graphic above the battery, and lower-right information panel. No full vehicle composition.",
+    "sceneLightColor": "Dark black/charcoal scene with strong green glow accents from the battery cells and thin green light streaks. Metallic gold highlight on the shield. High contrast studio-style lighting.",
+    "peoplePetsStory": "Not applicable; no people or pets are present.",
+    "propsOcclusion": "The battery housing is partially overlapped by the decorative shield graphic and text panels only in foreground layering. No real-world occlusion from people, animals, or environment.",
+    "graphicsText": "Heavy use of marketing overlay text, iconography, panel borders, and a decorative shield/check symbol. Text is clearly part of the designed infographic rather than physical product marking.",
+    "effects": "Glowing green energy effect on cylindrical cells, light streaks, glossy reflections, transparent housing, and premium CGI rendering effects.",
+    "rendering": "Highly polished 3D/CGI commercial visualization rather than straightforward product photography. Futuristic, premium, clean, and stylized."
+  },
+  "hardConstraints": [
+    "Current image is a battery-focused infographic, not a full vehicle scene.",
+    "No people are present.",
+    "No pets are present.",
+    "The main subject is a transparent rectangular battery module/housing shown in close-up.",
+    "The visible battery cells are cylindrical and rendered with green glow.",
+    "The layout contains prominent overlay marketing text at upper left.",
+    "A gold shield with a check mark is visibly included as a graphic element.",
+    "A right-side information panel is visibly included.",
+    "No scooter frame, wheels, seat, handlebar, footrests, kickstand, baskets, or other confirmed vehicle geometry are shown in this image.",
+    "Visible text includes model/spec-style claims such as 'C1S Lithium Battery', '36V DC · 7.8Ah', 'Approx. 20 Miles Range', and 'Approx. 5 Hours Charging'; these are present in the current image and should not be treated as editable marketing text except where categorized as marketing."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "This is a stylized CGI infographic; the exact internal battery structure, cell count, and housing construction of the real product are not evidenced by this image alone.",
+    "The floating shield/check graphic appears symbolic marketing artwork, not proof of certification or testing.",
+    "The image does not show the vehicle integration context, so the exact placement of this battery within the scooter cannot be verified from this frame.",
+    "Because no real product exterior is shown, there are no visible physical product marks separate from overlay text in this image.",
+    "Historical prompt mentions a right information panel and battery focus, which matches this image broadly, but historical instructions are not treated as proof of product facts."
+  ],
+  "version": "f22657bb-b8fe-449c-86d9-b34cf789a174",
+  "imageId": "img-15-1",
+  "sourceHash": "ac29497ef4ec611b6b848afcf8534103b5e588a137c473fa4b4bd7b5e51e684a",
+  "createdAt": "2026-09-27T11:50:06.284Z"
+}

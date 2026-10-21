@@ -1,0 +1,108 @@
+{
+  "summary": "这是一张方形六分区电商功能总览图，展示同一电动货运滑板车/踏板车的局部特写：前碟刹、可调车把与座垫、右把控制模块、后减震、前灯与转向立管标识、后尾灯。整体为浅粉偏淡紫背景，白色圆角卡片排版，深棕色粗体标题，配有克制的青蓝色发光效果。未出现整车全貌、人物或宠物。",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "DISC BRAKE",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "ADJUSTABLE",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "SEAT & HANDLEBAR",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "SMART",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "CONTROL PANEL",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "SMOOTH SUSPENSION",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t7",
+      "sourceText": "BRIGHT HEADLIGHT",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t8",
+      "sourceText": "SAFETY TAIL LIGHT",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t9",
+      "sourceText": "青蓝色圆形实物标识，内部为链环/∞样式图形，无可读字母",
+      "category": "product_mark",
+      "editable": false,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "1:1方图，左侧上下两张大卡片，右侧为上方一张横向卡片、中部一张横向卡片、下方一张纵向分割卡片。各卡片均为白色圆角矩形并带柔和投影。画面聚焦部件特写，没有整车英雄图。",
+    "sceneLightColor": "整体为高调棚拍/电商渲染观感，背景浅粉淡紫，卡片内为白到浅灰渐变；产品为黑色金属与橡胶材质，局部辅以青蓝色发光，尾灯为红色发光点缀。",
+    "peoplePetsStory": "无人、无宠物、无生活方式叙事，仅产品功能展示。",
+    "propsOcclusion": "存在部件级正常裁切与遮挡：碟刹卡片仅展示轮组局部；减震卡片仅展示后悬挂附近结构；头灯与尾灯均为局部特写。未见人为添加的无关道具遮挡主体。",
+    "graphicsText": "含多组营销标题文本，右上卡片中间有上下双向箭头图形表示可调节；其余主要为标题排版与少量功能性发光效果。未见尺寸线、编号、复杂说明线。",
+    "effects": "碟刹盘周围有半透明青蓝运动/能量环；后减震弹簧轮廓带青蓝辉光；头灯镜面有发光表现；尾灯带轻微红色亮起效果。整体效果克制，偏技术感。",
+    "rendering": "高精度商业产品渲染/精修风格，材质边缘干净，金属高光、橡胶纹理、螺丝与线缆细节较清晰。非自然场景实拍。"
+  },
+  "hardConstraints": [
+    "当前成品为六卡片局部功能总览，不是整车全景。",
+    "未出现人物或宠物；hasPeople必须为false，persons为空。",
+    "可清晰见到前轮碟刹总成：银色打孔刹车盘、黑色卡钳、黑色前叉/安装结构、黑胎及青蓝色轮圈装饰线。",
+    "可清晰见到可调车把与座垫是分开展示的两个部件，之间有上下双向箭头图形。",
+    "中部控制模块为右侧把手局部特写，包含黑色控制模块、纹理握把、弯把管、线缆和红色圆形按钮；不是大屏仪表。",
+    "后减震区域明确为单个蓝色螺旋弹簧与相应安装五金，不应凭空增加第二个弹簧。",
+    "前灯卡片中可见低位圆柱形黑色前灯、白色发光镜面，以及其后方转向立管上的青蓝色圆形实物标识；该标识是当前图中可见SKU识别特征。",
+    "尾灯卡片中可见水平红色尾灯，安装在后篮黑色管件结构内/附近；后篮管件关系不可随意改造。",
+    "源图中的青蓝色圆形实物标识属于product_mark，不应因去logo需求被擦除。",
+    "所有已出现的文本均为营销标题；不要新增型号字样、性能数字、承重、认证或服务承诺。",
+    "本图未提供脚踏、停车脚撑、整车中部货篮全貌等完整证据，不能据此重建或断言这些结构在当前画面中的具体状态。",
+    "局部遮挡和裁切是当前构图的一部分，不要求把被裁掉的整车部件补全。"
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "该图为局部特写拼版，无法从当前成品独立验证整车完整几何、部件总数及所有连接逻辑；若后续编辑涉及整车外形或未露出的侧面，需要额外证据图。",
+    "头灯旁青蓝色圆形标识可见图形轮廓，但无可读文字，因此只能记录为实物标识，不能推断品牌字样。",
+    "减震、碟刹、尾灯等卡片均为近景裁切，无法仅凭此图确认对应部件在整车上的全部安装环境与另一侧对称情况。",
+    "右上“可调”卡片展示车把立管和座杆局部，但具体调节范围、锁止结构性能等不可从图中证明。",
+    "中部控制模块卡片仅见局部外观，无法从当前图确认其功能定义、显示能力或按键数量以外的电子规格。",
+    "尾灯卡片仅能确认一个水平红色尾灯与后篮管件局部，无法确认后货架/后篮完整开口与全部连接点。",
+    "七维中的部分维度并非独立适用对象：本图无人物/宠物叙事维度内容，且非真实场景空间，因此相关维度只能说明为不适用或信息有限。"
+  ],
+  "version": "7a104d10-b6cb-471b-8196-79afa89f4b3f",
+  "imageId": "img-51-1",
+  "sourceHash": "eeb88c65154568510fed1edea54a6c1481cbb414a3fc0a3d4ee621655deda314",
+  "createdAt": "2026-09-27T11:51:00.789Z"
+}

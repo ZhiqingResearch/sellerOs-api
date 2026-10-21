@@ -1,0 +1,240 @@
+{
+  "historyTitle": "Wireless Sports Earbuds Listing 质量评估",
+  "mode": "standard",
+  "scoreVersion": "cdq-2026-09-16",
+  "total": 73.5833,
+  "dimensions": [
+    {
+      "name": "CDQ完整性",
+      "subtitle": "折算分 · 证据覆盖率 66.6667%",
+      "weight": 40,
+      "maxScore": 40,
+      "score": 26.6667,
+      "color": "#FF9500",
+      "criteria": [
+        {
+          "name": "结构化属性",
+          "description": "未获取类目必填属性清单，无法核验属性完整性与正确性。",
+          "maxScore": 30,
+          "score": null,
+          "source": "操作建议",
+          "deductions": [],
+          "status": "UNAVAILABLE"
+        },
+        {
+          "name": "标题质量",
+          "description": "标题长度 83 字符，包含品牌、产品类型及关键配置，结构完整；无违禁词；同词未见明显堆砌。",
+          "maxScore": 25,
+          "score": 25,
+          "source": "操作建议",
+          "deductions": [],
+          "status": "VERIFIED"
+        },
+        {
+          "name": "变体质量",
+          "description": "未获取变体矩阵数据，无法核验变体完整性。",
+          "maxScore": 20,
+          "score": null,
+          "source": "操作建议",
+          "deductions": [],
+          "status": "UNAVAILABLE"
+        },
+        {
+          "name": "图片质量",
+          "description": "主图长边 355px < 1000px，不支持放大；副图 7 张，覆盖场景、细节、尺寸、包装，覆盖度良好。",
+          "maxScore": 15,
+          "score": 10.5,
+          "source": "操作建议",
+          "deductions": [
+            {
+              "reason": "主图长边 355px 未达 1000px 放大门槛",
+              "points": 3
+            },
+            {
+              "reason": "主图非纯白底（存在阴影与倒影）",
+              "points": 1.5
+            }
+          ],
+          "status": "VERIFIED"
+        },
+        {
+          "name": "A+ 内容",
+          "description": "已获取 A+ 模块证据，包含场景图与对比表，模块数充足。",
+          "maxScore": 5,
+          "score": 5,
+          "source": "操作建议",
+          "deductions": [],
+          "status": "VERIFIED"
+        },
+        {
+          "name": "五点描述",
+          "description": "提供 6 条五点描述，满足 ≥3 条要求。",
+          "maxScore": 5,
+          "score": 5,
+          "source": "操作建议",
+          "deductions": [],
+          "status": "VERIFIED"
+        }
+      ],
+      "cdq": {
+        "applicableMax": 100,
+        "effectiveMax": 66.6667,
+        "earnedScore": 44.5,
+        "normalizedScore": 66.75,
+        "evidenceCoverage": 0.6667
+      }
+    },
+    {
+      "name": "关键词覆盖",
+      "weight": 25,
+      "maxScore": 25,
+      "score": 20.5,
+      "color": "#007AFF",
+      "criteria": [
+        {
+          "name": "核心关键词进入标题前 75 字符",
+          "description": "标题前 75 字符包含核心词 Wireless Sports Earbuds，命中。",
+          "maxScore": 7,
+          "score": 7,
+          "source": "官方",
+          "deductions": []
+        },
+        {
+          "name": "S/A 级关键词覆盖标题 + Bullet",
+          "description": "覆盖良好，未发现明显缺失。",
+          "maxScore": 7,
+          "score": 7,
+          "source": "行业研究",
+          "deductions": []
+        },
+        {
+          "name": "B/C 级长尾词在 Bullet / 描述 / 后台词中覆盖",
+          "description": "覆盖率符合要求。",
+          "maxScore": 5,
+          "score": 5,
+          "source": "操作建议",
+          "deductions": []
+        },
+        {
+          "name": "后台搜索词写满且与标题不重复",
+          "description": "未获取后台 Search Terms。",
+          "maxScore": 4,
+          "score": 0,
+          "source": "官方",
+          "deductions": [
+            {
+              "reason": "未获取此项",
+              "points": 4
+            }
+          ]
+        },
+        {
+          "name": "关键词真实可承接，无虚假不相关高流量词",
+          "description": "内容与产品匹配。",
+          "maxScore": 2,
+          "score": 2,
+          "source": "操作建议",
+          "deductions": []
+        }
+      ]
+    },
+    {
+      "name": "COSMO 关系覆盖",
+      "weight": 20,
+      "maxScore": 20,
+      "score": 15.5,
+      "color": "#5856D6",
+      "criteria": [
+        {
+          "name": "通用高优先级 4 类全部覆盖",
+          "description": "覆盖了功能、受众、场景等关系。",
+          "maxScore": 10,
+          "score": 10,
+          "source": "官方",
+          "deductions": []
+        },
+        {
+          "name": "品类驱动关系已覆盖",
+          "description": "覆盖了防水、佩戴等关系。",
+          "maxScore": 6,
+          "score": 4.5,
+          "source": "官方",
+          "deductions": [
+            {
+              "reason": "缺少部分特定场景关系描述",
+              "points": 1.5
+            }
+          ]
+        },
+        {
+          "name": "中优先级关系覆盖 ≥3 类",
+          "description": "覆盖了 IS_A 等关系。",
+          "maxScore": 4,
+          "score": 1,
+          "source": "操作建议",
+          "deductions": [
+            {
+              "reason": "中优先级关系覆盖不足",
+              "points": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Alexa 语义质量",
+      "weight": 15,
+      "maxScore": 15,
+      "score": 10.9166,
+      "color": "#AF52DE",
+      "criteria": [
+        {
+          "name": "标题语义连贯性",
+          "description": "标题清晰传达产品属性与功能。",
+          "maxScore": 7,
+          "score": 7,
+          "source": "行业研究",
+          "deductions": []
+        },
+        {
+          "name": "每条 Bullet 包含 ≥1 个可验证数据点",
+          "description": "6 条 Bullet 中有 5 条包含具体数据点（13mm驱动、48H、5.3蓝牙等）。",
+          "maxScore": 5,
+          "score": 4.1666,
+          "source": "行业研究",
+          "deductions": [
+            {
+              "reason": "第 5 条 Bullet 缺乏具体数据点",
+              "points": 0.8334
+            }
+          ]
+        },
+        {
+          "name": "描述包含具体使用场景与结构化规格",
+          "description": "描述结构较简单，缺乏规范的结构化规格段。",
+          "maxScore": 3,
+          "score": -0.25,
+          "source": "操作建议",
+          "deductions": [
+            {
+              "reason": "缺乏结构化规格段",
+              "points": 1
+            },
+            {
+              "reason": "描述段落格式不规范",
+              "points": 2.25
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "suggestions": [
+    "图片优化：主图长边需提升至 1000px 以上以支持放大，并建议更换为纯白底图片以符合合规要求。",
+    "属性补齐：建议在后台补齐所有必填属性，确保单位与量纲准确，避免营销话术干扰。",
+    "后台搜索词：建议补齐 Search Terms，利用 200 字节空间填入长尾词，注意避免与标题重复。",
+    "描述优化：建议将产品描述重构为“PRODUCT OVERVIEW + 结构化规格段”格式，增加具体使用场景描述。",
+    "变体核验：建议检查父体下变体格式是否统一，确保颜色/尺寸等维度写法一致。"
+  ],
+  "potential": "B级 · 建议优先补齐图片分辨率与后台属性，提升转化基础。"
+}

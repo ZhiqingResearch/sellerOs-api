@@ -1,0 +1,105 @@
+{
+  "summary": "A four-quadrant comparison infographic in portrait format contrasts a wide comfort saddle and disc brake wheel on the left against a narrow basic saddle and basic wheel setup on the right. The composition uses a bright mint/cream premium left side, a dark charcoal right side, and a large neon-green “VS” at center. No full vehicle is shown; only product close-ups and comparison graphics are visible.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "WIDE COMFORT SADDLE",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "Broad • Thick • Cushioned Design",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "NARROW BASIC SADDLE",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "Thin • Compact Design",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "VS",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "DISC BRAKE CONTROL",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t7",
+      "sourceText": "Perforated Disc Rotor + Caliper",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t8",
+      "sourceText": "BASIC WHEEL SETUP",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t9",
+      "sourceText": "Simple • Minimal Hardware",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "Portrait comparison infographic with a vertical 50/50 split and four content zones: top-left premium saddle, top-right generic saddle, bottom-left premium wheel/brake card, bottom-right generic wheel panel. A large central neon-green 'VS' overlaps the midpoint between upper and lower sections.",
+    "sceneLightColor": "Left side uses bright mint-to-cream gradient lighting with soft premium glow; right side uses dark charcoal/black subdued lighting. Product renders have polished studio highlights and strong contrast.",
+    "peoplePetsStory": "No people or pets. No usage scenario narrative; purely feature comparison presentation.",
+    "propsOcclusion": "Close-up product crops show partial seatposts and fork sections. The center 'VS' graphic overlaps the boundary between lower panels. No complex real-world occlusion scene is present.",
+    "graphicsText": "Large bold English comparison headlines and subtitles; thumbs-up and thumbs-down icons; center neon brush-style 'VS'; white wireframe overlay on the left saddle; rounded white card for the left wheel and dark rounded panel for the right wheel.",
+    "effects": "Non-physical white contour/wireframe mesh over the premium saddle, soft glow around that saddle, bright neon-green center 'VS', subtle shadowing and polished advertising-style rendering. No obvious readable technical HUD labels are present in the final image.",
+    "rendering": "Highly polished commercial 3D/CG infographic style with photorealistic product-like materials, clean gradients, crisp edges, and premium e-commerce aesthetics."
+  },
+  "hardConstraints": [
+    "No people are present; hasPeople must remain false unless new visible person evidence is added.",
+    "This accepted image is a comparison infographic, not a full-vehicle scene; do not force appearance of the whole scooter, rider, pet, baskets, footrests, or kickstand.",
+    "Top-left shows a wide saddle with visible underside spring/support hardware and a textured black upper; these visible structural cues should not be arbitrarily changed without evidence.",
+    "Bottom-left wheel shows a visible silver perforated disc rotor and black brake caliper; preserve these visible brake components and their mechanical relationship.",
+    "Bottom-left wheel includes a bright cyan-blue rim accent on a black wheel; this identifying color cue should be preserved unless explicitly changed by the user.",
+    "Bottom-right wheel is depicted as a generic monochrome alternative and should not inherit the left wheel's cyan rim accent, rotor, or caliper details unless intentionally redesigned.",
+    "All currently visible text is marketing overlay text rather than observed physical product marking.",
+    "No brand name, model code, certification mark, numeric performance spec, load claim, or service promise is visible in the current image.",
+    "The left saddle wireframe mesh and center 'VS' are graphic overlays/effects, not physical product structure.",
+    "Historical prompt references comparison content that generally matches this image, but only the current image content is confirmed fact."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "Cannot verify whether the top-left saddle geometry exactly matches the accepted SKU's real saddle from this infographic alone; source evidence image would be needed for strict structural validation.",
+    "Cannot verify exact spoke count or wheel construction fidelity against the real SKU beyond what is visibly rendered here.",
+    "Cannot verify whether the right-side saddle and wheel are purely generic placeholders or correspond to any real alternative product; they are presented as comparison visuals only.",
+    "No full scooter context is shown, so footrests, kickstand state, basket structure, frame geometry, and other vehicle-level hard facts are not applicable in this image.",
+    "No physical product branding or model marking is visible, so none can be confirmed from this frame.",
+    "Some lighting glow and surface finishing are stylized CG effects rather than documentary product evidence."
+  ],
+  "version": "1e6c71dd-4832-45c1-ab94-1571b24ac596",
+  "imageId": "img-16-1",
+  "sourceHash": "0a605901af4a6728eab407366c5ec0bf585e5b6712612f0d7c8184eee10d2f30",
+  "createdAt": "2026-09-27T11:50:26.085Z"
+}

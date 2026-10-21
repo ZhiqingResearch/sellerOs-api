@@ -1,0 +1,207 @@
+{
+  "api": "https://dev-api.intelligentselleros.com",
+  "uploadedAt": "2026-09-29T08:36:36.973Z",
+  "imageCount": 25,
+  "images": {
+    "img-3-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-3-1/73db268c-9928-46e8-bc20-765e0267de9c.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-3-1/73db268c-9928-46e8-bc20-765e0267de9c.jpeg",
+      "sha256": "72d9f285f09555bb47f0a251edbffa60971ca2b0bd4d21b432ddf0c68e96ed66",
+      "bytes": 943060,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:34:41.003Z"
+    },
+    "img-4-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-4-1/624248a2-6749-4bf5-a8d2-c8592c1264e5.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-4-1/624248a2-6749-4bf5-a8d2-c8592c1264e5.jpeg",
+      "sha256": "940d9cb3b8e821c72efb2948196769f6a66f21fd74050bb0e3bf12f790a34e86",
+      "bytes": 1428645,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:34:44.050Z"
+    },
+    "img-5-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-5-1/f8fff027-5069-49d0-ab70-0c421a818a91.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-5-1/f8fff027-5069-49d0-ab70-0c421a818a91.jpeg",
+      "sha256": "b77127438633f0b1180404c016f1983912655dc2017dead735400fb3e21a7233",
+      "bytes": 1198088,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:34:46.059Z"
+    },
+    "img-6-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-6-1/16611a2b-9db6-43cb-a99d-328aa9f83e69.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-6-1/16611a2b-9db6-43cb-a99d-328aa9f83e69.jpeg",
+      "sha256": "096a21ad1b8209c634c802011019c7e0de65654f5cf3ecab833550a0c0b7f64c",
+      "bytes": 1203423,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:34:47.978Z"
+    },
+    "img-7-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-7-1/b86f7a1c-8364-43ca-b37c-c3e66aab50f0.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-7-1/b86f7a1c-8364-43ca-b37c-c3e66aab50f0.jpeg",
+      "sha256": "4cf65255bde8aced1030c7581296ca245e9ef2f79ed724c61cf0b63c77ae5264",
+      "bytes": 1125740,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:34:49.731Z"
+    },
+    "img-7-2": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-7-2/54f02b6d-689e-4714-96f9-4877f5f10f12.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-7-2/54f02b6d-689e-4714-96f9-4877f5f10f12.jpeg",
+      "sha256": "062741b78a1b87f06fb0f2cd8730218f9b8b8c89277388e84d536a3103105266",
+      "bytes": 958835,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:34:51.848Z"
+    },
+    "img-8-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-8-1/31715a88-ff29-4ab2-885f-280c8ed5c9d3.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-8-1/31715a88-ff29-4ab2-885f-280c8ed5c9d3.jpeg",
+      "sha256": "09ada05b41860cb11295f02a497ccfc32fc14cb873e87723b09d584a1887b802",
+      "bytes": 802936,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:34:53.569Z"
+    },
+    "img-9-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-9-1/7e5bcc13-7976-49c7-a16f-49019a18d12c.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-9-1/7e5bcc13-7976-49c7-a16f-49019a18d12c.jpeg",
+      "sha256": "9e96dde8e87301320018f6847c6279cad1605e7de36044bc6995aacd5b3a32c0",
+      "bytes": 2858925,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:34:58.949Z"
+    },
+    "img-9-2": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-9-2/796b255b-1ecf-4d69-99df-a8b8591b8dfa.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-9-2/796b255b-1ecf-4d69-99df-a8b8591b8dfa.jpeg",
+      "sha256": "40168ed2e8a73403ee7e17527065aed31e38e0ccdce1fec3506f10d03d182ca6",
+      "bytes": 2870702,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:35:05.911Z"
+    },
+    "img-10-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-10-1/920b3712-845d-4df7-94ad-4d2d6025acac.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-10-1/920b3712-845d-4df7-94ad-4d2d6025acac.jpeg",
+      "sha256": "ba5a360ceca5c11f1b81bacd32a0a06baa52c80adfb6944d9d5ef0b7bf0e71e7",
+      "bytes": 2637799,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:35:12.452Z"
+    },
+    "img-12-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-12-1/1fe46fd0-4c03-4d85-98f3-19b99ea61066.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-12-1/1fe46fd0-4c03-4d85-98f3-19b99ea61066.jpeg",
+      "sha256": "0ff3e51e911aff107987f2626697b11d82f8c1f7b634364568b0cafb1bfd31a6",
+      "bytes": 2939611,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:35:16.824Z"
+    },
+    "img-15-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-15-1/bc1050b7-c64a-4272-b343-94a1cf9e1f80.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-15-1/bc1050b7-c64a-4272-b343-94a1cf9e1f80.jpeg",
+      "sha256": "ac29497ef4ec611b6b848afcf8534103b5e588a137c473fa4b4bd7b5e51e684a",
+      "bytes": 2718727,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:35:22.714Z"
+    },
+    "img-16-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-16-1/7498256a-6da9-4768-b697-e59e00dd03c2.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-16-1/7498256a-6da9-4768-b697-e59e00dd03c2.jpeg",
+      "sha256": "0a605901af4a6728eab407366c5ec0bf585e5b6712612f0d7c8184eee10d2f30",
+      "bytes": 2526192,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:35:31.024Z"
+    },
+    "img-18-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-18-1/11f9c662-a2ad-4ee2-9405-56ec8f3ff50a.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-18-1/11f9c662-a2ad-4ee2-9405-56ec8f3ff50a.jpeg",
+      "sha256": "f0e3a2709d5458832a28187790b80ce865e914a33ca227b28132e492d11d2c28",
+      "bytes": 2039050,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:35:42.227Z"
+    },
+    "img-19-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-19-1/e63d48f3-c6f0-44d4-aa53-d87ce1b0af9c.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-19-1/e63d48f3-c6f0-44d4-aa53-d87ce1b0af9c.jpeg",
+      "sha256": "f5878703c8bbe1391761e123ee9a5d201d2c1564ca604a142e0176c1a1342d64",
+      "bytes": 1123193,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:35:50.575Z"
+    },
+    "img-51-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-51-1/29aa7f95-c308-4652-a9f9-c338cda0fde0.png",
+      "key": "chetaidou/preset-library/CS1plus/img-51-1/29aa7f95-c308-4652-a9f9-c338cda0fde0.png",
+      "sha256": "eeb88c65154568510fed1edea54a6c1481cbb414a3fc0a3d4ee621655deda314",
+      "bytes": 18870146,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:36:05.859Z"
+    },
+    "img-54-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-54-1/26777f16-1a2d-454b-940e-c9b7e36462a3.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-54-1/26777f16-1a2d-454b-940e-c9b7e36462a3.jpeg",
+      "sha256": "8379474cd6d1bd0fa0099bfcc6bde9b89fcac7d9b6d808988bd7391a037d2e6f",
+      "bytes": 2420124,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:36:11.325Z"
+    },
+    "img-58-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-58-1/2430ff5b-8549-4cc4-aa5c-5cde4bfd2768.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-58-1/2430ff5b-8549-4cc4-aa5c-5cde4bfd2768.jpeg",
+      "sha256": "1360bc194df5ba48e4bd23ccb588af7fee16a545f43f6c1b8263d073ad486c7a",
+      "bytes": 1214480,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:36:13.894Z"
+    },
+    "img-60-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-60-1/ca26aebc-5e1a-4eec-9d64-ff91f593c6db.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-60-1/ca26aebc-5e1a-4eec-9d64-ff91f593c6db.jpeg",
+      "sha256": "888d4247c44cea1d2d6d66d5759c9cbfdf013ff5d86e10b0612accf600e16a3b",
+      "bytes": 2684190,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:36:16.999Z"
+    },
+    "img-61-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-61-1/dce3902e-2c3b-4742-a86a-ab74449b1c84.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-61-1/dce3902e-2c3b-4742-a86a-ab74449b1c84.jpeg",
+      "sha256": "3e98bc1e049afe35ed5f5e2677e044d9d7a797422ad2f84eae67314308d14be3",
+      "bytes": 6888172,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:36:23.072Z"
+    },
+    "img-63-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-63-1/ac4a9119-fca2-4a47-bd73-bd37e38c6eb7.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-63-1/ac4a9119-fca2-4a47-bd73-bd37e38c6eb7.jpeg",
+      "sha256": "daf485d3506958b939e5b80e7a892ea702bb0595de247cc6387ecae63674e5a6",
+      "bytes": 1112483,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:36:27.817Z"
+    },
+    "img-63-2": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-63-2/14132d02-66f7-4ba5-8014-5c53144bb148.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-63-2/14132d02-66f7-4ba5-8014-5c53144bb148.jpeg",
+      "sha256": "05610afbdc3099b75c7759d5470fb765c6dc4b1e640613d4766529d2aae268b7",
+      "bytes": 1294367,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:36:29.660Z"
+    },
+    "img-64-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-64-1/09a73d4e-7849-442b-94b4-4e6a09082c8b.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-64-1/09a73d4e-7849-442b-94b4-4e6a09082c8b.jpeg",
+      "sha256": "d411c375662c2739c37c145daa7602ca0a619f84c2d56228b8b134c9669feac6",
+      "bytes": 1206736,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:36:31.220Z"
+    },
+    "img-65-1": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-65-1/4a38bfe6-14ae-412f-895b-a5789307cc84.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-65-1/4a38bfe6-14ae-412f-895b-a5789307cc84.jpeg",
+      "sha256": "11e5921ef89cc6b00e22f127bd6ba084e85472ff6678cba0c6a394ab40122e6c",
+      "bytes": 2200329,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:36:33.826Z"
+    },
+    "img-65-2": {
+      "publicUrl": "https://erp-pro.nyc3.cdn.digitaloceanspaces.com/chetaidou/preset-library/CS1plus/img-65-2/75e64610-956f-434b-ad3a-20500f978263.jpeg",
+      "key": "chetaidou/preset-library/CS1plus/img-65-2/75e64610-956f-434b-ad3a-20500f978263.jpeg",
+      "sha256": "baeef87b446acafccae90e5bef6157ba8aafa1a718d662b7f7d60d147f69cdf0",
+      "bytes": 2125607,
+      "acl": "public-read",
+      "verifiedAt": "2026-09-29T08:36:36.947Z"
+    }
+  }
+}

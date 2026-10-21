@@ -1,0 +1,83 @@
+{
+  "qualityStatus": "ai_unreviewed",
+  "summary": "一张深色电商信息图，顶部以两只车轮特写突出前后双碟刹，下方为四个圆角功能卡片：舒适座椅、可调座椅、明亮前灯、安全尾灯。画面无人物无宠物，主体为当前SKU的局部结构展示而非整车全貌。",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "DUAL DISC BRAKE",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "×2",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "Comfortable Seat",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "Adjustable Seat",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "Bright Headlight",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "Safe Rear Light",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "4:5竖版信息图。顶部大标题+前后轮并列特写，中下部为2×2功能卡片布局；当前截图中下排卡片可见但接近画面底边。",
+    "sceneLightColor": "深蓝灰/石墨色背景，冷调棚拍光；文字为白色，强调色为鲜绿色，尾灯为红色发光。",
+    "peoplePetsStory": "无人、无宠物、无叙事情节，为纯产品功能展示。",
+    "propsOcclusion": "顶部前后轮局部互不遮挡主体功能点；各卡片均为近景裁切展示，仅显示相关部件，不要求整车全露。",
+    "graphicsText": "存在明显营销排版文字、圆角卡片、绿色箭头指示和受控发光效果，属于后期设计版式。",
+    "effects": "含柔和辉光、受控反射、轻微渐变背景和尾灯/前灯发光表现。",
+    "rendering": "高精修电商合成/渲染风格，金属和塑料边缘干净，整体非自然场景实拍感。"
+  },
+  "hardConstraints": [
+    "当前成品明确展示前后各一只车轮，并各自带有独立的打孔刹车盘和黑色卡钳；不可合并成单一刹车结构。",
+    "前后轮圈均可见蓝青色装饰圈，这是当前SKU识别色之一，不应改成其他强调色。",
+    "前轮区域可见前叉、挡泥板与前碟刹组合关系；后轮区域可见后挡泥板、后碟刹与蓝色减震弹簧的组合关系。",
+    "后轮卡片中可见蓝色后减震弹簧，属于当前成品已显示的身份特征，不应删除或替换为其他悬挂形式。",
+    "座椅卡片显示宽大圆润的黑灰色鞍座及其下方连接件，座垫基本几何应保持。",
+    "可调座椅卡片显示座杆与夹具/锁紧结构，已确认存在座椅高度调节表达；不要改造为不同类型机构。",
+    "前灯卡片显示圆形前灯、黑色灯壳、支架及周边车架连接关系；真实可见实物结构不可擦除。",
+    "尾灯卡片显示后篮管件内的一只水平安装红色尾灯及其支架/线缆周边结构；不可新增第二尾灯或改成其他安装位置。",
+    "后部篮筐/货架的真实管件开口与连接关系在尾灯卡片中有证据，应保持，不因遮挡或简化而删除整根远侧管件。",
+    "本图为局部功能总览，不强制出现整车、脚踏、停车脚撑或人物。"
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "画面为局部特写信息图，未展示整车全貌，因此无法从本图核验脚踏（footrests）与停车脚撑的具体状态。",
+    "未展示中部货篮完整结构，只能确认尾灯附近后部篮筐/货架局部管件关系。",
+    "未展示品牌、型号、参数或认证信息，因此这些内容均无图像证据。",
+    "图中各部件带有较强精修/渲染质感；若需判断是否与源实物100%一致，仍需对应源证据图逐一比对。",
+    "下排功能卡片靠近画面底部，虽然标题可读，但卡片下沿外的更多结构未显示，不应据此补全未见部分。"
+  ],
+  "version": "f03800ca-d55d-4360-977b-a205128859ea",
+  "imageId": "img-60-1",
+  "sourceHash": "888d4247c44cea1d2d6d66d5759c9cbfdf013ff5d86e10b0612accf600e16a3b",
+  "createdAt": "2026-09-27T11:51:22.885Z"
+}

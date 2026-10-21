@@ -1,0 +1,62 @@
+{
+  "summary": "A wide lifestyle street scene shows the accepted C1Splus cargo scooter parked on a cobblestone shopping street, viewed from the right side with the front wheel on the right and rear basket on the left. The black scooter remains the main subject, with blue rear shock and blue wheel rim accents visible, front and rear baskets loaded with parcels, and one adult person standing behind/alongside the scooter holding boxes. The parking kickstand is deployed and touching the ground. Background storefronts and pedestrians are softly blurred. No clear editable marketing text overlay is visible in the delivered image.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": true,
+  "persons": [
+    {
+      "personId": "p1",
+      "observedAppearance": "One adult person, likely male-presenting by styling only, visible from upper torso down with head partly cropped out. Wearing an olive/gray overshirt or light jacket, beige/tan T-shirt, gray pants, and light-colored sneakers. Standing beside and slightly behind the scooter, holding cardboard parcels. Not riding."
+    },
+    {
+      "personId": "p2",
+      "observedAppearance": "One distant background pedestrian on the right side of the street, blurred, wearing a dark jacket and blue jeans, walking away."
+    },
+    {
+      "personId": "p3",
+      "observedAppearance": "One distant background pedestrian near center-right, blurred, wearing a light top with darker outer layer."
+    },
+    {
+      "personId": "p4",
+      "observedAppearance": "One distant background pedestrian near center-left, blurred, wearing a pink-toned top."
+    },
+    {
+      "personId": "p5",
+      "observedAppearance": "One distant background pedestrian near center-right, blurred and partially occluded."
+    }
+  ],
+  "textInventory": [],
+  "softFeatures": {
+    "composition": "Wide banner-like composition with the scooter centered slightly right of frame, shown in a right-facing side/front-right leaning parked view. Human figure is secondary support context behind the product. Large negative space from the street and buildings remains on both sides.",
+    "sceneLightColor": "Soft natural daylight with warm-neutral tones; gentle contrast and shallow depth of field.",
+    "peoplePetsStory": "Package pickup or delivery context implied by the standing person handling parcels beside the parked cargo scooter. No pets visible.",
+    "propsOcclusion": "Multiple cardboard boxes placed in the front basket, rear basket, and in the person's hands. The person partially occludes the stem/upper frame area. Cargo partially occludes basket interiors and some far-side structure, but the scooter body remains mostly visible.",
+    "graphicsText": "No clearly readable overlay label or marketing text is visible in this delivered image. Background signage exists but is too blurred/cropped to transcribe reliably.",
+    "effects": "Soft background blur, realistic lifestyle staging, no obvious artificial glow or dramatic effects.",
+    "rendering": "Photorealistic commercial e-commerce style image."
+  },
+  "hardConstraints": [
+    "Confirmed accepted SKU in current image is a compact black cargo scooter/e-bike style vehicle with step-through frame layout.",
+    "Front wheel is on the right side of frame and rear basket is on the left side; do not mirror the vehicle orientation.",
+    "Tall stem/handlebar structure is present.",
+    "Front cargo basket is present and mounted ahead of the rider area.",
+    "Rear cargo basket is present behind the saddle.",
+    "Blue rear shock absorber is visible and should be preserved.",
+    "Blue rim accent on the visible wheels is present and should be preserved.",
+    "Saddle, wheel layout, basket topology, and overall frame identity should be preserved.",
+    "Parking kickstand is deployed and in contact with the ground in the current image.",
+    "Independent footrest hardware is visible under the mid-frame area; do not replace with bicycle pedals.",
+    "Visible front brake disc and caliper should be preserved; do not invent hidden-side hardware.",
+    "Cargo boxes are supported by the baskets and should follow correct occlusion without deleting whole far-side bars or changing basket connections."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "No clearly readable text is confirmed from storefront/background signage due to blur and distance.",
+    "The rider-contact side opposite the camera is not fully visible; do not reconstruct unseen far-side structure without evidence.",
+    "Some rear basket connection details and far-side bars are partially hidden by parcel occlusion and angle, so only visible geometry is confirmed.",
+    "The top of the main person's head/face is cropped, so full facial features are not available."
+  ],
+  "version": "594ca580-0b06-4c16-b48a-dddee747fd72",
+  "imageId": "img-5-1",
+  "sourceHash": "b77127438633f0b1180404c016f1983912655dc2017dead735400fb3e21a7233",
+  "createdAt": "2026-09-27T11:48:17.299Z"
+}

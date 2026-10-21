@@ -1,0 +1,118 @@
+{
+  "summary": "A premium studio-style brand-credibility composition featuring one black seated electric cargo scooter shown from a shallow front-left three-quarter angle on a pale blue-to-white gradient background. The scooter is placed on the right side with its front wheel left of the rear wheel, central tubular cargo enclosure and rear basket both empty, kickstand deployed, cyan rim accents visible on both wheels, and a blue rear suspension spring visible. Large marketing typography appears on the left, two blue laurel badges appear on the upper-right, and an acrylic SGS certificate display sits on translucent blocks at the lower-left.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "tA",
+      "sourceText": "Feel The Difference",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tB",
+      "sourceText": "#1",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tC",
+      "sourceText": "Sit & Ride Scooter",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tD",
+      "sourceText": "Brand in the US*",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tE",
+      "sourceText": "Pioneer of Pet Scooters",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tF",
+      "sourceText": "Gyroor C1 electric scooter review — You can sit and ride on this scooter!",
+      "category": "model",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tG",
+      "sourceText": "12 Years of R&D Excellence",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tH",
+      "sourceText": "SGS Certification",
+      "category": "certification",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tI",
+      "sourceText": "SGS",
+      "category": "certification",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tJ",
+      "sourceText": "small logo/text on scooter head tube unclear",
+      "category": "product_mark",
+      "editable": false,
+      "readability": "unclear"
+    },
+    {
+      "textId": "tK",
+      "sourceText": "small certificate body text unclear",
+      "category": "certification",
+      "editable": false,
+      "readability": "unclear"
+    }
+  ],
+  "softFeatures": {
+    "composition": "4:3 e-commerce layout. Text-heavy information area on the left, scooter dominant on the right, two laurel badges stacked at upper-right, certificate display at lower-left. Scooter is partially cropped by the right edge but both wheels and lower structure remain readable.",
+    "sceneLightColor": "Bright studio lighting with pale ice-blue, powder-blue, and soft-white palette. Smooth blue-white gradient background with soft highlights and gentle floor reflection.",
+    "peoplePetsStory": "No people or pets. Pure product-and-credibility presentation with no narrative interaction.",
+    "propsOcclusion": "Acrylic-framed certificate on translucent blocks at lower-left. The scooter self-occludes some far-side structure due to viewing angle; visible overlap appears natural. No cargo in central enclosure or rear basket.",
+    "graphicsText": "Large bold black headline, large vivid-blue #1, black supporting copy, rounded white editorial review card with blue header, and two vivid-blue laurel-style badges. Background also includes large translucent sweeping arc graphics.",
+    "effects": "Subtle grounded contact shadows, faint clean floor reflection, satin-like product highlights, airy translucent arc overlays in the background.",
+    "rendering": "Polished commercial composite / photorealistic product render aesthetic with clean edges and premium Amazon A+ style finishing."
+  },
+  "hardConstraints": [
+    "Current image shows one stationary scooter only; do not duplicate the vehicle.",
+    "Vehicle orientation is front-left three-quarter, close to left-side profile; front wheel is on the left and rear wheel on the right, so no mirroring/reversal.",
+    "Preserve the accepted C1Splus geometry and layout, including tall handlebar stem, seated step-through frame, large low open tubular central cargo enclosure, and rear cargo basket.",
+    "Do not alter the real tube count, openings, mounting logic, or connections of the central cargo enclosure or rear basket.",
+    "Central cargo enclosure and rear basket are empty in the current accepted image.",
+    "Kickstand is deployed in this accepted image; do not simultaneously depict a riding-state leg/stand configuration.",
+    "Keep the independent footrest concept separate from the parking kickstand; do not replace with bicycle pedals.",
+    "Preserve visible brake hardware as shown; do not invent hidden-side brake components.",
+    "Retain the recognizable identity features visible here: black frame/body, cyan-blue wheel rim accents, blue rear suspension spring, fenders, headlight, saddle, and overall wheel/frame proportions.",
+    "Near-side structure may occlude far-side parts only where they overlap; do not delete an entire far-side tube just to force full visibility.",
+    "Source product marks physically present on the scooter should not be erased merely because marketing text may change."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "The small logo/text on the scooter head tube is present but not clearly readable from this image; exact lettering needs closer evidence if editing around product marks.",
+    "The lower center footrest area is partially obscured by angle and frame components; exact full outline would need closer product evidence if a tighter edit is requested.",
+    "Most body text inside the acrylic SGS certificate plaque is too small to verify from this image; only the prominent 'SGS' is clearly readable.",
+    "This accepted image provides evidence for the currently visible side and angle only; any edit revealing additional hidden-side structure would require direct product evidence rather than reconstruction from the historical prompt."
+  ],
+  "version": "d93d209f-84ec-4448-96bd-478ec635ef40",
+  "imageId": "img-65-1",
+  "sourceHash": "11e5921ef89cc6b00e22f127bd6ba084e85472ff6678cba0c6a394ab40122e6c",
+  "createdAt": "2026-09-27T11:52:18.078Z"
+}

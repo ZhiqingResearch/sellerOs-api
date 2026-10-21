@@ -1,0 +1,111 @@
+{
+  "summary": "这是一张电商品牌横幅成品图：右侧主体为一辆黑色电动宠物/货运踏板车，采用浅左前四分之三接近侧视角，停放在半透明绿色亚克力展示台上；左侧与右侧布置了大字标题、榜单/资质风格文案、编辑卡片和金色月桂徽章。画面无人、无宠物、无载物，属于棚拍感品牌展示合成图。当前图中可见并应保留的SKU识别要素包括：中部低位开放式管状货篮、座后货篮、黑色跨步式车架、蓝色轮圈装饰、蓝色后减震、前后挡泥板、低位圆灯、独立矩形脚踏与独立停车脚撑、可见刹车盘/卡钳关系。",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "tA",
+      "sourceText": "Feel The Difference",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tB",
+      "sourceText": "#1",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tC",
+      "sourceText": "Stro\\ed approved pet-friendly commuting brand copy",
+      "category": "marketing",
+      "editable": false,
+      "readability": "unclear"
+    },
+    {
+      "textId": "tD",
+      "sourceText": "Pioneer of Pet Scooters",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tE",
+      "sourceText": "Editorial-review card's a editorial-review card in compact pet sccnctct feature soma:iit additional supplied approved SGS certification material if scmge of urcnranding online editorial feature.",
+      "category": "marketing",
+      "editable": false,
+      "readability": "unclear"
+    },
+    {
+      "textId": "tF",
+      "sourceText": "Acrylic Certification supplied approved SGS Certification material if available",
+      "category": "certification",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tG",
+      "sourceText": "12 Years",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tH",
+      "sourceText": "Years of R&D Excellence",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tI",
+      "sourceText": "SGS",
+      "category": "certification",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tJ",
+      "sourceText": "Certification",
+      "category": "certification",
+      "editable": false,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "超宽横幅构图，信息区在左、主体车居中偏右、右侧为两枚竖向排列的金色月桂徽章；产品完整入镜，车把未碰上边缘，轮组与下部结构可见。",
+    "sceneLightColor": "背景为浅薄荷绿、暖米白、奶油色渐变，整体高键柔光棚拍感；有柔和高光、浅接触阴影和轻微反射。",
+    "peoplePetsStory": "无人、无宠物、无货物，无叙事动作，偏品牌资质陈列展示。",
+    "propsOcclusion": "下方有多块半透明绿色亚克力展示台；车辆与展示台存在轻微遮挡和倒影。主体车架内部有正常近远管件重叠，可见近侧篮杆遮挡后侧构件，但未见整根远侧管件被不合理删除。",
+    "graphicsText": "含大标题、#1卖点文案、编辑评论卡、透明认证牌、两枚金色月桂徽章。部分左侧正文为占位/错乱文案风格，清晰度和语义较差。",
+    "effects": "有玻璃/亚克力透明材质、淡色流线背景、轻微反射与柔和阴影，无运动模糊，无特效火花或速度线。",
+    "rendering": "写实电商合成/渲染风格，产品边缘干净，背景与道具为设计化商业视觉，不是自然实拍环境。七维中的人物维度不适用，因为画面无人。"
+  },
+  "hardConstraints": [
+    "保持当前SKU的黑色跨步式车架几何与整车长比例，不改成其他车型。",
+    "保持中部低位开放式管状货篮的真实开口、管件数量、走向与连接关系。",
+    "保持座后货篮的真实管件结构与连接关系，不增加把手前篮。",
+    "保持宽大黑色座垫、前后挡泥板、低位圆形前灯、蓝色后减震、蓝色轮圈装饰等当前可见识别特征。",
+    "保持前后轮、可见刹车盘与卡钳关系，不凭空补出隐藏侧制动硬件。",
+    "脚踏为独立矩形footrests，不是bicycle pedals；不得改造成自行车脚踏。",
+    "停车脚撑与脚踏分离，且当前画面为停车状态，脚撑已放下；不要同时表现骑行脚撑状态。",
+    "近侧杆件可遮挡主体，主体只应遮住重叠的远侧管件，不删除整根远侧管件。",
+    "源图中的实物标识若存在应与营销叠字区分；不可因清理文案而误删真实产品标识。",
+    "当前图无人、无宠物、无货物；若后续改动涉及加入人物或载物，需要额外证据支持接触关系与承托逻辑。"
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "左侧#1后面的副标题存在明显错乱/占位痕迹，部分字符无法可靠判读，因此仅作unclear记录，不据此生成确定文案事实。",
+    "左下编辑卡正文大段文字虽部分可见，但整体拼写和语义混乱，无法作为可靠成品文案依据。",
+    "透明认证牌内容看似为占位式认证说明，不应直接视为真实认证结论；若要保留或替换认证信息，需要外部证据。",
+    "图中未见清晰品牌名或型号名，不能从历史提示词或模糊区域反推具体品牌/型号文字。",
+    "由于该图为品牌横幅合成图而非全角度证据图，未显露的背侧结构、隐藏连接点和遮挡侧硬件仍需额外实物证据，不能凭空补全。"
+  ],
+  "version": "f9326266-86d9-436f-805d-9c59a52f9ab6",
+  "imageId": "img-8-1",
+  "sourceHash": "09ada05b41860cb11295f02a497ccfc32fc14cb873e87723b09d584a1887b802",
+  "createdAt": "2026-09-27T11:49:11.511Z"
+}

@@ -1,0 +1,109 @@
+{
+  "summary": "这是一张以电池技术为主题的横幅信息图，非整车展示。画面主体为中央偏右的透明电池仓与一组发绿色光效的圆柱形电芯，背景为深黑色并带有绿色能量线条。左侧有主标题与功能卡片，上方偏中位置有金色盾牌对勾图形，右侧有信息面板。未见人物、宠物或整车完整结构，仅有抽象/局部透明外壳式结构提示。",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "Reliable Lithium Power",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "Integrated Battery System",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "20 Miles Range",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "36V 7.8Ah Lithium-Ion Battery",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "*Range may vary based on rider weight, terrain, temperature, road conditions, and battery charge.",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t6",
+      "sourceText": "C1S Lithium Battery",
+      "category": "model",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t7",
+      "sourceText": "36V DC · 7.8Ah",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t8",
+      "sourceText": "Approx. 20 Miles Range",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t9",
+      "sourceText": "Approx. 5 Hours Charging",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "t10",
+      "sourceText": "Built-in Battery Design",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "宽幅横向版式。左侧为大标题和功能信息卡，中间为透明电池仓与绿色圆柱电芯主体，上方偏中为金色盾牌对勾图形，右侧为竖向信息面板。整体是信息图/科技广告构图，不是整车构图。",
+    "sceneLightColor": "整体为深黑/炭黑背景，主光效为亮绿色发光线条与电芯荧光，高对比商业打光，辅以金色高光盾牌与白色文字。",
+    "peoplePetsStory": "无人、无宠物、无叙事场景，属于纯产品技术示意/营销信息图。",
+    "propsOcclusion": "主体为透明壳体内的电芯阵列，各部件之间存在正常前后遮挡；未见人物、宠物或其他道具遮挡。仅见抽象透明外壳局部包覆电池，不涉及整车关键结构遮挡判断。",
+    "graphicsText": "包含多组营销与参数文字、线性图标、右侧信息面板，以及一个金色盾牌对勾图形。文字排版清晰，具有典型A+科技卖点横幅风格。",
+    "effects": "存在绿色能量光束、发光描边、玻璃/透明材质反射、金属高光和轻微科幻感辉光效果。",
+    "rendering": "高质感CGI/3D渲染风格，非实拍。透明外壳、电芯金属端面、发光效果和背景反射均呈现商业级数字渲染特征。七维中的人物/宠物相关维度基本不适用，因画面不含人宠与生活场景。"
+  },
+  "hardConstraints": [
+    "当前图为电池技术横幅，主体是透明电池仓和绿色圆柱电芯，不应拆解为整车主展示图事实。",
+    "画面中未见人物，hasPeople必须为false，persons必须为空。",
+    "仅能依据当前成品图可见内容记录，不把历史提示词自动当成成品事实。",
+    "所有清晰可读文字需逐项按原文转录，不猜测不可见或不存在的文字。",
+    "品牌/型号/参数/认证/实物标识类文字不可标为editable=true。",
+    "本图可见的“C1S Lithium Battery”“36V DC · 7.8Ah”“20 Miles Range”“Approx. 5 Hours Charging”等属于型号或参数表达，不应视为可随意编辑的普通营销文案。",
+    "未见真实实物品牌铭牌或认证标识；金色盾牌对勾是图形元素，不可当作真实认证证据。",
+    "画面未提供整车几何、脚踏、停车脚撑、车篮、刹车盘等结构证据，不能凭历史规则把这些结构当作本图已展示事实。"
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "该图为CGI技术示意，透明外壳是否对应真实SKU内部结构不可由本图单独确认，若需映射到真实整车内置电池位置与封装方式，需要额外实物证据。",
+    "绿色圆柱电芯的准确数量、串并联方式、单体规格均未以可验证实物证据给出，不能从示意图反推真实配置。",
+    "金色盾牌对勾仅表现为营销图形，不能确认任何真实认证、质保或安全等级，需要外部证据。",
+    "右侧与左侧出现的续航、充电时长、电压电量等数值仅能记录为画面文字内容；是否为已确认SKU官方有效参数，需产品资料证据核实。",
+    "画面中可见的透明外轮廓像是抽象电池仓/结构包络，不足以确认其与C1Splus整车具体连接关系。"
+  ],
+  "qualityStatus": "ai_unreviewed",
+  "version": "b6e98d1d-2c18-4935-b902-6916c06aec5e",
+  "imageId": "img-3-1",
+  "sourceHash": "72d9f285f09555bb47f0a251edbffa60971ca2b0bd4d21b432ddf0c68e96ed66",
+  "createdAt": "2026-09-27T11:48:17.034Z"
+}

@@ -1,0 +1,89 @@
+{
+  "summary": "Vertical comparison lifestyle poster. Upper main scene shows the C1Splus-style black electric cargo scooter on a sunny seaside boardwalk, oriented with rear wheel on the left and front wheel on the right. A woman rides the scooter, and a tan-and-white dog sits inside the central cargo enclosure. Large marketing headline and comparison labels are present. Lower section is a black-and-white comparison scene with another woman walking a dog on a leash. A wide white diagonal divider separates the two scenes.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": true,
+  "persons": [
+    {
+      "personId": "p1",
+      "observedAppearance": "Adult woman in upper scene, smiling, wearing an orange cap, orange sleeveless top, light beige shorts, and light sneakers, seated on the scooter with both hands on the handlebar."
+    },
+    {
+      "personId": "p2",
+      "observedAppearance": "Adult woman in lower scene, grayscale, wearing a short-sleeve T-shirt and jeans, walking forward while holding a dog leash."
+    }
+  ],
+  "textInventory": [
+    {
+      "textId": "t1",
+      "sourceText": "PET-FRIENDLY CABIN",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t2",
+      "sourceText": "Ours",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t3",
+      "sourceText": "Share The Wind,\nNot The Strain",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t4",
+      "sourceText": "Other",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "t5",
+      "sourceText": "Exhausted Before\nYou Arrive",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "4:5 vertical poster with a dominant upper lifestyle scene and a smaller lower comparison scene, separated by a bold white diagonal divider. Product occupies the center-right of the upper section, with large headline at upper left and label/copy at upper right.",
+    "sceneLightColor": "Upper scene is warm, sunny, and bright with soft coastal daylight. Lower scene is intentionally grayscale and subdued.",
+    "peoplePetsStory": "Upper scene presents a cheerful rider commuting with a dog seated in the scooter's central cabin. Lower scene presents a more tiring alternative of walking a dog on a leash.",
+    "propsOcclusion": "Rider's legs partially occlude the scooter center area. Dog overlaps the central enclosure correctly. Some lower product structure is partially obscured by rider feet and enclosure rails. Lower-scene dog is partly cropped at the frame edge.",
+    "graphicsText": "Large bold black headline in the upper left, green rounded 'Ours' label with black supporting copy in upper right, red rounded 'Other' label with white supporting copy in lower right.",
+    "effects": "Clean commercial compositing with mild depth-of-field feel, soft natural shadows, and a monochrome treatment in the lower scene. No heavy motion blur visible.",
+    "rendering": "Photorealistic premium e-commerce/lifestyle rendering. Product, rider, and dog are presented with polished commercial realism rather than raw documentary photography."
+  },
+  "hardConstraints": [
+    "Observed scooter is a black electric cargo scooter with rear wheel on the left and front wheel on the right in the shown composition.",
+    "Central front/mid cargo enclosure is present and contains the dog.",
+    "Rear basket is present behind the rider.",
+    "Bright cyan-blue rim accents are visible on both wheels.",
+    "Blue rear suspension spring is visible near the rear wheel.",
+    "Front wheel disc brake and caliper are visible on the near side.",
+    "No front-mounted handlebar basket is shown.",
+    "A rectangular footrest is visible beneath the central frame area; it should be treated as a footrest, not a bicycle pedal.",
+    "No deployed parking kickstand is visibly shown in this riding-style scene.",
+    "Rider is seated on the saddle with both hands on the handlebar.",
+    "Upper scene includes a tan-and-white dog seated within the real central enclosure, not in the rear basket.",
+    "Lower comparison scene includes a woman and a leashed dog, with no scooter visible there.",
+    "Wide white diagonal divider between upper and lower scenes is part of the current composition.",
+    "Readable marketing text currently present includes 'PET-FRIENDLY CABIN', 'Ours', 'Share The Wind, Not The Strain', 'Other', and 'Exhausted Before You Arrive'."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "Some scooter structural details are partially obscured by the rider's legs, shoes, and the dog; any edit affecting hidden frame connections would need product evidence.",
+    "The lower-scene dog is only partially visible due to cropping; full body posture and exact breed details are not fully evidenced.",
+    "Any readable real product marking beyond the visible cyan steering-tube emblem is not evidenced here.",
+    "Because this is a composed lifestyle graphic, background scene elements are not product-structure evidence.",
+    "Historical prompt mentions exact source-product fidelity, but this breakdown is based only on the current final image; any mismatch with earlier drafts or prompts is not automatically a hard conflict."
+  ],
+  "version": "f271aefe-b5cb-4650-b117-c2bfd8ccb05c",
+  "imageId": "img-9-2",
+  "sourceHash": "40168ed2e8a73403ee7e17527065aed31e38e0ccdce1fec3506f10d03d182ca6",
+  "createdAt": "2026-09-27T11:49:33.951Z"
+}

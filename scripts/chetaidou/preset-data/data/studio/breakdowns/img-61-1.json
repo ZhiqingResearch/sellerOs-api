@@ -1,0 +1,159 @@
+{
+  "summary": "A premium dark technical-spec infographic showing the accepted C1Splus scooter in a near-strict left-side product view on a navy gradient background. The scooter is black with cyan-blue wheel rim accents, a blue rear suspension spring, a large open central cargo enclosure, rear cargo basket, wide saddle, front and rear disc brakes, fenders, and a deployed parking kickstand. The lower section contains multiple large readable specification text blocks separated by thin lines.",
+  "qualityStatus": "ai_unreviewed",
+  "hasPeople": false,
+  "persons": [],
+  "textInventory": [
+    {
+      "textId": "tA1",
+      "sourceText": "A",
+      "category": "unknown",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tA2",
+      "sourceText": "Maximum Range",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tA3",
+      "sourceText": "20 Miles*",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tA4",
+      "sourceText": "Approx. 20 Miles*",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tB1",
+      "sourceText": "B",
+      "category": "unknown",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tB2",
+      "sourceText": "Maximum Speed",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tB3",
+      "sourceText": "19 MPH*",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tB4",
+      "sourceText": "Approx. 19 MPH*",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tC1",
+      "sourceText": "C",
+      "category": "unknown",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tC2",
+      "sourceText": "Max Load Capacity",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tC3",
+      "sourceText": "265 LBS",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tD1",
+      "sourceText": "Bike Weight",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tD2",
+      "sourceText": "45 LBS",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tE1",
+      "sourceText": "Wheel Size",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tE2",
+      "sourceText": "12 in Pneumatic Tires",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    },
+    {
+      "textId": "tF1",
+      "sourceText": "Brakes",
+      "category": "marketing",
+      "editable": true,
+      "readability": "readable"
+    },
+    {
+      "textId": "tF2",
+      "sourceText": "Dual Disc Brakes",
+      "category": "spec",
+      "editable": false,
+      "readability": "readable"
+    }
+  ],
+  "softFeatures": {
+    "composition": "Vertical infographic layout. Scooter centered in the upper half, full vehicle visible including both wheels and deployed kickstand. Lower section is a structured specification panel with three main columns and three smaller blocks beneath.",
+    "sceneLightColor": "Dark charcoal-navy to slate-blue studio background with soft cool lighting, mild floor reflection, and subtle contact shadow under the wheels.",
+    "peoplePetsStory": "No people or pets present; pure product-plus-spec presentation.",
+    "propsOcclusion": "No external props. Some normal self-occlusion from the scooter structure and overlapping frame/basket tubes. The near-side visible structure dominates; no extra cargo is inside the baskets.",
+    "graphicsText": "Large muted blue-gray abstract curved graphic behind the scooter. Thin divider line above the text panel and thin green divider lines between lower spec blocks. White and green sans-serif typography.",
+    "effects": "Clean premium studio rendering style with polished highlights on black metal, cyan accent rings on the wheels, slight shadowing and floor reflection.",
+    "rendering": "Highly polished commercial product render/edited product composite rather than a casual photo."
+  },
+  "hardConstraints": [
+    "Accepted SKU shown as a black electric cargo scooter with large open central cargo enclosure and rear cargo basket.",
+    "Preserve the visible left-side-oriented product geometry and component layout as shown in this accepted image.",
+    "Do not alter the number of visible major components or their connections, including handlebar stem, saddle, central cargo enclosure, rear basket, wheels, fenders, brakes, and rear suspension.",
+    "Keep the independent rectangular footrest separate from the parking kickstand; they are distinct components.",
+    "Parking kickstand is deployed in the current accepted image; do not combine parked and riding support states.",
+    "Preserve visible front and rear disc brakes and calipers; do not invent hidden-side hardware.",
+    "Do not add bicycle pedals, crankset, chain, or handlebar/front basket.",
+    "Preserve identity cues visible here, including cyan-blue wheel rim accents and blue rear suspension spring.",
+    "Keep the central cargo enclosure and rear basket empty.",
+    "No people, pets, or cargo are present in this accepted image."
+  ],
+  "conflicts": [],
+  "uncertainties": [
+    "The view is close to strict side profile but the handlebar/control area shows slight visible front-facing surfaces; whether this is considered an intentional relaxation or exact orthographic lock should be confirmed from source requirements.",
+    "No separate close evidence is provided here to verify all non-prominent structural details on the far side; edits that reveal additional unseen structure would require source evidence.",
+    "There are no clearly readable real product brand or model markings visible on the scooter body in this image.",
+    "The lower text presents technical claims and numbers, but their factual verification cannot be established from the image alone."
+  ],
+  "version": "ff266532-2098-4067-8780-79c6923a8ded",
+  "imageId": "img-61-1",
+  "sourceHash": "3e98bc1e049afe35ed5f5e2677e044d9d7a797422ad2f84eae67314308d14be3",
+  "createdAt": "2026-09-27T11:51:34.115Z"
+}

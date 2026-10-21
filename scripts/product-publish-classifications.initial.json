@@ -1,0 +1,62 @@
+[
+  {
+    "code": "NOTEBOOK COMPUTER",
+    "name": "laptop",
+    "sortOrder": 0
+  },
+  {
+    "code": "TABLET COMPUTER",
+    "name": "Tablet Computer",
+    "sortOrder": 1
+  },
+  {
+    "code": "ELECTRONIC DEVICE DOCKING STATION",
+    "name": "Electronic Device Docking Station",
+    "sortOrder": 2
+  },
+  {
+    "code": "WEARABLE COMPUTER",
+    "name": "Wearable Computer",
+    "sortOrder": 3
+  },
+  {
+    "code": "SPEAKERS",
+    "name": "Speaker",
+    "sortOrder": 4
+  },
+  {
+    "code": "KEYBOARD MOUSE SET",
+    "name": "Keyboard & Mouse Set",
+    "sortOrder": 5
+  },
+  {
+    "code": "KEYBOARDS",
+    "name": "Keyboard",
+    "sortOrder": 6
+  },
+  {
+    "code": "PERSONAL COMPUTER",
+    "name": "Desktop",
+    "sortOrder": 7
+  },
+  {
+    "code": "MULTIPORT HUB",
+    "name": "Multiport Hub",
+    "sortOrder": 8
+  },
+  {
+    "code": "CAMCORDER",
+    "name": "Camcorder",
+    "sortOrder": 9
+  },
+  {
+    "code": "HEADPHONES",
+    "name": "Headphones",
+    "sortOrder": 10
+  },
+  {
+    "code": "CONSOLE VIDEO GAMES",
+    "name": "CONSOLE_VIDEO_GAMES",
+    "sortOrder": 11
+  }
+]

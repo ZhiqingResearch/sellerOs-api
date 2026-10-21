@@ -1,0 +1,42 @@
+-- CreateTable
+CREATE TABLE `User` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `username` VARCHAR(191) NOT NULL,
+    `phone` VARCHAR(191) NOT NULL,
+    `password` VARCHAR(191) NOT NULL,
+    `role` ENUM('USER', 'ADMIN') NOT NULL DEFAULT 'USER',
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    UNIQUE INDEX `User_phone_key`(`phone`),
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `SmsCode` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `phone` VARCHAR(191) NOT NULL,
+    `code` VARCHAR(191) NOT NULL,
+    `used` BOOLEAN NOT NULL DEFAULT false,
+    `expiredAt` DATETIME(3) NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `History` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `title` VARCHAR(191) NOT NULL,
+    `type` ENUM('PRODUCT_SCORING', 'LISTING_GENERATION', 'LISTING_SCORING') NOT NULL,
+    `score` DOUBLE NULL,
+    `data` JSON NOT NULL,
+    `userId` INTEGER NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `updatedAt` DATETIME(3) NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `History` ADD CONSTRAINT `History_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -1,0 +1,25 @@
+node_modules
+dist
+.env
+generated/prisma
+logs
+.DS_Store
+
+seedbackups/
+
+# Playwright MCP 本地缓存 / 截图
+.playwright-mcp/
+
+# 本地估时 / 草稿文档
+IMAGE_CREATION_BACKEND_ESTIMATE.md
+
+# 本地临时文档（前端对接说明、调研草稿等），不提交
+temp/
+docs/**
+
+users.data.ts
+
+scripts/data/
+
+.idea
+.zcode
