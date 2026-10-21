@@ -1,4 +1,5 @@
-import { BadGatewayException, ConflictException, Injectable, Logger } from "@nestjs/common"
+import { DomesticBusinessGateway } from "./domestic-business-gateway"
+import { Inject, BadGatewayException, ConflictException, Injectable, Logger } from "@nestjs/common"
 import { Prisma } from "@prisma/client"
 import { createHash } from "node:crypto"
 import { PrismaService } from "../../prisma/prisma.service"
@@ -17,7 +18,6 @@ interface BusinessAiBillingSnapshot {
   tokenUsage?: AiGatewayTokenUsage
 }
 
-const DEFAULT_BUSINESS_AI_MODEL = "ZQ-Think-Flash"
 const BUSINESS_AI_TRANSACTION_MAX_WAIT_MS = 10_000
 const BUSINESS_AI_TRANSACTION_TIMEOUT_MS = 60_000
 
@@ -26,7 +26,7 @@ export class BusinessAiService {
   private readonly logger = new Logger(BusinessAiService.name)
 
   constructor(
-    private readonly aiGatewayProvider: AiGatewayProvider,
+    @Inject(DomesticBusinessGateway) private readonly aiGatewayProvider: AiGatewayProvider,
     private readonly usageService: UsageService,
     private readonly prisma: PrismaService
   ) {}
@@ -152,7 +152,7 @@ export class BusinessAiService {
           runId: dto.runId,
           module,
           operation: dto.operation,
-          model: dto.model ?? DEFAULT_BUSINESS_AI_MODEL,
+          model: dto.model,
           inputHash,
         },
       })
@@ -314,7 +314,7 @@ export class BusinessAiService {
         JSON.stringify({
           systemPrompt: dto.systemPrompt ?? "",
           userPrompt: dto.userPrompt,
-          model: dto.model ?? DEFAULT_BUSINESS_AI_MODEL,
+          model: dto.model,
           temperature: dto.temperature ?? null,
           responseFormat: dto.responseFormat ?? "text",
         })

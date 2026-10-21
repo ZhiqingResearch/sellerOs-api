@@ -10,7 +10,7 @@ function createDto(model?: string): AnalyzeCompetitorsDto {
 }
 
 describe("AnalyzeCompetitorsDto", () => {
-  it.each(["ZQ-Think-Flash", "ZQ-Think-Lite", "ZQ-Think-Pro"])(
+  it.each(["qwen3.8-max", "MiniMax-M3"])(
     "允许竞品分析模型 %s",
     async model => {
       await expect(validate(createDto(model))).resolves.toHaveLength(0)

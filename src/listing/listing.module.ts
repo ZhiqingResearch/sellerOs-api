@@ -1,3 +1,4 @@
+import { DomesticBusinessModelModule } from "../common/business-ai/domestic-business-model.module"
 import { Module } from "@nestjs/common"
 import { HistoryModule } from "../history/history.module"
 import { UsageModule } from "../usage/usage.module"
@@ -11,7 +12,7 @@ import { ListingScoreService } from "./listing-score.service"
 import { ListingController } from "./listing.controller"
 
 @Module({
-  imports: [UsageModule, HistoryModule],
+  imports: [DomesticBusinessModelModule, UsageModule, HistoryModule],
   controllers: [ListingController],
   providers: [
     ListingAiService,

@@ -1,7 +1,8 @@
+import { DOMESTIC_BUSINESS_MODELS } from "./domestic-business-models"
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger"
 import { IsIn, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min } from "class-validator"
 
-export const BUSINESS_AI_MODELS = ["ZQ-Think-Flash", "ZQ-Think-Lite", "ZQ-Think-Pro"] as const
+export const BUSINESS_AI_MODELS = DOMESTIC_BUSINESS_MODELS
 
 /** 与 Listing 相同：BFF 负责业务提示词，后端统一鉴权、调用网关和结算。 */
 export class BusinessAiDto {
@@ -21,10 +22,9 @@ export class BusinessAiDto {
   @IsIn(["generate", "extract", "research"])
   operation!: "generate" | "extract" | "research"
 
-  @ApiPropertyOptional({ enum: BUSINESS_AI_MODELS, default: "ZQ-Think-Flash" })
-  @IsOptional()
-  @IsIn(BUSINESS_AI_MODELS)
-  model?: (typeof BUSINESS_AI_MODELS)[number]
+  @ApiProperty({ enum: BUSINESS_AI_MODELS, example: "qwen3.8-max" })
+  @IsIn(BUSINESS_AI_MODELS, { message: "请选择 qwen3.8-max 或 MiniMax-M3 模型" })
+  model!: string
 
   @ApiPropertyOptional({ example: "只输出严格 JSON" })
   @IsOptional()

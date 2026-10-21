@@ -9,7 +9,7 @@ const records = { beginStep: jest.fn().mockResolvedValue(null) } as unknown as L
 
 describe("图片评分模型与扣费", () => {
   afterEach(() => jest.restoreAllMocks())
-  it.each(["ZQ-Think-Flash", "ZQ-Think-Pro"] as const)(
+  it.each(["qwen3.8-max", "MiniMax-M3"] as const)(
     "%s 收到实际图片且仍只扣一次费用",
     async model => {
       const userContent = [
@@ -127,21 +127,11 @@ describe("图片评分模型与扣费", () => {
     expect(chargeFixedModule).not.toHaveBeenCalled()
   })
 
-  it("不把图片送给 Lite 或其他业务", async () => {
+  it("图片仅用于评分，不能送入其他业务", async () => {
     const prepare = jest.spyOn(imageTools, "prepareListingScoreImages")
     const service = new ListingAiService({} as AiGatewayProvider, { assertFixedModuleAffordable: jest.fn().mockResolvedValue(undefined) } as unknown as UsageService, records)
     const images = [{ url: "https://m.media-amazon.com/images/I/a.jpg", role: "main" as const }]
-    await expect(
-      service.complete(7, {
-        operation: "score",
-        model: "ZQ-Think-Lite",
-        userPrompt: "文字",
-        images,
-      })
-    ).rejects.toThrow("不支持图片评分")
-    await expect(
-      service.complete(7, { operation: "generation", userPrompt: "文字", images })
-    ).rejects.toThrow("图片输入仅用于")
+    await expect(service.complete(7, { operation: "generation", model: "qwen3.8-max", userPrompt: "文字", images })).rejects.toThrow("图片输入仅用于")
     expect(prepare).not.toHaveBeenCalled()
   })
 })

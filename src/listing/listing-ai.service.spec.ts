@@ -192,7 +192,7 @@ describe("ListingAiService", () => {
     expect(invocations[0]?.userPrompt).toBe("user")
     expect(invocations[0]?.options).toMatchObject({
       model: "ZQ-Think-Pro",
-      modelConfigKey: "AI_GATEWAY_LISTING_SCORE_MODEL",
+
       temperature: 0,
       resolveBilling: true,
     })
@@ -264,7 +264,7 @@ describe("ListingAiService", () => {
       "生成属性问题",
       expect.objectContaining({
         model: "ZQ-Think-Flash",
-        modelConfigKey: "AI_GATEWAY_LISTING_ASSISTANT_MODEL",
+
         temperature: 0.2,
         resolveBilling: true,
       })

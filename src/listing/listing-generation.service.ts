@@ -1,9 +1,11 @@
+import { DomesticBusinessGateway } from "../common/business-ai/domestic-business-gateway"
 import { prepareListingScoreDelivery } from "./listing-score-delivery"
 import { buildListingScoreSystemPrompt } from "./listing-score-prompt"
 import { parseListingScoreSource } from "./listing-score-evidence"
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -50,7 +52,7 @@ export class ListingGenerationService implements OnModuleInit, OnModuleDestroy {
   private activeCount = 0
   constructor(
     private readonly prisma: PrismaService,
-    private readonly gateway: AiGatewayProvider,
+    @Inject(DomesticBusinessGateway) private readonly gateway: AiGatewayProvider,
     private readonly ai: ListingAiService,
     private readonly runs: ListingRunService
   ) {}
@@ -134,7 +136,7 @@ export class ListingGenerationService implements OnModuleInit, OnModuleDestroy {
           data: {
             listingRunId: run.id,
             operation: "generation",
-            model: dto.main.model ?? "ZQ-Think-Flash",
+            model: dto.main.model,
           },
         })
         const longTitle = dto.longTitle
@@ -142,7 +144,7 @@ export class ListingGenerationService implements OnModuleInit, OnModuleDestroy {
               data: {
                 listingRunId: run.id,
                 operation: "long_title",
-                model: dto.longTitle.model ?? "ZQ-Think-Flash",
+                model: dto.longTitle.model,
               },
             })
           : null
@@ -267,7 +269,7 @@ export class ListingGenerationService implements OnModuleInit, OnModuleDestroy {
         })
         if (hasAutoScore) {
           const scoreStep = await tx.listingAiStep.create({
-            data: { listingRunId: task.listingRunId, operation: "score", model: dto.autoScore!.model ?? "ZQ-Think-Flash" },
+            data: { listingRunId: task.listingRunId, operation: "score", model: dto.autoScore!.model },
           })
           await tx.listingGenerationTask.update({
             where: { id: task.id },

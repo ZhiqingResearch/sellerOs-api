@@ -203,7 +203,7 @@ export class ListingRunService {
       data: {
         listingRunId: run.taskId,
         operation: dto.operation,
-        model: dto.model ?? "ZQ-Think-Flash",
+        model: dto.model,
       },
     })
     return { ...step, historyId: run.id, runId: run.runId }

@@ -1,6 +1,7 @@
+import { DomesticBusinessGateway } from "../common/business-ai/domestic-business-gateway"
 import { parseListingJsonObject } from "./listing-result-parser"
 import { listingGenerationChargeId } from "../usage/fixed-module-credits"
-import { BadGatewayException, BadRequestException, Injectable } from "@nestjs/common"
+import { Inject, BadGatewayException, BadRequestException, Injectable } from "@nestjs/common"
 import { Prisma } from "@prisma/client"
 import {
   AiGatewayProvider,
@@ -15,16 +16,6 @@ import { prepareListingScoreDelivery } from "./listing-score-delivery"
 import { parseListingScoreSource } from "./listing-score-evidence"
 import { buildListingImageSystemPrompt, prepareListingScoreImages } from "./listing-score-images"
 import { buildListingScoreSystemPrompt } from "./listing-score-prompt"
-
-const MODEL_CONFIG_KEYS: Record<ListingAiOperation, string> = {
-  generation: "AI_GATEWAY_LISTING_MODEL",
-  optimization: "AI_GATEWAY_LISTING_MODEL",
-  long_title: "AI_GATEWAY_LISTING_ASSISTANT_MODEL",
-  qa_rewrite: "AI_GATEWAY_LISTING_ASSISTANT_MODEL",
-  score: "AI_GATEWAY_LISTING_SCORE_MODEL",
-  category_match: "AI_GATEWAY_LISTING_ASSISTANT_MODEL",
-  attribute_analysis: "AI_GATEWAY_LISTING_ASSISTANT_MODEL",
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -65,7 +56,7 @@ function isValidAttributeAnalysisResponse(data: unknown): boolean {
 @Injectable()
 export class ListingAiService {
   constructor(
-    private readonly aiGatewayProvider: AiGatewayProvider,
+    @Inject(DomesticBusinessGateway) private readonly aiGatewayProvider: AiGatewayProvider,
     private readonly usageService: UsageService,
     private readonly listingRunService: ListingRunService
   ) {}
@@ -84,7 +75,6 @@ export class ListingAiService {
           {
             model: dto.model,
             userContent,
-            modelConfigKey: MODEL_CONFIG_KEYS[dto.operation],
             operationName: `Listing ${dto.operation}`,
             temperature: dto.temperature,
             maxOutputTokens: dto.maxOutputTokens,
@@ -153,7 +143,6 @@ export class ListingAiService {
         {
           model: dto.model,
           userContent,
-          modelConfigKey: MODEL_CONFIG_KEYS[dto.operation],
           operationName: `Listing ${dto.operation}`,
           temperature: dto.temperature,
           maxOutputTokens: dto.maxOutputTokens,
@@ -254,9 +243,6 @@ export class ListingAiService {
   private async _prepareImages(dto: ListingAiInvocationDto) {
     if (dto.images?.length && dto.operation !== "score") {
       throw new BadRequestException("图片输入仅用于 Listing 评分")
-    }
-    if (dto.images?.length && dto.model === "ZQ-Think-Lite") {
-      throw new BadRequestException("ZQ-Think-Lite 不支持图片评分，请选择 Flash 或 Pro")
     }
     return prepareListingScoreImages(dto.userPrompt, dto.images)
   }

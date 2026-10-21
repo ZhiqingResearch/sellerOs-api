@@ -176,6 +176,25 @@ describe("ListingDocumentService", () => {
     expect(deleteObject).toHaveBeenCalledWith(objectKey)
   })
 
+  it.each(["qwen3.8-max", "MiniMax-M3"])("扫描 PDF 转为页图后使用所选模型 %s", async model => {
+    const buffer = Buffer.from("%PDF-1.4 synthetic")
+    const objectKey = "listing-documents/7/550e8400-e29b-41d4-a716-446655440000.pdf"
+    getObjectMetadata.mockResolvedValue({ contentLength: buffer.length, contentType: "application/pdf" })
+    downloadBuffer.mockResolvedValue(buffer)
+    const internals = service as unknown as {
+      _parseDocument(buffer: Buffer, extension: string): Promise<{ content: string; pageCount: number; warnings: string[] }>
+      _renderPdfPages(buffer: Buffer): Promise<string[]>
+    }
+    jest.spyOn(internals, "_parseDocument").mockResolvedValue({ content: "", pageCount: 1, warnings: [] })
+    const pages = jest.spyOn(internals, "_renderPdfPages").mockResolvedValue(["data:image/png;base64,cGFnZQ=="])
+    generateJson.mockResolvedValue({ data: { features: [], sellingPoints: [], warnings: [] }, tokenUsage: { promptTokens: 1, completionTokens: 1, thinkingTokens: 0 } })
+    await service.analyze(7, { objectKey, fileName: "test.pdf", mimeType: "application/pdf", fileSize: buffer.length, model })
+    expect(pages).toHaveBeenCalledWith(buffer)
+    expect(generateJson).toHaveBeenCalledWith(expect.any(String), expect.any(String), expect.objectContaining({ model, userContent: expect.arrayContaining([{ type: "image_url", image_url: { url: "data:image/png;base64,cGFnZQ==" } }]) }))
+    expect(generateSignedDownloadUrl).not.toHaveBeenCalled()
+    expect(deleteObject).toHaveBeenCalledWith(objectKey)
+  })
+
   it("拒绝创建图片上传凭证", async () => {
     await expect(
       service.createUploadTicket(7, {

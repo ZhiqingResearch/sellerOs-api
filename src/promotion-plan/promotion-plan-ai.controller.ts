@@ -1,3 +1,4 @@
+import { DomesticBusinessModelGuard } from "../common/business-ai/domestic-business-model.guard"
 import { Body, Controller, Post, Request, Res, UseGuards } from "@nestjs/common"
 import { ApiBearerAuth, ApiOperation, ApiProduces, ApiTags } from "@nestjs/swagger"
 import type { Response } from "express"
@@ -11,7 +12,7 @@ import { BusinessAiService } from "../common/business-ai/business-ai.service"
 @ApiTags("新品推广计划")
 @ApiBearerAuth()
 @Controller("promotion-plan/ai")
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, DomesticBusinessModelGuard)
 @RequirePermissions("tool.promotion_plan")
 export class PromotionPlanAiController {
   constructor(private readonly businessAiService: BusinessAiService) {}

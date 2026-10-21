@@ -18,13 +18,13 @@ describe("ListingModelSelectionGuard", () => {
   } as unknown as PrismaService)
   beforeEach(() => findFirst.mockReset())
 
-  it.each(["claude-haiku-5-5", "gpt-6-luna", "gpt-6.1-sol"])("DTO 接受新增模型 %s", async model => {
+  it.each(["claude-haiku-5-5", "gpt-6-luna", "gpt-6.1-sol"])("DTO 拒绝旧内部模型 %s", async model => {
     const dto = plainToInstance(ListingAiInvocationDto, {
       operation: "generation",
       model,
       userPrompt: "产品资料",
     })
-    expect(await validate(dto)).toEqual([])
+    expect((await validate(dto)).some(error => error.property === "model")).toBe(true)
   })
 
   it("允许实际绑定内部运营角色的多角色用户", async () => {

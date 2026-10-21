@@ -1,4 +1,5 @@
-import { BadGatewayException, ConflictException, Injectable, Logger } from "@nestjs/common"
+import { DomesticBusinessGateway } from "../common/business-ai/domestic-business-gateway"
+import { Inject, BadGatewayException, ConflictException, Injectable, Logger } from "@nestjs/common"
 import { Prisma } from "@prisma/client"
 import { createHash, randomUUID } from "node:crypto"
 import {
@@ -75,7 +76,7 @@ export class CompetitorAnalysisService {
 
   constructor(
     private readonly evidenceProvider: CompetitorEvidenceProvider,
-    private readonly aiGatewayProvider: AiGatewayProvider,
+    @Inject(DomesticBusinessGateway) private readonly aiGatewayProvider: AiGatewayProvider,
     private readonly usageService: UsageService,
     private readonly prisma: PrismaService,
     private readonly recordService: CompetitorAnalysisRecordService
@@ -229,7 +230,7 @@ export class CompetitorAnalysisService {
         JSON.stringify({
           systemPrompt: prompts.systemPrompt,
           userPrompt: prompts.userPrompt,
-          model: dto.model ?? "ZQ-Think-Flash",
+          model: dto.model,
         })
       )
       .digest("hex")
@@ -268,7 +269,7 @@ export class CompetitorAnalysisService {
           runId: dto.runId,
           module: "competitor-analysis",
           operation: "summary",
-          model: dto.model ?? "ZQ-Think-Flash",
+          model: dto.model,
           inputHash,
         },
       })

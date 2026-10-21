@@ -1,3 +1,4 @@
+import { DomesticBusinessModelGuard } from "../common/business-ai/domestic-business-model.guard"
 import {
   Body,
   Controller,
@@ -44,7 +45,7 @@ const SSE_HEARTBEAT_INTERVAL_MS = 15_000
 @ApiTags("Listing 生成")
 @ApiBearerAuth()
 @Controller("listing")
-@UseGuards(JwtAuthGuard, PermissionsGuard, ListingModelSelectionGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, ListingModelSelectionGuard, DomesticBusinessModelGuard)
 export class ListingController {
   constructor(
     private readonly listingAiService: ListingAiService,

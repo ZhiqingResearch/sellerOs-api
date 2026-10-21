@@ -50,12 +50,11 @@ export class AnalyzeCompetitorsDto {
   @IsIn(SUPPORTED_COUNTRIES)
   country!: string
 
-  @ApiPropertyOptional({
-    description: "生成竞品 AI 总结使用的模型；未传时使用代码内默认模型",
+  @ApiProperty({
+    description: "前端必传的国产模型 ID，须在 TEXT 目录启用",
     enum: COMPETITOR_ANALYSIS_MODELS,
-    example: "ZQ-Think-Flash",
+    example: "qwen3.8-max",
   })
-  @IsOptional()
-  @IsIn(COMPETITOR_ANALYSIS_MODELS)
-  model?: CompetitorAnalysisModel
+  @IsIn(COMPETITOR_ANALYSIS_MODELS, { message: "请选择 qwen3.8-max 或 MiniMax-M3 模型" })
+  model!: CompetitorAnalysisModel
 }

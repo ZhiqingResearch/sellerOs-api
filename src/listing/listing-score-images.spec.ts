@@ -202,14 +202,14 @@ describe("Listing 实际图片输入", () => {
     const images = Array.from({ length: 25 }, () => ({ url: IMAGE_URL, role: "aplus" }))
     expect(
       await validate(
-        plainToInstance(ListingAiInvocationDto, { operation: "score", userPrompt: "文字", images })
+        plainToInstance(ListingAiInvocationDto, { operation: "score", model: "qwen3.8-max", userPrompt: "文字", images })
       )
     ).toHaveLength(0)
     expect(
       (
         await validate(
           plainToInstance(ListingAiInvocationDto, {
-            operation: "score",
+            operation: "score", model: "qwen3.8-max",
             userPrompt: "文字",
             images: Array(41).fill(images[0]),
           })
@@ -220,7 +220,7 @@ describe("Listing 实际图片输入", () => {
       (
         await validate(
           plainToInstance(ListingAiInvocationDto, {
-            operation: "score",
+            operation: "score", model: "qwen3.8-max",
             userPrompt: "文字",
             images: [{ url: IMAGE_URL, role: "other" }],
           })

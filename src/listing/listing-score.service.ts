@@ -1,6 +1,8 @@
+import { DomesticBusinessGateway } from "../common/business-ai/domestic-business-gateway"
 import {
   BadGatewayException,
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
@@ -68,7 +70,7 @@ export class ListingScoreService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly gateway: AiGatewayProvider,
+    @Inject(DomesticBusinessGateway) private readonly gateway: AiGatewayProvider,
     private readonly ai: ListingAiService
   ) {}
 
@@ -88,7 +90,7 @@ export class ListingScoreService {
           systemPrompt: dto.systemPrompt ?? "",
           userPrompt: dto.userPrompt,
           images: dto.images ?? [],
-          model: dto.model ?? "ZQ-Think-Flash",
+          model: dto.model,
           temperature: dto.temperature ?? null,
           maxOutputTokens: dto.maxOutputTokens ?? null,
           market: dto.scoreMarket ?? null,
@@ -114,7 +116,7 @@ export class ListingScoreService {
             module: SCORE_MODULE,
             operation: "score",
             runId: requestId,
-            model: dto.model ?? "ZQ-Think-Flash",
+            model: dto.model,
             inputHash,
           },
         })
@@ -137,8 +139,6 @@ export class ListingScoreService {
         const primary: ScoreAttempt = {}
         let outputText = ""
         try {
-          if (dto.images?.length && dto.model === "ZQ-Think-Lite")
-            throw new BadGatewayException("ZQ-Think-Lite 不支持图片评分，请选择 Flash 或 Pro")
           const userContent = await prepareListingScoreImages(dto.userPrompt, dto.images)
           for await (const event of this.gateway.streamChat(
             buildListingImageSystemPrompt(
@@ -148,7 +148,6 @@ export class ListingScoreService {
             dto.userPrompt,
             {
               model: dto.model,
-              modelConfigKey: "AI_GATEWAY_LISTING_SCORE_MODEL",
               userContent,
               temperature: 0,
               maxOutputTokens: dto.maxOutputTokens,
@@ -352,7 +351,6 @@ export class ListingScoreService {
             {
               // 账单可能记录上游供应商模型名；请求继续使用原入口的逻辑模型。
               model: dto.model,
-              modelConfigKey: "AI_GATEWAY_LISTING_SCORE_MODEL",
               userContent: repairUserContent,
               temperature: 0,
               resolveBilling: true,

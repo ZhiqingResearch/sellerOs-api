@@ -1,3 +1,4 @@
+import { DomesticBusinessModelGuard } from "../common/business-ai/domestic-business-model.guard"
 import { Body, Controller, Post, Request, UseGuards } from "@nestjs/common"
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger"
 import { RequirePermissions } from "../auth/decorators/require-permissions.decorator"
@@ -10,7 +11,7 @@ import { SummarizeCompetitorsDto } from "./dto/summarize-competitors.dto"
 @ApiTags("竞品分析")
 @ApiBearerAuth()
 @Controller("competitor-analysis")
-@UseGuards(JwtAuthGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, PermissionsGuard, DomesticBusinessModelGuard)
 @RequirePermissions("agent.competitor")
 export class CompetitorAnalysisController {
   constructor(private readonly competitorAnalysisService: CompetitorAnalysisService) {}

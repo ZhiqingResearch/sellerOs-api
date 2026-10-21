@@ -80,14 +80,13 @@ export class ListingAiInvocationDto {
   @IsIn(LISTING_AI_OPERATIONS)
   operation!: ListingAiOperation
 
-  @ApiPropertyOptional({
-    description: "前端选择的 AI 中转站逻辑模型 ID",
+  @ApiProperty({
+    description: "前端必传的国产模型 ID，须在 TEXT 目录启用",
     enum: LISTING_AI_MODELS,
-    default: "ZQ-Think-Flash",
+    example: "qwen3.8-max",
   })
-  @IsOptional()
-  @IsIn(LISTING_AI_MODELS)
-  model?: ListingAiModel
+  @IsIn(LISTING_AI_MODELS, { message: "请选择 qwen3.8-max 或 MiniMax-M3 模型" })
+  model!: ListingAiModel
 
   @ApiPropertyOptional({
     description: "仅评分使用的真实图片，最多40张",

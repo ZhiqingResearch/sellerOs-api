@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common"
+import { DomesticBusinessGateway } from "../common/business-ai/domestic-business-gateway"
+import { Inject, BadRequestException, Injectable, Logger } from "@nestjs/common"
 import { randomUUID } from "crypto"
 import * as path from "path"
 import * as XLSX from "xlsx"
@@ -12,7 +13,6 @@ import {
   CreateListingDocumentUploadDto,
 } from "./dto/listing-document.dto"
 import { MAX_LISTING_DOCUMENT_BYTES } from "./listing-document.constants"
-import { DEFAULT_LISTING_AI_MODEL } from "./listing-ai.models"
 import { LISTING_DOCUMENT_SYSTEM_PROMPT } from "./listing.prompts"
 import type { ListingDocumentFacts } from "./listing.types"
 
@@ -43,7 +43,7 @@ export class ListingDocumentService {
 
   constructor(
     private readonly spacesService: SpacesService,
-    private readonly aiGatewayProvider: AiGatewayProvider
+    @Inject(DomesticBusinessGateway) private readonly aiGatewayProvider: AiGatewayProvider
   ) {}
 
   async createUploadTicket(userId: number, dto: CreateListingDocumentUploadDto) {
@@ -89,25 +89,20 @@ export class ListingDocumentService {
       this._validateMagicBytes(buffer, extension)
       const parsed = await this._parseDocument(buffer, extension)
 
-      const shouldAnalyzeFileUrl =
-        extension === ".pdf" && !parsed.content.trim() && dto.model === DEFAULT_LISTING_AI_MODEL
-      if (!parsed.content.trim() && !shouldAnalyzeFileUrl) {
-        throw new BadRequestException(
-          `文档未提取到可读文字；扫描版 PDF 请使用 ${DEFAULT_LISTING_AI_MODEL}`
-        )
+      const shouldAnalyzePageImages = extension === ".pdf" && !parsed.content.trim()
+      if (!parsed.content.trim() && !shouldAnalyzePageImages) {
+        throw new BadRequestException("文档未提取到可读文字")
       }
 
       const promptParts = [
         dto.documentPrompt?.trim() ? `用户补充要求：${dto.documentPrompt.trim()}` : "",
         `文件名：${safeFileName}`,
-        shouldAnalyzeFileUrl
-          ? "请读取下方文件链接中的内容并提取商品事实。"
+        shouldAnalyzePageImages
+          ? "请读取下方 PDF 页面图片中的内容并提取商品事实。"
           : "以下是后端解析的文档正文：",
         parsed.content,
       ].filter(Boolean)
-      const signedFileUrl = shouldAnalyzeFileUrl
-        ? await this.spacesService.generateSignedDownloadUrl(dto.objectKey, 600)
-        : null
+      const pageImages = shouldAnalyzePageImages ? await this._renderPdfPages(buffer) : []
       const aiResult: AiGatewayJsonResult<ListingDocumentFacts> =
         await this.aiGatewayProvider.generateJson<ListingDocumentFacts>(
           LISTING_DOCUMENT_SYSTEM_PROMPT,
@@ -117,10 +112,10 @@ export class ListingDocumentService {
             operationName: "Listing 文件提取",
             temperature: 0,
             maxOutputTokens: 4_000,
-            userContent: signedFileUrl
+            userContent: pageImages.length
               ? [
                   { type: "text", text: promptParts.join("\n\n") },
-                  { type: "image_url", image_url: { url: signedFileUrl } },
+                  ...pageImages.map(url => ({ type: "image_url", image_url: { url } })),
                 ]
               : undefined,
             isDataValid: data => this._isDocumentFactsValid(data),
@@ -133,8 +128,8 @@ export class ListingDocumentService {
         facts: aiResult.data,
         warnings: [
           ...parsed.warnings,
-          ...(shouldAnalyzeFileUrl
-            ? ["扫描版 PDF 已通过云端签名链接交给 ZQ-Think-Flash 分析"]
+          ...(shouldAnalyzePageImages
+            ? [`扫描版 PDF 已转换为页面图片，交给 ${dto.model} 分析`]
             : []),
         ],
         usage: {
@@ -199,6 +194,19 @@ export class ListingDocumentService {
     }
   }
 
+  private async _renderPdfPages(buffer: Buffer): Promise<string[]> {
+    const { PDFParse } = await import("pdf-parse")
+    const parser = new PDFParse({ data: new Uint8Array(buffer) })
+    try {
+      const result = await parser.getScreenshot({ desiredWidth: 1600, imageDataUrl: true, imageBuffer: false })
+      const pages = result.pages.map(page => page.dataUrl)
+      if (!pages.length || pages.some(page => !page)) throw new BadRequestException("PDF 页面无法解析")
+      return pages
+    } finally {
+      await parser.destroy()
+    }
+  }
+
   private async _parseDocument(buffer: Buffer, extension: string): Promise<ParsedDocument> {
     if (extension === ".docx") {
       const mammoth = await import("mammoth")
@@ -224,7 +232,7 @@ export class ListingDocumentService {
     const { PDFParse } = await import("pdf-parse")
     const parser = new PDFParse({ data: new Uint8Array(buffer) })
     try {
-      const result = await parser.getText()
+      const result = await parser.getText({ pageJoiner: "" })
       return this._normalizeParsedDocument(result.text, result.total, [])
     } finally {
       await parser.destroy()

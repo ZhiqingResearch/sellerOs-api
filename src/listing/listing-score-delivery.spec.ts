@@ -1,3 +1,4 @@
+import { DomesticBusinessModels } from "../common/business-ai/domestic-business-models"
 import { Logger, ValidationPipe } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import { BusinessAiRun, Prisma } from "@prisma/client"
@@ -101,7 +102,7 @@ function createFixture(incident: IncidentFixture) {
   const service = new ListingScoreService(prisma as unknown as PrismaService,
     { streamChat } as unknown as AiGatewayProvider, { chargeSavedOutput, assertAffordable: jest.fn().mockResolvedValue(undefined) } as unknown as ListingAiService)
   const dto = {
-    operation: "score" as const, model: "ZQ-Think-Flash" as const,
+    operation: "score" as const, model: "qwen3.8-max" as const,
     scoreRequestId: "07f3ca4e-e9a8-4693-811c-009e5658cfaa", scoreMarket: "amazon_us",
     userPrompt: `mode：standard\n<listing-scoring-source>${JSON.stringify(incident.sourceFacts)}</listing-scoring-source>`,
   }
@@ -173,6 +174,7 @@ describe.each([25, 26, 28, 32])("原始完整报告%s不再因语义校对阻断
     const builder = Test.createTestingModule({
       controllers: [ListingController],
       providers: [
+        { provide: DomesticBusinessModels, useValue: { assertEnabled: jest.fn().mockResolvedValue(undefined) } },
         { provide: ListingScoreService, useValue: f.service },
         ...[ListingAiService, ListingDocumentService, ListingGenerationService, ListingRunService, HistoryService]
           .map(provide => ({ provide, useValue: {} })),

@@ -1,3 +1,5 @@
+import { DomesticBusinessGateway } from "./domestic-business-gateway"
+import { DomesticBusinessModels } from "./domestic-business-models"
 import {
   UnauthorizedException,
   ValidationPipe,
@@ -13,7 +15,6 @@ import { PrismaService } from "../../prisma/prisma.service"
 import { PromotionPlanAiController } from "../../promotion-plan/promotion-plan-ai.controller"
 import { SmartPricingAiController } from "../../smart-pricing/smart-pricing-ai.controller"
 import { UsageService } from "../../usage/usage.service"
-import { AiGatewayProvider } from "../providers/ai-gateway.provider"
 import { BusinessAiService } from "./business-ai.service"
 
 describe("推广计划与智能定价 AI HTTP 链路", () => {
@@ -26,6 +27,7 @@ describe("推广计划与智能定价 AI HTTP 链路", () => {
   const generateJson = jest.fn()
   const streamChat = jest.fn()
   const prisma = {
+    aiGatewayModel: { findFirst: jest.fn().mockResolvedValue({ publicId: "qwen3.8-max" }) },
     businessAiRun: {
       findUnique: jest.fn(),
       create: jest.fn(),
@@ -38,19 +40,20 @@ describe("推广计划与智能定价 AI HTTP 链路", () => {
   const billing = {
     costCny: "0.123456",
     currency: "CNY",
-    model: "ZQ-Think-Flash",
+    model: "qwen3.8-max",
     requestId: "gateway-business-test",
     requestIds: ["gateway-business-test"],
   }
   const tokenUsage = { promptTokens: 10, completionTokens: 5, thinkingTokens: 2, totalTokens: 17 }
-  const payload = { operation: "generate", userPrompt: "商品资料", temperature: 0.1 }
+  const payload = { model: "qwen3.8-max", operation: "generate", userPrompt: "商品资料", temperature: 0.1 }
 
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       controllers: [PromotionPlanAiController, SmartPricingAiController],
       providers: [
         BusinessAiService,
-        { provide: AiGatewayProvider, useValue: { generateJson, streamChat } },
+        DomesticBusinessModels,
+        { provide: DomesticBusinessGateway, useValue: { generateJson, streamChat } },
         {
           provide: UsageService,
           useValue: { chargeModel, chargeModelInTransaction, gatewayPriceMultiplier, assertFixedModuleAffordable },

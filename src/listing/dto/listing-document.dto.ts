@@ -60,7 +60,7 @@ export class AnalyzeListingDocumentDto {
   @ApiProperty({
     description: "文档分析使用的 AI 中转站逻辑模型 ID",
     enum: LISTING_AI_MODELS,
-    default: "ZQ-Think-Flash",
+    example: "qwen3.8-max",
   })
   @IsIn(LISTING_AI_MODELS)
   model!: ListingAiModel

@@ -1,3 +1,4 @@
+import { DomesticBusinessModelModule } from "../common/business-ai/domestic-business-model.module"
 import { UsageModule } from "../usage/usage.module"
 import { Module } from "@nestjs/common"
 import { BusinessAiModule } from "../common/business-ai/business-ai.module"
@@ -6,7 +7,7 @@ import { PromotionPlanRecordController } from "./promotion-plan-record.controlle
 import { PromotionPlanRecordService } from "./promotion-plan-record.service"
 
 @Module({
-  imports: [BusinessAiModule, UsageModule],
+  imports: [DomesticBusinessModelModule, BusinessAiModule, UsageModule],
   controllers: [PromotionPlanRecordController, PromotionPlanAiController],
   providers: [PromotionPlanRecordService],
 })

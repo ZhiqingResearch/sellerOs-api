@@ -1,3 +1,4 @@
+import { DomesticBusinessModels } from "../common/business-ai/domestic-business-models"
 import { INestApplication, Logger, ValidationPipe } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import { BusinessAiRun, Prisma } from "@prisma/client"
@@ -35,7 +36,7 @@ const report = {
 }
 const dto = {
   operation: "score" as const,
-  model: "ZQ-Think-Pro" as const,
+  model: "qwen3.8-max" as const,
   userPrompt: "商品资料",
   scoreRequestId: "832c13ca-7715-4515-b17a-236fab52a9ba",
 }
@@ -248,7 +249,6 @@ describe("独立评分持久化、恢复与结算", () => {
       expect.any(String),
       expect.objectContaining({
         model: dto.model,
-        modelConfigKey: "AI_GATEWAY_LISTING_SCORE_MODEL",
       })
     )
     expect(f.row().outputText).toBe(brokenReport)
@@ -381,6 +381,7 @@ describe("独立评分本地 HTTP / SSE 故障注入", () => {
     const builder = Test.createTestingModule({
       controllers: [ListingController],
       providers: [
+        { provide: DomesticBusinessModels, useValue: { assertEnabled: jest.fn().mockResolvedValue(undefined) } },
         { provide: ListingScoreService, useValue: f.service },
         ...[
           ListingAiService,
