@@ -1,27 +1,13 @@
-name: builder
+name: prod
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "部署环境（dev / dev1 / dev2 / dev3 / uat 可选任意分支或 tag；prod 必须选 v* 开头的 tag 运行；留 none 则按旧规则：develop→dev、develop1→dev1、develop2→dev2）"
-        type: choice
-        default: none
-        options:
-          - none
-          - dev
-
+  push:
+    branches:
+      - 'release-*'
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
-      # 生产部署的前置校验：必须在 Run workflow 的下拉框里选择 v* 开头的 tag（而不是分支）
-      - name: Validate prod deploy ref
-        if: inputs.environment == 'prod' && !startsWith(github.ref, 'refs/tags/v')
-        run: |
-          echo "::error::生产部署必须选择 v* 开头的 tag 运行（当前 ref：${{ github.ref }}）。请先打 tag（如 v1.1.0）再触发。"
-          exit 1
-
       - name: Check out the repo
         uses: actions/checkout@v4
 
@@ -42,49 +28,40 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ secrets.ALIYUN_REGISTRY }}/dinglan-backend/${{ github.event.repository.name }}
+          images: ${{ secrets.ALIYUN_REGISTRY }}/${{ secrets.ALIYUN_REGISTRY_NAMESPACE }}/${{ github.event.repository.name }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=tag
-          # tag 事件默认会追加 :latest（latest=auto），导致 outputs.tags 变多行，关掉
-          flavor: |
-            latest=false
+            type=ref,event=branch  # 基于分支名称生成标签
 
-      - name: Build and push
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64
           file: ./Dockerfile
+          target: runtime
           push: true
+          # 阿里云镜像仓库不接受 BuildKit provenance 使用的 OCI empty manifest
           provenance: false
-          sbom: false
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          secrets: |
-            github_packages_token=${{ secrets.PACKAGES_TOKEN }}
-
-      - name: Print image URL
-        run: echo "Image pushed - ${{ steps.meta.outputs.tags }}"
+          build-args: MODE=production
+          tags: ${{ steps.meta.outputs.tags }} # 确保 tags 被正确设置
 
       - name: Get Jenkins CRUMB
         id: get-crumb
         run: |
           CRUMB=$(curl -s -u ${{ secrets.JENKINS_USERNAME }}:${{ secrets.JENKINS_API_TOKEN }} \
             "${{ secrets.JENKINS_URL }}/crumbIssuer/api/json" | jq -r .crumb)
-          echo "crumb=$CRUMB" >> "$GITHUB_OUTPUT"
+          echo "crumb=$CRUMB" >> $GITHUB_OUTPUT
 
-      # dev 环境：选了 environment=dev 时部署当前所选分支；未选（none）时保持旧行为——仅 develop 分支自动部署
-      - name: Notify Jenkins dev (develop 环境)
-        if: inputs.environment == 'dev' || (inputs.environment == 'none' && github.ref == 'refs/heads/develop')
+      - name: Notify Jenkins for Production
+        if: startsWith(github.ref, 'refs/heads/release-')
         env:
           CRUMB: ${{ steps.get-crumb.outputs.crumb }}
         run: |
-          # 取 metadata 输出的第一个镜像地址（已做小写化；flavor latest=false 保证只有这一个）
-          IMAGE_TAG="${{ fromJSON(steps.meta.outputs.json).tags[0] }}"
+          IMAGE_TAG=${{ steps.meta.outputs.tags }}
+          BRANCH_NAME=${{ github.ref_name }}  # 动态获取分支名称
           curl -X POST \
             -H "Jenkins-Crumb: $CRUMB" \
             -u ${{ secrets.JENKINS_USERNAME }}:${{ secrets.JENKINS_API_TOKEN }} \
             "${{ secrets.JENKINS_URL }}/job/sourcing-api-dev/buildWithParameters" \
             --data token=${{ secrets.JENKINS_BUILD_TOKEN }} \
-            --data IMAGE_TAG="${IMAGE_TAG}"
+            --data IMAGE_TAG=${IMAGE_TAG} \
+            --data DOCKER_REGISTRY=${{ secrets.ALIYUN_REGISTRY }}
