@@ -54,7 +54,7 @@ jobs:
           echo "crumb=$CRUMB" >> $GITHUB_OUTPUT
 
       - name: Notify Jenkins for Production
-        if: startsWith(github.ref, 'refs/heads/release-')
+        if: startsWith(github.ref, 'refs/heads/release')
         env:
           CRUMB: ${{ steps.get-crumb.outputs.crumb }}
         run: |
