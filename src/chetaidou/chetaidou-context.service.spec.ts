@@ -2,7 +2,7 @@ import { Test } from "@nestjs/testing"
 import { Prisma } from "@prisma/client"
 import { PrismaService } from "../prisma/prisma.service"
 import { ChetaidouContextService, TaskSnapshot } from "./chetaidou-context.service"
-import { CHETAIDOU_IMAGE_CATEGORY, CHETAIDOU_TEXT_CATEGORY } from "./chetaidou.constants"
+import { CHETAIDOU_BREAKDOWN_CATEGORY, CHETAIDOU_IMAGE_CATEGORY, CHETAIDOU_TEXT_CATEGORY } from "./chetaidou.constants"
 
 describe("车泰斗按分类选择模型", () => {
   const findMany = jest.fn()
@@ -78,6 +78,22 @@ describe("车泰斗按分类选择模型", () => {
     await expect(service.resolveModels(models)).rejects.toMatchObject({
       response: { code: "MODEL_NOT_READY" },
     })
+  })
+
+  it("拆解只读独立分类，缺配置时不回落联想分类", async () => {
+    findMany.mockImplementation(({ where }: { where: Prisma.AiGatewayModelWhereInput }) =>
+      Promise.resolve(where.modality === "IMAGE" ? [models.image]
+        : where.category === CHETAIDOU_BREAKDOWN_CATEGORY
+          ? [{ publicId: "qwen3.8-max", category: CHETAIDOU_BREAKDOWN_CATEGORY }] : [models.text])
+    )
+    expect((await service.resolveBreakdownModels()).text).toEqual({
+      publicId: "qwen3.8-max", category: CHETAIDOU_BREAKDOWN_CATEGORY,
+    })
+    expect((await service.resolveModels()).text).toEqual(models.text)
+    findMany.mockImplementation(({ where }: { where: Prisma.AiGatewayModelWhereInput }) =>
+      Promise.resolve(where.category === CHETAIDOU_BREAKDOWN_CATEGORY ? [] : [models.image])
+    )
+    await expect(service.resolveBreakdownModels()).rejects.toMatchObject({ response: { code: "MODEL_NOT_READY" } })
   })
 
   it("同分类多个文本模型可共存，用户选择绑定 publicId，缺少显式模型不回退", async () => {

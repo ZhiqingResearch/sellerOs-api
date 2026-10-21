@@ -5,23 +5,26 @@ import { prepareTextModels, syncTextModels } from "./chetaidou/text-models.mjs"
 
 const { values: args } = parseArgs({ options: {
   "dry-run": { type: "boolean" }, enable: { type: "boolean" }, multiplier: { type: "string" },
-  model: { type: "string" },
+  model: { type: "string" }, "set-default": { type: "boolean" }, category: { type: "string" },
 } })
 const db = new PrismaClient()
 try {
+  const category = args.category ?? "CHETAIDOU_MULTIMODAL"
+  if (!["CHETAIDOU_MULTIMODAL", "CHETAIDOU_BREAKDOWN"].includes(category))
+    throw new Error("--category 仅支持 CHETAIDOU_MULTIMODAL 或 CHETAIDOU_BREAKDOWN")
   const baseURL = process.env.AI_GATEWAY_BASE_URL?.trim()
   const apiKey = process.env.AI_GATEWAY_API_KEY?.trim()
   if (!baseURL || !apiKey) throw new Error("缺少 AI_GATEWAY_BASE_URL 或 AI_GATEWAY_API_KEY")
   const gateway = new AiGatewayClient({ baseURL, apiKey, timeoutMs: 60_000, getRetry: { maxRetries: 0 } })
-  const models = await prepareTextModels(gateway, args.model ? [args.model] : undefined)
-  if (args.model) {
+  const models = await prepareTextModels(gateway, args.model ? [args.model] : undefined, category)
+  if (args.model && !args["set-default"]) {
     const last = await db.aiGatewayModel.findFirst({
-      where: { category: "CHETAIDOU_MULTIMODAL" }, orderBy: { sortOrder: "desc" }, select: { sortOrder: true },
+      where: { category }, orderBy: { sortOrder: "desc" }, select: { sortOrder: true },
     })
     models[0].sortOrder = last ? last.sortOrder + 1 : 0
   }
   const results = await syncTextModels(db, models, {
-    dryRun: !!args["dry-run"], enable: !!args.enable,
+    dryRun: !!args["dry-run"], enable: !!args.enable, setDefault: !!args["set-default"],
     multiplier: args.multiplier === undefined ? undefined : Number(args.multiplier),
   })
   console.log(JSON.stringify({ dryRun: !!args["dry-run"], models: results }, null, 2))

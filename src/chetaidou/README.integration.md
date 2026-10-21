@@ -136,7 +136,7 @@ AI 自动联想的全部维度统一 `selectionMode=single`，覆盖所有文本
 
 详见 [联想前端联调文档](./README.ideation-integration.md)：模型列表复用 `/api/ai-models?modality=TEXT&category=CHETAIDOU_MULTIMODAL`；草稿 settings 新增 model、dimensionCountRange、optionCountRange。新任务最多三维一批调用，仍逐维入库、按失败维度重试；旧任务沿用冻结规则。以下历史联调条目中的固定数量规则，以本节新版本契约为准。
 
-2026-10-13：新建 AI 拆解（上传、用户/后台重新拆解及失败任务重试）固定使用 `ZQ-Multimodal-Gemini-3.8-Flash`，不跟随目录默认排序或草稿 `settings.model`。该模型须在 `CHETAIDOU_MULTIMODAL` 分类启用且网关可用，否则返回 `MODEL_NOT_READY`；其他文本阶段仍按用户选择。历史任务和已有 Call 保留冻结模型及原请求，不自动改写或重发。
+2026-10-21：新建 AI 拆解（上传、用户/后台重新拆解及失败任务重试）从数据库 `AiGatewayModel` 的独立 `CHETAIDOU_BREAKDOWN` 分类读取默认模型：筛选 `modality=TEXT`、`enabled=true`、`gatewayActive=true`，按 `sortOrder`、`id` 升序取首项，当前配置为 `qwen3.8-max`，业务代码不写死模型 ID。拆解忽略草稿 `settings.model`；联想/发散/组合继续使用 `CHETAIDOU_MULTIMODAL` 分类，按用户选择或该分类默认项解析。分类无可用模型时返回 `MODEL_NOT_READY`。新任务快照冻结解析结果，历史任务和已有 Call 保留原模型及请求，不自动改写或重发。
 
 ## 前端必须修改
 
@@ -205,7 +205,7 @@ npm run chetaidou:init -- --enable \
   --image-multiplier=<图片售价倍率> --dry-run
 ```
 
-默认登记两个文本模型（`ZQ-Multimodal-Gemini-3.7-Flash`、`ZQ-Multimodal-Gemini-3.8-Flash`）和两个图片模型（`gpt-image-2.5-sunburst`、`ZQ-Image-1`），新模型启用；已有配置保持原价和排序。可选 `--image-model` 替换本次图片模型清单。
+默认将文本模型 `qwen3.8-max` 分别登记到 `CHETAIDOU_MULTIMODAL` 和 `CHETAIDOU_BREAKDOWN`，并登记两个图片模型（`gpt-image-2.5-sunburst`、`ZQ-Image-1`），新模型启用；已有配置保持原价和排序。可选 `--image-model` 替换本次图片模型清单。
 
 不迁移旧权限、不补齐历史图片、不覆盖已有事实卡或模型。相同完整记录原样复用，残缺或冲突时报错。可用 `--tool-role` / `--admin-role` 为已有角色追加权限，或显式传 `--allow-origin` 配置新前端域名；`--maintenance-only`、`--models-only`、`--replace-facts` 已移除。详见 `scripts/chetaidou/README.md`。
 

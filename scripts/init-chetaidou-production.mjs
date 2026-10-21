@@ -52,6 +52,7 @@ async function prepareModels(db) {
   const selected = []
   const entries = [
     ...CHETAIDOU_TEXT_MODELS.map((id, sortOrder) => ({ kind: "text", category: "CHETAIDOU_MULTIMODAL", modality: "TEXT", id, sortOrder })),
+    { kind: "text", category: "CHETAIDOU_BREAKDOWN", modality: "TEXT", id: "qwen3.8-max", sortOrder: 0 },
     ...(args["image-model"] !== undefined ? [args["image-model"].trim()] : CHETAIDOU_IMAGE_MODELS)
       .map((id, sortOrder) => ({ kind: "image", category: "CHETAIDOU_IMAGE", modality: "IMAGE", id, sortOrder })),
   ]
@@ -75,6 +76,7 @@ async function prepareModels(db) {
       gateway.models.get(id), gateway.models.requestSchema(id, { operation: kind === "text" ? "chat.completions" : "images.generations" }),
     ])
     if (detail.modality !== kind) throw new Error(`${id} 模型类型不匹配`)
+    if (category === "CHETAIDOU_BREAKDOWN" && detail.facts?.vision !== true) throw new Error(`${id} 未声明拆解所需的视觉能力`)
     if (kind === "image" && (!detail.facts?.modes?.includes("edit") || !requestSchema.request_schema)) throw new Error(`${id} 不支持参考图编辑或缺少请求 Schema`)
     selected.push({ category, data: {
       publicId: id, category, displayName: detail.display_name, modality,
@@ -102,6 +104,7 @@ async function main() {
 省略 --actor-id 时记录为系统初始化（审计 ID=0），不关联个人账号
 可选授权：--tool-role=<已有角色code> --admin-role=<已有角色code>（可重复，只追加授权）
 文本模型按内置清单全量初始化：${CHETAIDOU_TEXT_MODELS.join("、")}
+拆解模型独立登记到 CHETAIDOU_BREAKDOWN：qwen3.8-max
 图片模型按内置清单全量初始化：${CHETAIDOU_IMAGE_MODELS.join("、")}
 已有配置复用；可选 --image-model=<publicId> 替换本次图片模型清单
 新模型价格需显式传 --text-multiplier=<倍率> --image-multiplier=<倍率>

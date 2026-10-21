@@ -252,13 +252,13 @@ describe("车泰斗生图模型计费一致性", () => {
 })
 
 describe("车泰斗批次调用计费", () => {
-  it("按冻结分类查模型倍率，一次三维 Call 只收费一次，重复结算直接返回", async () => {
+  it.each(["CHETAIDOU_MULTIMODAL", "CHETAIDOU_BREAKDOWN"])("按冻结分类 %s 查模型倍率，重复结算直接返回", async category => {
     const row = {
       id: "batch-call",
       ownerId: 7,
-      source: "chetaidou.ideation",
-      model: "ZQ-Think-Ultra",
-      category: "CHETAIDOU_MULTIMODAL",
+      source: category === "CHETAIDOU_BREAKDOWN" ? "chetaidou.breakdown" : "chetaidou.ideation",
+      model: "qwen3.8-max",
+      category,
       billingStatus: "PENDING",
       outcome: "ACCEPTED",
     }

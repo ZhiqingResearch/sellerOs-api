@@ -38,19 +38,18 @@ npm run chetaidou:init -- --enable \
 # 预检通过后，使用相同参数去掉 --dry-run 正式执行
 ```
 
-两个文本模型及两个图片模型都已配置好时：
+文本模型及两个图片模型都已配置好时：
 
 ```bash
 npm run chetaidou:init -- --enable --dry-run
 npm run chetaidou:init -- --enable
 ```
 
-主初始化入口只登记以下两个文本模型，不再需要单独执行文本模型同步，也不需要传 `--text-model`：
+主初始化入口默认登记以下文本模型，不再需要单独执行文本模型同步，也不需要传 `--text-model`：
 
-- `ZQ-Multimodal-Gemini-3.7-Flash`：Google Gemini 3.7 Flash 多模态理解。
-- `ZQ-Multimodal-Gemini-3.8-Flash`：Google Gemini 3.8 Flash 多模态理解。
+- `qwen3.8-max`：分别登记到 `CHETAIDOU_MULTIMODAL`（联想/发散/组合）和独立的 `CHETAIDOU_BREAKDOWN`（拆解）分类。运行时按各自分类的 `sortOrder`、`id` 升序读取默认项，业务代码不写死模型。
 
-新建文本模型统一使用 `--text-multiplier` 指定的倍率；已有模型保持原价，若显式倍率与其价格冲突则报错。新环境仅初始化以上两项，不自动删除或停用旧环境的其他模型。
+新建文本模型统一使用 `--text-multiplier` 指定的倍率；已有模型保持原价，若显式倍率与其价格冲突则报错。新环境仅初始化以上文本模型，不自动删除或停用旧环境的其他模型。
 
 默认同时登记并启用以下两个图片模型，新库默认项为 `gpt-image-2.5-sunburst`：
 
@@ -122,7 +121,7 @@ npm run chetaidou:init -- --pack-from=../chetaidou-studio-main \
 
 ## 文本模型目录同步（2026-10-06）
 
-这是模型目录同步，不是全量资料初始化或历史维护。默认只同步上述两个车泰斗文本模型的名称和能力（完整初始化已包含这两个模型登记），displayName 来自网关查询。
+这是模型目录同步，不是全量资料初始化或历史维护。默认只同步 `qwen3.8-max` 的名称和能力（完整初始化已包含该模型登记），displayName 来自网关查询。
 
 ```bash
 node --env-file-if-exists=.env scripts/sync-chetaidou-text-models.mjs --enable --multiplier=1 --dry-run
@@ -131,14 +130,23 @@ node --env-file-if-exists=.env scripts/sync-chetaidou-text-models.mjs --enable -
 
 新增模型必须显式传售价倍率，1 为项目 TEXT 默认倍率；已有记录的价格和排序不覆盖。只有明确传 --enable 才启用已有记录。该脚本不调用内容生成接口。
 
-仅追加或同步 Gemini 3.7 Flash 联想可选项：
+已有环境在独立分类 `CHETAIDOU_BREAKDOWN` 登记 `qwen3.8-max` 并设为默认拆解模型（对应本次数据库配置）：
 
 ```bash
-node --env-file-if-exists=.env scripts/sync-chetaidou-text-models.mjs --model=ZQ-Multimodal-Gemini-3.7-Flash --enable --multiplier=1 --dry-run
-node --env-file-if-exists=.env scripts/sync-chetaidou-text-models.mjs --model=ZQ-Multimodal-Gemini-3.7-Flash --enable --multiplier=1
+node --env-file-if-exists=.env scripts/sync-chetaidou-text-models.mjs --category=CHETAIDOU_BREAKDOWN --enable --multiplier=1 --set-default --dry-run
+node --env-file-if-exists=.env scripts/sync-chetaidou-text-models.mjs --category=CHETAIDOU_BREAKDOWN --enable --multiplier=1 --set-default
 ```
 
-`--model` 只操作指定模型；新增项排在现有文本目录之后，保留现有默认项和其他模型启停。前端沿用 `GET /api/ai-models?modality=TEXT&category=CHETAIDOU_MULTIMODAL` 获取选项，草稿 `settings.model` 传对应 publicId。新调用使用 JSON mode，旧调用请求保持冻结。
+`--category` 支持 `CHETAIDOU_MULTIMODAL`（缺省）和 `CHETAIDOU_BREAKDOWN`，只操作指定分类。`--set-default` 将指定模型（缺省 `qwen3.8-max`）启用并设为 `sortOrder=0`，同分类其他启用文本模型中排序 ≤0 的项改为 1；保留它们的启用状态以及全部现有计费配置。设置默认项必须同时传 `--enable`，且模型须声明视觉能力。调整在同一事务完成，可重复执行；`--dry-run` 只预览，不写库。
+
+仅追加或同步 Qwen 联想可选项：
+
+```bash
+node --env-file-if-exists=.env scripts/sync-chetaidou-text-models.mjs --model=qwen3.8-max --enable --multiplier=1 --dry-run
+node --env-file-if-exists=.env scripts/sync-chetaidou-text-models.mjs --model=qwen3.8-max --enable --multiplier=1
+```
+
+`--model` 只操作指定模型；新增项排在现有文本目录之后，保留现有默认项和其他模型启停。前端沿用 `GET /api/ai-models?modality=TEXT&category=CHETAIDOU_MULTIMODAL` 获取选项，草稿 `settings.model` 传对应 publicId。JSON mode 沿用后端已核验的模型能力规则，旧调用请求保持冻结。
 
 ## 图片模型目录追加（2026-10-12）
 

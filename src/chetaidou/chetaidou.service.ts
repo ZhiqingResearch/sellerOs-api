@@ -41,13 +41,11 @@ import {
 } from "./chetaidou-image-options.service"
 import { ChetaidouStorageService, originalImageOf, stableHash } from "./chetaidou-storage.service"
 import {
-  CHETAIDOU_BREAKDOWN_MODEL,
   CHETAIDOU_BUSINESS_TYPE,
   CHETAIDOU_ERROR_CODES,
   CHETAIDOU_IMAGE_CATEGORY,
   CHETAIDOU_MAX_CUSTOM_DIMENSIONS,
   CHETAIDOU_SITES,
-  CHETAIDOU_TEXT_CATEGORY,
   chetaidouEnabled,
   chetaidouIdeationStatus,
   chetaidouImageJobStatus,
@@ -90,6 +88,7 @@ export class ChetaidouService {
   async getConfig() {
     const modelsReady = await this.billing
       .assertModelsReady()
+      .then(() => this.context.resolveBreakdownModels())
       .then(() => true)
       .catch(() => false)
     return {
@@ -327,7 +326,7 @@ export class ChetaidouService {
       return { imageId: existing.imageId, taskId: existing.id }
     }
 
-    await this.billing.assertModelsReady()
+    await this.context.resolveBreakdownModels()
 
     const scopeKey = this.storage.masterFileKey(skuId, `u${userId}`, "pending")
     // 临时 key 防并发重复上传覆盖；DB 成功后不 move（key 含随机段）
@@ -399,7 +398,8 @@ export class ChetaidouService {
       },
       fact: { id: 0, version: 0, content: {}, contentHash: "" }, // 事务内回填
       breakdown: null,
-      settings: { ...defaultSettings(), model: CHETAIDOU_BREAKDOWN_MODEL },
+      settings: defaultSettings(),
+      models: await this.context.resolveBreakdownModels(),
       resolvedSelections: [],
       customDimensions: [],
       decisions: [],
@@ -501,7 +501,7 @@ export class ChetaidouService {
       if (existing.requestHash !== requestHash) throw idempotencyConflict()
       return { taskId: existing.id }
     }
-    await this.billing.assertModelsReady()
+    await this.context.resolveBreakdownModels()
     const { fact } = await this.requireAccessibleImage(userId, imageId)
     const taskId = randomUUID()
     const snapshot = await this.context.buildSnapshot({
@@ -527,8 +527,8 @@ export class ChetaidouService {
             where: { ownerId_imageId: { ownerId: userId, imageId } },
           })
         ),
-        model: CHETAIDOU_BREAKDOWN_MODEL,
       },
+      models: await this.context.resolveBreakdownModels(),
       resolvedSelections: [],
       customDimensions: [],
       decisions: [],
@@ -2295,11 +2295,8 @@ export class ChetaidouService {
     }
     const retrySnapshot = structuredClone(root.snapshot as unknown as TaskSnapshot)
     if (root.type === "BREAKDOWN") {
-      retrySnapshot.models.text = {
-        publicId: CHETAIDOU_BREAKDOWN_MODEL,
-        category: CHETAIDOU_TEXT_CATEGORY,
-      }
-      retrySnapshot.settings.model = CHETAIDOU_BREAKDOWN_MODEL
+      retrySnapshot.models.text = (await this.context.resolveBreakdownModels()).text
+      retrySnapshot.settings.model = retrySnapshot.models.text.publicId
     }
     await this.billing.assertModelsReady(retrySnapshot.models)
     const retryDraft = await this.requireDraft(userId, root.imageId)

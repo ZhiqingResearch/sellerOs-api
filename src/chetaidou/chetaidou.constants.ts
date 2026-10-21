@@ -6,7 +6,6 @@ export const IMAGE_CREATIVE_BUSINESS_TYPE = "IMAGE_CREATIVE" as const
 
 export const CHETAIDOU_CALL_PREFIX = "chetaidou:call:" as const
 export const CHETAIDOU_CHARGE_PREFIX = "chetaidou:charge:" as const
-export const CHETAIDOU_BREAKDOWN_MODEL = "ZQ-Multimodal-Gemini-3.8-Flash" as const
 
 /** Task.type */
 export type ChetaidouTaskType =
@@ -133,6 +132,7 @@ export function chetaidouRepairBudget(): number {
 }
 // ── 业务模型分类：具体 publicId 只维护在 AiGatewayModel 目录 ──────────────
 export const CHETAIDOU_TEXT_CATEGORY = "CHETAIDOU_MULTIMODAL"
+export const CHETAIDOU_BREAKDOWN_CATEGORY = "CHETAIDOU_BREAKDOWN"
 export const CHETAIDOU_IMAGE_CATEGORY = "CHETAIDOU_IMAGE"
 
 export function chetaidouEnabled(): boolean {

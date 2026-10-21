@@ -273,13 +273,18 @@ describe("车泰斗联调回归", () => {
     return runner
   }
 
-  it.each(["upload", "rebreak", "admin", "retry"])(
-    "新拆解固定 Gemini 3.8，忽略默认与草稿模型且保留旧调用：%s",
-    async entry => {
-      jest.spyOn(context, "resolveModels").mockImplementation(async (frozen, model) => ({
-        text: frozen?.text ?? { publicId: model ?? "text", category: "CHETAIDOU_MULTIMODAL" },
-        image: frozen?.image ?? { publicId: "image", category: "CHETAIDOU_IMAGE" },
-      }))
+  it.each(["qwen3.8-max", "database-replacement"].flatMap(model =>
+    ["upload", "rebreak", "admin", "retry"].map(entry => [entry, model])
+  ))(
+    "新拆解读取独立分类默认模型，忽略联想默认和草稿选择且保留旧调用：%s %s",
+    async (entry, model) => {
+      jest.mocked(context.resolveModels).mockRestore()
+      state.db.aiGatewayModel.findMany.mockImplementation(async ({ where }) => {
+        const publicId = where.modality === "IMAGE" ? "image"
+          : where.category === "CHETAIDOU_BREAKDOWN" ? model : "ideation-model"
+        return where.publicId && where.publicId !== publicId
+          ? [] : [{ publicId, category: where.category }]
+      })
       state.draft.settings.model = "ZQ-Multimodal-Gemini-3.5-Flash-Lite"
       let taskId: string
       if (entry === "upload") {
@@ -294,19 +299,22 @@ describe("车泰斗联调回归", () => {
           fileKey: "image.png",
           asset: { mime: "image/png", width: 100, height: 100, checksum: "image" },
           factId: 1,
-          idempotencyKey: "upload-gemini-3.8",
+          idempotencyKey: "upload-database-model",
           requestHash: "upload",
           createdBy: 7,
         })
         taskId = created.taskId
       } else if (entry === "rebreak") {
         Object.assign(state.image, { sourceType: "USER_UPLOAD", ownerId: 7 })
-        taskId = (await service.retryBreakdown(7, 19, "rebreak-gemini-3.8")).taskId
+        taskId = (await service.retryBreakdown(7, 19, "rebreak-database-model")).taskId
       } else if (entry === "admin") {
         const admin = new ChetaidouAdminService(state.db, {} as never, context, service)
-        taskId = (await admin.rebreak(19, 7, "admin-gemini-3.8")).taskId
+        taskId = (await admin.rebreak(19, 7, "admin-database-model")).taskId
       } else {
+        const draftModel = state.draft.settings.model
+        delete state.draft.settings.model
         const root = await compose()
+        state.draft.settings.model = draftModel
         Object.assign(root, { type: "BREAKDOWN", status: "FAILED" })
         root.snapshot.models.text.publicId = "ZQ-Multimodal-Gemini-3.5-Flash-Lite"
         const oldSnapshot = structuredClone(root.snapshot)
@@ -319,7 +327,7 @@ describe("车泰斗联调回归", () => {
             model: "old-model",
           },
         })
-        taskId = (await service.retryTask(7, root.id, { idempotencyKey: "retry-gemini-3.8" }))
+        taskId = (await service.retryTask(7, root.id, { idempotencyKey: "retry-database-model" }))
           .taskId
         expect(root.snapshot).toEqual(oldSnapshot)
         expect(
@@ -330,14 +338,14 @@ describe("车泰斗联调回归", () => {
       }
       const task = state.tasks.find(t => t.id === taskId)
       expect(task.snapshot.models.text).toEqual({
-        publicId: "ZQ-Multimodal-Gemini-3.8-Flash",
-        category: "CHETAIDOU_MULTIMODAL",
+        publicId: model,
+        category: "CHETAIDOU_BREAKDOWN",
       })
-      expect(task.snapshot.settings.model).toBe("ZQ-Multimodal-Gemini-3.8-Flash")
+      expect(task.snapshot.settings.model).toBe(model)
       expect(state.draft.settings.model).toBe("ZQ-Multimodal-Gemini-3.5-Flash-Lite")
       const completeMultimodal = jest.fn().mockResolvedValue({
         completion: { choices: [{ message: { content: "{}" } }] },
-        requestId: "gemini-3.8-request",
+        requestId: "database-model-request",
       })
       const runner = new ChetaidouTaskRunnerService(
         state.db,
@@ -347,12 +355,13 @@ describe("车泰斗联调回归", () => {
       )
       await runner.execute(taskId)
       expect(completeMultimodal).toHaveBeenCalledWith(
-        expect.objectContaining({ model: "ZQ-Multimodal-Gemini-3.8-Flash" }),
+        expect.objectContaining({ model }),
         undefined,
         true
       )
       expect(await state.db.chetaidouCall.findFirst({ where: { taskId } })).toMatchObject({
-        model: "ZQ-Multimodal-Gemini-3.8-Flash",
+        model,
+        category: "CHETAIDOU_BREAKDOWN",
       })
     }
   )

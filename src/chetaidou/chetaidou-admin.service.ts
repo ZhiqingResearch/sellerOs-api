@@ -13,7 +13,7 @@ import { randomUUID } from "crypto"
 import { PrismaService } from "../prisma/prisma.service"
 import { ChetaidouContextService } from "./chetaidou-context.service"
 import { ChetaidouStorageService, stableHash } from "./chetaidou-storage.service"
-import { CHETAIDOU_BREAKDOWN_MODEL, CHETAIDOU_BUSINESS_TYPE } from "./chetaidou.constants"
+import { CHETAIDOU_BUSINESS_TYPE } from "./chetaidou.constants"
 import { validateBreakdownOutput } from "./chetaidou.schemas"
 import { ChetaidouService } from "./chetaidou.service"
 
@@ -257,8 +257,8 @@ export class ChetaidouAdminService {
         contentHash: fact!.contentHash,
       },
       breakdown: null,
+      models: await this.context.resolveBreakdownModels(),
       settings: {
-        model: CHETAIDOU_BREAKDOWN_MODEL,
         site: "original",
         textMode: "keep",
         personMode: "keep",

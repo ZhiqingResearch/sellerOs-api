@@ -85,6 +85,10 @@ describe("ChetaidouService", () => {
         {
           provide: ChetaidouContextService,
           useValue: {
+            resolveBreakdownModels: jest.fn().mockResolvedValue({
+              text: { publicId: "qwen3.8-max", category: "CHETAIDOU_BREAKDOWN" },
+              image: { publicId: "image", category: "CHETAIDOU_IMAGE" },
+            }),
             buildSnapshot: jest.fn(() => ({})),
             contextHash: jest.fn(() => "hash"),
             requestHash: jest.fn(() => "reqhash"),
@@ -120,6 +124,7 @@ describe("ChetaidouService", () => {
     const resolveImageModel = jest.spyOn(service["imageOptions"], "resolveModel")
     const config = await service.getConfig()
     expect(config).toMatchObject({ generateCounts: [1, 2, 4, 8], models: { ready: true } })
+    expect(service["context"].resolveBreakdownModels).toHaveBeenCalled()
     expect(config).not.toHaveProperty("imageGeneration")
     expect(resolveImageModel).not.toHaveBeenCalled()
   })

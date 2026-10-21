@@ -12,6 +12,7 @@ import {
 } from "./chetaidou-execution"
 import { stableHash } from "./chetaidou-storage.service"
 import {
+  CHETAIDOU_BREAKDOWN_CATEGORY,
   CHETAIDOU_ERROR_CODES,
   CHETAIDOU_IMAGE_CATEGORY,
   CHETAIDOU_TEXT_CATEGORY,
@@ -73,7 +74,8 @@ export class ChetaidouContextService {
   /** 文本和图片按冻结选择或目录排序默认值解析；重试不换模型。 */
   async resolveModels(
     frozen?: TaskSnapshot["models"],
-    textModel?: string
+    textModel?: string,
+    textCategory = CHETAIDOU_TEXT_CATEGORY
   ): Promise<TaskSnapshot["models"]> {
     const resolve = async (kind: "text" | "image", category: string) => {
       const selected =
@@ -103,10 +105,15 @@ export class ChetaidouContextService {
       return rows[0]
     }
     const [text, image] = await Promise.all([
-      resolve("text", CHETAIDOU_TEXT_CATEGORY),
+      resolve("text", textCategory),
       resolve("image", CHETAIDOU_IMAGE_CATEGORY),
     ])
     return { text, image }
+  }
+
+  /** 拆解独立配置，避免联想等文本阶段的默认模型影响拆解。 */
+  async resolveBreakdownModels(): Promise<TaskSnapshot["models"]> {
+    return this.resolveModels(undefined, undefined, CHETAIDOU_BREAKDOWN_CATEGORY)
   }
 
   /** 读当前生效资料组合（SKU 必须启用且有 facts；image 必须可用） */
