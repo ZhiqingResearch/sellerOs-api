@@ -28,7 +28,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: ${{ secrets.ALIYUN_REGISTRY }}/${{ secrets.ALIYUN_REGISTRY_NAMESPACE }}/${{ github.event.repository.name }}
+          images: ${{ secrets.ALIYUN_REGISTRY }}/dinglan-backend/${{ github.event.repository.name }}
           tags: |
             type=ref,event=branch  # 基于分支名称生成标签
 
