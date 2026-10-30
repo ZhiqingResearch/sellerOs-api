@@ -1,3 +1,4 @@
+import { deliverVideo } from "../aigc/media-delivery"
 import { BadRequestException, UnauthorizedException } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { Decimal } from "@prisma/client/runtime/library"
@@ -118,10 +119,19 @@ describe("AiGatewayWebhookService", () => {
       usage as never,
       artifacts as never,
       imageCallbacks as never,
-      chetaidouReceipts as never, { refresh: jest.fn(), registerContinuation: jest.fn() } as never
+      chetaidouReceipts as never, { refresh: jest.fn(), registerContinuation: jest.fn() } as never, {} as never
     )
     return { service, tx, prisma, gateway, usage, artifacts, imageCallbacks, chetaidouReceipts, rawResults }
   }
+
+  it("视频标识失败时不落成功、不扣费，也不提交新的生成任务", async () => {
+    const { service, tx, usage, gateway } = setup()
+    jest.mocked(deliverVideo).mockRejectedValueOnce(new Error("label unavailable"))
+    await expect(service.applyVideoTask(gatewayTask, "label-failed")).rejects.toThrow("label unavailable")
+    expect(tx.videoTask.updateMany).not.toHaveBeenCalled()
+    expect(usage.chargeModelInTransaction).not.toHaveBeenCalled()
+    expect(gateway.createVideoTask).not.toHaveBeenCalled()
+  })
 
   function setupImage(updateCount = 1) {
     const config = {
@@ -211,7 +221,7 @@ describe("AiGatewayWebhookService", () => {
       usage as never,
       artifacts as never,
       imageCallbacks as never,
-      chetaidouReceipts as never, { refresh: jest.fn(), registerContinuation: jest.fn() } as never
+      chetaidouReceipts as never, { refresh: jest.fn(), registerContinuation: jest.fn() } as never, {} as never
     )
     return { service, tx, prisma, gateway, usage, artifacts, imageCallbacks, chetaidouReceipts }
   }
@@ -2435,3 +2445,6 @@ describe("AiGatewayWebhookService", () => {
     ).rejects.toBeInstanceOf(UnauthorizedException)
   })
 })
+
+// 计费/状态机单测隔离文件IO；标识失败另有专门回归。
+jest.mock("../aigc/media-delivery", () => ({ deliverVideo: jest.fn((_spaces, url: string) => Promise.resolve(url)) }))

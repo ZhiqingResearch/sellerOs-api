@@ -13,6 +13,7 @@ import { AliyunContentModerationProvider } from "../common/providers/aliyun-cont
 import { PrismaService } from "../prisma/prisma.service"
 import { contentInputs } from "./content-inputs"
 import { ContentSnapshotService } from "./content-snapshot.service"
+import { requestContentInputs } from "./moderation-scope"
 import type { ModerationInput, ModerationReceipt, ModerationResult } from "./moderation.types"
 import { record } from "./moderation.types"
 
@@ -224,8 +225,11 @@ export class TaskModerationService {
       throw new ConflictException("超时任务尚未提交过业务，不能自动重新生成，请创建新任务")
     }
     if (!task.moderationStatus) {
-      const inputs = contentInputs(task.generationParams, "generation", VIDEO_TECHNICAL_FIELDS)
-      if (!inputs.length) throw new BadRequestException("任务缺少可审核的业务内容")
+      const inputs = await requestContentInputs(
+        contentInputs(task.generationParams, "generation", VIDEO_TECHNICAL_FIELDS),
+        true
+      )
+      if (!inputs.length) throw new BadRequestException("任务缺少可审核的提示词或素材")
       inputs.forEach(input => this.provider.validate(input))
       const state: ModerationState = {
         revision: 1,
@@ -262,7 +266,8 @@ export class TaskModerationService {
             VIDEO_TECHNICAL_FIELDS
           )
           state.inputHash = inputHash(frozen)
-          state.items = frozenInputs.map(input => ({
+          const media = frozenInputs.filter(input => input.type !== "TEXT")
+          state.items = [...inputs.filter(input => input.type === "TEXT"), ...media].map(input => ({
             input,
             service: this.provider.service(input.type),
             status: "PENDING",

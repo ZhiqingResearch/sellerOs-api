@@ -502,6 +502,9 @@ export interface ReferenceImageInput {
 }
 
 export interface ProviderGenerateInput {
+  /** 已成功生成的任务只恢复产物处理，不重新提交收费任务。 */
+  resumeTaskId?: string;
+  onGenerated?: (taskId: string) => Promise<void>;
   localRedraw?: import("../local-redraw.constants").LocalRedrawPlan
   referenceImages: ReferenceImageInput[];
   prompt: string;

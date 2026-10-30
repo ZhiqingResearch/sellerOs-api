@@ -2,6 +2,9 @@ import { Injectable, Logger, ServiceUnavailableException } from "@nestjs/common"
 import type { ImageTaskArtifact } from "@zhiqingresearch/ai-ts-sdk"
 import axios from "axios"
 import sharp from "sharp"
+import { labelImage } from "../aigc/image-label"
+import { retryDelivery } from "../aigc/aigc-metadata"
+import { objectAigcMetadata } from "../aigc/media-delivery"
 import { cropImageToAspectRatio } from "../common/utils/image-aspect-crop"
 import type { PortraitDeliveryPlan } from "../image-project/portrait-size-planner"
 import { SpacesService } from "../spaces/spaces.service"
@@ -54,6 +57,11 @@ export class AiGatewayImageArtifactService {
 
   constructor(private readonly spaces: SpacesService) {}
 
+  private async upload(buffer: Buffer, key: string): Promise<string> {
+    const result = await retryDelivery(() => labelImage(buffer, key))
+    return this.spaces.uploadBuffer(result.buffer, key, result.mime, "public-read", objectAigcMetadata(result.metadata))
+  }
+
   async store(
     task: ImageArtifactTask,
     imageId: number,
@@ -82,7 +90,7 @@ export class AiGatewayImageArtifactService {
     const originalKey = `portrait-originals/${task.userId}/${task.projectId}/${task.id}/${imageId}.${sourceExtension}`
     let originalUrl: string | null = null
     try {
-      originalUrl = await this.spaces.uploadBuffer(buffer, originalKey, sourceMime)
+      originalUrl = await this.upload(buffer, originalKey)
     } catch {
       this.logger.warn({ event: "image_artifact.original_save_failed", taskId: task.id, imageId })
     }
@@ -90,7 +98,7 @@ export class AiGatewayImageArtifactService {
     if (!plan) {
       const dimensions = await this.imageSize(buffer).catch(() => ({ width: null, height: null }))
       const key = `${resultPrefix}/${task.userId}/${task.projectId}/${task.id}/${imageId}.${sourceExtension}`
-      const url = await this.spaces.uploadBuffer(buffer, key, sourceMime)
+      const url = await this.upload(buffer, key)
       return {
         url,
         originalUrl,
@@ -112,7 +120,7 @@ export class AiGatewayImageArtifactService {
       )
       const outputExtension = this.extension(processed.mimeType)
       const resultKey = `${resultPrefix}/${task.userId}/${task.projectId}/${task.id}/${imageId}.${outputExtension}`
-      const url = await this.spaces.uploadBuffer(processed.buffer, resultKey, processed.mimeType)
+      const url = await this.upload(processed.buffer, resultKey)
       return {
         url,
         originalUrl,
@@ -148,7 +156,7 @@ export class AiGatewayImageArtifactService {
           ? Math.max(metadata.width, metadata.height) >=
             Math.max(plan.requested.width, plan.requested.height)
           : null
-      const fallbackUrl = originalUrl ?? await this.spaces.uploadBuffer(buffer, originalKey, sourceMime)
+      const fallbackUrl = originalUrl ?? await this.upload(buffer, originalKey)
       return {
         url: fallbackUrl,
         originalUrl: fallbackUrl,

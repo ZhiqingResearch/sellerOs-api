@@ -1,3 +1,4 @@
+import { auditText } from "../../aigc/text-audit"
 import { GenerateVideosOperation, GoogleGenAI } from "@google/genai"
 import { Injectable, Logger } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
@@ -107,6 +108,10 @@ export class GoogleProvider {
 
   /** 调用 Gemini 生成文本 */
   async generateText(systemPrompt: string, userPrompt: string): Promise<string | null> {
+    return auditText(GoogleProvider.TEXT_MODEL, userPrompt, () => this.generateTextAudited(systemPrompt, userPrompt))
+  }
+
+  private async generateTextAudited(systemPrompt: string, userPrompt: string): Promise<string | null> {
     await this.moderation.assertContent(userPrompt, "prompt")
     try {
       const response = await this.ai.models.generateContent({
@@ -126,6 +131,10 @@ export class GoogleProvider {
 
   /** 调用 Gemini 并开启 Google 搜索工具（web grounding），用于实时信息类任务 */
   async generateTextWithSearch(systemPrompt: string, userPrompt: string): Promise<string | null> {
+    return auditText(GoogleProvider.TEXT_MODEL, userPrompt, () => this.generateTextWithSearchAudited(systemPrompt, userPrompt))
+  }
+
+  private async generateTextWithSearchAudited(systemPrompt: string, userPrompt: string): Promise<string | null> {
     await this.moderation.assertContent(userPrompt, "prompt")
     try {
       const response = await this.ai.models.generateContent({
@@ -146,6 +155,10 @@ export class GoogleProvider {
 
   /** 调用 Gemini Deep Research（Interactions API） */
   async deepSearch(query: string): Promise<string | null> {
+    return auditText("deep-research-pro-preview-12-2025", query, () => this.deepSearchAudited(query))
+  }
+
+  private async deepSearchAudited(query: string): Promise<string | null> {
     await this.moderation.assertContent(query, "query")
     try {
       const interaction = await this.ai.interactions.create({

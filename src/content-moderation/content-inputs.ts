@@ -2,7 +2,9 @@ import { BadRequestException } from "@nestjs/common"
 import { getMetadataStorage } from "class-validator"
 import { record, type ModerationInput, type ModerationMediaType } from "./moderation.types"
 
-// 只排除技术字段；未知的自由字符串默认作为业务内容送审。
+// 文本仅审核用户提示词；其余字段仍递归查找图片、视频和文档。
+const PROMPT_FIELD =
+  /^(?:.*prompt(?:override)?s?|instructions?|questions?|query|userContent|text)$/i
 const TECHNICAL =
   /^(?:id|ids|.*Ids?|.*_ids?|keyA|keyB|code|.*Code|.*_code|otp|captcha|hash|.*Hash|.*_hash|salt|page|pageSize|limit|offset|sort|sortBy|orderBy|direction|status|publicId|model|modelName|modelPublicId|modelCategory|sourceType|requestId|request_id|idempotencyKey|attemptId|chargeRequestId|currency|locale|language|region|mimeType|mimetype|contentType|filename|originalname|prefix|callback|callbackUrl|callback_url|returnUrl|return_url|webhookUrl|webhook_url|resolution|aspectRatio|aspect_ratio|ratio|format|quality|size|seed|duration|durationSec|duration_seconds|startDate|endDate|createdAt|updatedAt|expiresAt)$/
 const SENSITIVE_TECHNICAL =
@@ -54,6 +56,7 @@ export function contentInputs(
   technicalFields: readonly string[] = []
 ): ModerationInput[] {
   const inputs: ModerationInput[] = []
+  const prompts = new Set<string>()
   const visit = (item: unknown, path: string, name: string, parent: Record<string, unknown>) => {
     if (TECHNICAL.test(name) || SENSITIVE_TECHNICAL.test(name) || technicalFields.includes(name))
       return
@@ -95,6 +98,14 @@ export function contentInputs(
         return
       }
     }
+    if (
+      PROMPT_FIELD.test(name) ||
+      (name === "content" &&
+        (typeof parent.role === "string" || ["userContent", "messages"].includes(root)))
+    ) {
+      prompts.add(item.trim())
+      return
+    }
     const url = /^(?:https?:\/\/|data:|blob:)/i.test(item)
     const type = url ? mediaType(`${path} ${name}`, item, parent) : null
     if (url && !type && /^(?:url|uri|src)s?$/i.test(name)) {
@@ -112,17 +123,23 @@ export function contentInputs(
       })
       return
     }
-    // 没有媒体类型的链接仍按文字审核；不能仅因内容是URL便跳过。
-    const chars = Array.from(item)
-    for (let start = 0; start < chars.length; start += 1800) {
-      inputs.push({
-        key: `${path}.${start / 1800}`,
-        type: "TEXT",
-        content: chars.slice(start, start + 2000).join(""),
-      })
-      if (start + 2000 >= chars.length) break
-    }
   }
   visit(value, root, root.split(".").pop() || root, {})
-  return inputs
+  const content = [...prompts].join("\n\n")
+  const chars = Array.from(content)
+  const texts: ModerationInput[] = []
+  for (let start = 0; start < chars.length; start += 1800) {
+    texts.push({
+      key: `${root}.prompt.${start / 1800}`,
+      type: "TEXT",
+      content: chars.slice(start, start + 2000).join(""),
+    })
+    if (start + 2000 >= chars.length) break
+  }
+  const media = [
+    ...new Map(
+      inputs.map(input => [JSON.stringify([input.type, input.url, input.documentType]), input])
+    ).values(),
+  ]
+  return [...texts, ...media]
 }

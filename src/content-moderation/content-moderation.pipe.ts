@@ -9,8 +9,9 @@ import {
 import { REQUEST } from "@nestjs/core"
 import type { Request } from "express"
 import { rm } from "node:fs/promises"
-import { contentInputs } from "./content-inputs"
+import { logRejectedInput } from "../aigc/text-audit"
 import { ContentModerationService } from "./content-moderation.service"
+import { registerModerationValidation } from "./moderation-scope"
 
 // 供应商回执不属于用户输入，不可因正文审核阻塞入账或异步回调。
 const CALLBACKS = [
@@ -31,6 +32,11 @@ export class ContentModerationPipe extends ValidationPipe {
   }
 
   override async transform(value: unknown, metadata: ArgumentMetadata): Promise<unknown> {
+    try { return await this.transformAudited(value, metadata) }
+    catch (error) { await logRejectedInput(error); throw error }
+  }
+
+  private async transformAudited(value: unknown, metadata: ArgumentMetadata): Promise<unknown> {
     const path = this.request.path.replace(/^\/api(?=\/)/, "")
     if (
       path === "/content-moderation/check" &&
@@ -41,7 +47,9 @@ export class ContentModerationPipe extends ValidationPipe {
     ) {
       throw new BadRequestException("审核接口只接受业务类型和业务任务ID")
     }
-    const validated: unknown = await super.transform(value, metadata)
+    const validation = super.transform(value, metadata) as Promise<unknown>
+    registerModerationValidation(metadata, validation)
+    const validated: unknown = await validation
     if (
       metadata.type === "body" &&
       this.request.method === "POST" &&
@@ -58,24 +66,7 @@ export class ContentModerationPipe extends ValidationPipe {
       this.request.method === "POST" &&
       (/^\/video-project\/\d+\/(?:task|motion-control\/batch)$/.test(path) ||
         path === "/internal/generation/video-tasks")
-    if (deferred) {
-      if (metadata.type === "body") {
-        // 完整生成参数由任务审核；批次素材名称等仅用于本地展示的文字也必须审核。
-        const metadataContent = Object.fromEntries(
-          Object.entries(validated as Record<string, unknown>).filter(
-            ([key]) => !["params", "request", "category", "prompt"].includes(key)
-          )
-        )
-        await this.moderation.assertInputs(
-          contentInputs(
-            metadataContent,
-            "metadata",
-            path.startsWith("/internal/generation/") ? ["phone", "category"] : []
-          ).filter(input => input.type === "TEXT")
-        )
-      }
-      return validated
-    }
+    if (deferred) return validated
     if (metadata.type === "body" || metadata.type === "query") {
       if (
         /^\/(?:auth|internal\/(?:generation|llm-toolbox|credits)|open\/(?:credit|keyb\/credit))(?:\/|$)/.test(

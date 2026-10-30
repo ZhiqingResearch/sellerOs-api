@@ -24,7 +24,7 @@ export function publicModeration(value: unknown): unknown {
         )
       )
   const result = Object.fromEntries(
-    Object.entries(rest).map(([key, item]) => [key, publicModeration(item)])
+    Object.entries(rest).filter(([key]) => key !== "deliverySource").map(([key, item]) => [key, publicModeration(item)])
   )
   if (hasInternalModeration) {
     result.contentModeration = moderationSnapshot({

@@ -13,7 +13,28 @@ class ContentDto {
 }
 
 describe("全局业务内容审核边界", () => {
-  it("身份接口排除联系方式凭证，注册展示名仍审核", async () => {
+  it("提示词链接仍作为文本，用户传入的系统提示词和对话正文均合并，普通content字段不送审", () => {
+    const inputs = contentInputs({
+      prompt: "https://example.com/a.jpg",
+      systemPrompt: "用户自定义系统提示词",
+      messages: [
+        { role: "user", content: "用户消息" },
+        { role: "assistant", content: "客户端传入的历史消息" },
+      ],
+      content: "普通业务内容",
+      model: "model",
+      size: "2K",
+    })
+    expect(inputs).toEqual([
+      {
+        key: "input.prompt.0",
+        type: "TEXT",
+        content:
+          "https://example.com/a.jpg\n\n用户自定义系统提示词\n\n用户消息\n\n客户端传入的历史消息",
+      },
+    ])
+  })
+  it("身份接口的联系方式、凭证和展示名均不作为提示词送审", async () => {
     const received: unknown[] = []
     const moderation = {
       assertContent: jest.fn((value: unknown, root: string, technical: string[]) => {
@@ -28,10 +49,10 @@ describe("全局业务内容审核边界", () => {
       { email: "private@example.com", password: "secret", username: "展示名" },
       { type: "body", metatype: Object }
     )
-    expect(received).toEqual([{ key: "body.username.0", type: "TEXT", content: "展示名" }])
+    expect(received).toEqual([])
   })
 
-  it("识别嵌套的四类内容，技术凭证不送审，未知业务字段默认审核", () => {
+  it("识别嵌套的四类内容，仅提示词作为文本送审", () => {
     const dto = Object.assign(new ContentDto(), {
       prompt: "商品说明",
       password: "private-password",
@@ -60,19 +81,25 @@ describe("全局业务内容审核边界", () => {
     const serialized = JSON.stringify(inputs)
     expect(serialized).not.toContain("private-")
     expect(serialized).not.toContain("technical-category")
-    expect(inputs.some(input => input.content === "自由填写的业务来源")).toBe(true)
+    expect(inputs.filter(input => input.type === "TEXT")).toEqual([
+      { key: "input.prompt.0", type: "TEXT", content: "商品说明" },
+    ])
   })
 
-  it("长文本按Unicode字符审核全部内容，分片边界保留重叠", () => {
+  it("合并提示词后按Unicode字符分片，保留重叠且不遗漏尾部", () => {
     const text = "字".repeat(1799) + "😀敏感内容" + "尾".repeat(2200)
     const inputs = contentInputs({ prompt: text })
+    expect(inputs).toHaveLength(3)
     expect(inputs.every(input => Array.from(input.content!).length <= 2000)).toBe(true)
     expect(inputs[0].content).toContain("😀敏感内容")
     expect(inputs.at(-1)!.content!.endsWith("尾")).toBe(true)
+    expect(Array.from(inputs[0].content!).slice(1800).join("")).toBe(
+      Array.from(inputs[1].content!).slice(0, 200).join("")
+    )
   })
 
   it("支持Express无原型查询对象，并只读取真实Multer上传的磁盘文件", async () => {
-    const query = Object.assign(Object.create(null) as Record<string, string>, { keyword: "商品" })
+    const query = Object.assign(Object.create(null) as Record<string, string>, { prompt: "商品" })
     expect(contentInputs(query)[0].content).toBe("商品")
     const file = {
       path: "/tmp/server-upload-file",
@@ -172,7 +199,7 @@ describe("全局业务内容审核边界", () => {
     expect(moderation.assertContent).not.toHaveBeenCalled()
   })
 
-  it("待审视频入口仅检查展示文字，文件交给业务任务保存和查询；multipart文件实际审核", async () => {
+  it("待审视频的展示名称不送审，文件交给业务任务；multipart文件实际审核", async () => {
     const moderation = { assertContent: jest.fn(), assertInputs: jest.fn(), assertFile: jest.fn() }
     const deferred = new ContentModerationPipe(
       { path: "/api/video-project/1/motion-control/batch", method: "POST" } as never,
@@ -182,16 +209,7 @@ describe("全局业务内容审核边界", () => {
       { prompt: "复刻", actionVideos: [{ name: "动作名称", url: "https://assets.test/v.mp4" }] },
       { type: "body", metatype: Object }
     )
-    expect(
-      moderation.assertInputs.mock.calls[0][0].every(
-        (input: { type: string }) => input.type === "TEXT"
-      )
-    ).toBe(true)
-    expect(
-      moderation.assertInputs.mock.calls[0][0].some(
-        (input: { content: string }) => input.content === "动作名称"
-      )
-    ).toBe(true)
+    expect(moderation.assertInputs).not.toHaveBeenCalled()
     const normal = new ContentModerationPipe(
       { path: "/api/import", method: "POST" } as never,
       moderation as never

@@ -1,3 +1,4 @@
+import type { ProviderGenerateResult } from "../core/types";
 // src/image-generation/executor/generation-task-runner.service.ts
 //
 // 主生图(GenerationTask/GeneratedImage)单图执行器 —— 源路由
@@ -19,7 +20,7 @@
 // 终态聚合时上报一次,进程崩溃即丢失,语义一致。
 
 import { Inject, Injectable, Logger } from "@nestjs/common";
-import { InvokeType } from "@prisma/client"
+import { InvokeType, type Prisma } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library";
 import {
   IMAGE_PIPELINE_IDEMPOTENCY_PREFIX,
@@ -271,6 +272,7 @@ export class GenerationTaskRunnerService {
         .catch(() => undefined);
     }, HEARTBEAT_MS);
 
+    let deliveryPending = Boolean(image.deliverySource || image.providerJobId);
     try {
       const provider: ImageProvider = this.providerFactory(spec.provider);
       const item = spec.items.find((it) => it.order === image.order) ?? spec.items[0];
@@ -279,7 +281,20 @@ export class GenerationTaskRunnerService {
       // IMAGE_PIPELINE_IDEMPOTENCY_PREFIX(原 `gen:`,2026-09-10 统一——
       // webhook 据此识别管线任务的晚到回调)。
       input.idempotencyKey = `${IMAGE_PIPELINE_IDEMPOTENCY_PREFIX}${task.id}:${imageId}:${image.attemptNo ?? 0}`;
-      const result = await provider.generate(input);
+      input.resumeTaskId = image.providerJobId ?? undefined;
+      input.onGenerated = async (taskId) => {
+        deliveryPending = true;
+        await this.prisma.generatedImage.updateMany({
+          where: { id: imageId, status: "GENERATING", leaseOwner: WORKER_ID },
+          data: { providerJobId: taskId },
+        });
+      };
+      const result = image.deliverySource as unknown as ProviderGenerateResult | null ?? await provider.generate(input);
+      deliveryPending = true;
+      if (!result.url.startsWith("data:")) await this.prisma.generatedImage.updateMany({
+        where: { id: imageId, status: "GENERATING", leaseOwner: WORKER_ID },
+        data: { deliverySource: JSON.parse(JSON.stringify(result)) as Prisma.InputJsonValue },
+      });
       const rawUrl = result.url;
 
       // 交付计划 finalize + 上传;照源:finalize 失败降级托管 raw 图,绝不丢
@@ -299,17 +314,18 @@ export class GenerationTaskRunnerService {
             mimeType: fin.mimeType,
             scene: "IMAGE_CREATION_OUTPUT",
             authToken: "",
+            labelId: `generation:${task.id}:${imageId}`,
           });
           deliveredWidth = fin.width;
           deliveredHeight = fin.height;
         } catch (finErr) {
-          spacesUrl = await hostImage(rawUrl);
+          spacesUrl = await hostImage(rawUrl, "", `generation:${task.id}:${imageId}`);
           this.logger.warn(
             `[product-image:${task.id}] image_finalize_failed order=${image.order} strategy=${spec.deliveryPlan.strategy} message=${finErr instanceof Error ? finErr.message : String(finErr)}`,
           );
         }
       } else if (rawUrl) {
-        spacesUrl = spec.localRedraw ? rawUrl : await hostImage(rawUrl);
+        spacesUrl = spec.localRedraw ? rawUrl : await hostImage(rawUrl, "", `generation:${task.id}:${imageId}`);
       }
 
       if (spacesUrl) {
@@ -361,6 +377,13 @@ export class GenerationTaskRunnerService {
         }
       }
     } catch (err) {
+      if (deliveryPending && image.attemptNo < MAX_ATTEMPTS) {
+        await this.prisma.generatedImage.updateMany({
+          where: { id: imageId, status: "GENERATING", leaseOwner: WORKER_ID },
+          data: { errorMessage: "标识或交付处理中，请稍候", leaseOwner: null, leaseExpiresAt: new Date(0) },
+        });
+        return;
+      }
       const message = describeImageError(err);
       this.logger.error(`[product-image:${task.id}] image_failed order=${image.order}: ${message}`);
       await this.prisma.generatedImage.updateMany({

@@ -29,11 +29,13 @@ import { InternalGenerationGuard } from "../video-project/internal-generation.gu
 import { contentInputs } from "./content-inputs"
 import { ContentModerationPipe } from "./content-moderation.pipe"
 import { ContentModerationService } from "./content-moderation.service"
+import { ModerationScopeMiddleware } from "./moderation-scope"
 
 jest.mock("@alicloud/pop-core", () => jest.fn())
 
 describe("生成入口HTTP前置审核：实际管道、解析和决策", () => {
   let app: INestApplication
+  let moderation: ContentModerationService
   const vendor = jest.fn()
   const business = jest.fn().mockResolvedValue({
     ok: true,
@@ -99,7 +101,7 @@ describe("生成入口HTTP前置审核：实际管道、解析和决策", () => 
       SPACES_BASE_URL: "https://assets.test",
     })
     const provider = new AliyunContentModerationProvider(config)
-    const moderation = new ContentModerationService(
+    moderation = new ContentModerationService(
       provider,
       spaces as never,
       {
@@ -147,6 +149,8 @@ describe("生成入口HTTP前置审核：实际管道、解析和决策", () => 
       .useValue(auth)
       .compile()
     app = module.createNestApplication({ logger: false })
+    const scope = new ModerationScopeMiddleware()
+    app.use(scope.use.bind(scope))
     app.setGlobalPrefix("api")
     await app.init()
     await app.listen(0, "127.0.0.1")
@@ -157,6 +161,149 @@ describe("生成入口HTTP前置审核：实际管道、解析和决策", () => 
   })
   afterAll(async () => {
     await app.close()
+  })
+
+  it("一次multipart业务请求仅审核合并后的用户提示词，下游并行调用复用结果", async () => {
+    business.mockImplementationOnce(async () => {
+      await Promise.all(
+        Array.from({ length: 4 }, () =>
+          moderation.assertContent({
+            prompt: "STRICT RULE: backend template " + "x".repeat(2500),
+            model: "ZQ-Image-2",
+            type: "url",
+          })
+        )
+      )
+      return { ok: true, success: true, taskId: 1, generatedImages: [] }
+    })
+    await request(app.getHttpServer())
+      .post("/api/image-generation/generate")
+      .field(
+        "form",
+        JSON.stringify({
+          mode: "image-creation",
+          provider: "ZQ-Image-2",
+          resolutionTier: "2K",
+          market: "amazon_us",
+          action: "generate",
+          format: "url",
+          type: "general",
+          prompt: "一个新涂层",
+          negativePrompt: "不要文字",
+          productName: "不送审的产品名称",
+          description: "none",
+          nested: { prompt: "一个新涂层" },
+        })
+      )
+      .expect(201)
+    expect(vendor).toHaveBeenCalledTimes(1)
+    expect(vendor.mock.calls[0][0]).toBe("TextModerationPlus")
+    expect(JSON.parse(vendor.mock.calls[0][1].ServiceParameters)).toEqual({
+      content: "一个新涂层\n\n不要文字",
+    })
+    expect(business).toHaveBeenCalledTimes(1)
+  })
+
+  it("没有用户提示词时，不审核模型参数和下游模板", async () => {
+    business.mockImplementationOnce(async () => {
+      await moderation.assertContent({ prompt: "自动生成的系统模板" })
+      return { ok: true, success: true, taskId: 1, generatedImages: [] }
+    })
+    await request(app.getHttpServer())
+      .post("/api/image-generation/generate")
+      .field(
+        "form",
+        JSON.stringify({ provider: "ZQ-Image-2", resolutionTier: "2K", productName: "商品名称" })
+      )
+      .expect(201)
+    expect(vendor).not.toHaveBeenCalled()
+    expect(business).toHaveBeenCalledTimes(1)
+  })
+
+  it("不同请求重新审核，同一次请求不同参考图分别审核，相同素材不重复审核", async () => {
+    const form = JSON.stringify({
+      prompt: "用户提示词",
+      referenceImageUrls: [
+        "https://assets.test/a.png",
+        "https://assets.test/a.png",
+        "https://assets.test/b.png",
+      ],
+    })
+    for (let index = 0; index < 2; index++) {
+      business.mockImplementationOnce(async () => {
+        await moderation.assertContent({
+          prompt: "后端模板",
+          referenceImageUrls: ["https://assets.test/a.png", "https://assets.test/b.png"],
+        })
+        return { ok: true, success: true, taskId: 1, generatedImages: [] }
+      })
+      await request(app.getHttpServer())
+        .post("/api/image-generation/generate")
+        .field("form", form)
+        .expect(201)
+    }
+    expect(vendor.mock.calls.filter(([action]) => action === "TextModerationPlus")).toHaveLength(2)
+    expect(vendor.mock.calls.filter(([action]) => action === "ImageModeration")).toHaveLength(4)
+  })
+
+  it("超长提示词分片后完整送检，下游调用复用各片审核结果", async () => {
+    const prompt = "字".repeat(1999) + "😀" + "最后一句"
+    business.mockImplementationOnce(async () => {
+      await moderation.assertContent({ prompt: "后端模板" })
+      return { ok: true, taskId: 1, generatedImages: [] }
+    })
+    await request(app.getHttpServer())
+      .post("/api/image-generation/generate")
+      .field("form", JSON.stringify({ prompt }))
+      .expect(201)
+    const chunks = vendor.mock.calls.map(
+      ([, params]) => JSON.parse(params.ServiceParameters).content as string
+    )
+    expect(chunks).toHaveLength(2)
+    expect(Array.from(chunks[0])).toHaveLength(2000)
+    expect(chunks[0] + Array.from(chunks[1]).slice(200).join("")).toBe(prompt)
+    expect(business).toHaveBeenCalledTimes(1)
+  })
+
+  it("后续分片不通过时不调用生成", async () => {
+    vendor.mockImplementation(async (_action, params) => ({
+      Code: 200,
+      Data: {
+        RiskLevel: JSON.parse(params.ServiceParameters).content.includes("尾部风险")
+          ? "high"
+          : "none",
+        Result: [],
+      },
+    }))
+    await request(app.getHttpServer())
+      .post("/api/image-generation/generate")
+      .field("form", JSON.stringify({ prompt: "字".repeat(2000) + "尾部风险" }))
+      .expect(400)
+    expect(vendor).toHaveBeenCalledTimes(2)
+    expect(business).not.toHaveBeenCalled()
+  })
+
+  it("并发请求不共享审核结果，拒绝请求只审核一次且不能进入生成", async () => {
+    vendor.mockImplementation(async (_action, params) => ({
+      Code: 200,
+      Data: {
+        RiskLevel:
+          JSON.parse(params.ServiceParameters).content === "拒绝的提示词" ? "high" : "none",
+        Result: [],
+      },
+    }))
+    await Promise.all([
+      request(app.getHttpServer())
+        .post("/api/image-generation/generate")
+        .field("form", JSON.stringify({ prompt: "拒绝的提示词" }))
+        .expect(400),
+      request(app.getHttpServer())
+        .post("/api/image-generation/generate")
+        .field("form", JSON.stringify({ prompt: "正常的提示词" }))
+        .expect(201),
+    ])
+    expect(vendor).toHaveBeenCalledTimes(2)
+    expect(business).toHaveBeenCalledTimes(1)
   })
 
   describe.each(cases)("$path", ({ path, body }) => {
@@ -174,6 +321,9 @@ describe("生成入口HTTP前置审核：实际管道、解析和决策", () => 
       expect(response.status).toBe(mode === "rejected" ? 400 : 503)
       expect(vendor).toHaveBeenCalled()
       expect(business).not.toHaveBeenCalled()
+      expect(vendor.mock.calls.filter(([action]) => action === "TextModerationPlus")).toHaveLength(
+        1
+      )
     })
     it("审核通过后才进入业务，防止全拒绝造成假阳性", async () => {
       const response = await request(app.getHttpServer()).post(path).send(body)

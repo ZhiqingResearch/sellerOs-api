@@ -4,6 +4,7 @@ import { ApiHeader, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags } fr
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator"
 import { PrismaService } from "../prisma/prisma.service"
 import { InternalGenerationGuard } from "../video-project/internal-generation.guard"
+import { setAigcUserId } from "../aigc/text-audit"
 import { LlmToolboxService, UploadedImage } from "./llm-toolbox.service"
 
 /** 内部一键润色入参（prompt 校验语义与公开接口一致：非空校验在 service，文案冻结） */
@@ -103,6 +104,7 @@ export class InternalLlmToolboxController {
       select: { id: true },
     })
     if (!user) throw new NotFoundException({ code: "USER_NOT_FOUND" })
+    setAigcUserId(user.id)
     return user
   }
 }

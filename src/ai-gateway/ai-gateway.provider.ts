@@ -1,3 +1,4 @@
+import { auditText } from "../aigc/text-audit"
 import {
   BadGatewayException,
   BadRequestException,
@@ -149,7 +150,11 @@ export class AiGatewayProvider {
     }
   }
 
-  async completeMultimodal(
+  async completeMultimodal(request: ChatCompletionRequest, options?: JsonRequestOptions, waitForCompletion = false): Promise<MultimodalCompletionResult> {
+    return auditText(request.model, request.messages.filter(message => message.role === "user"), () => this.completeMultimodalAudited(request, options, waitForCompletion))
+  }
+
+  private async completeMultimodalAudited(
     request: ChatCompletionRequest,
     options?: JsonRequestOptions,
     waitForCompletion = false

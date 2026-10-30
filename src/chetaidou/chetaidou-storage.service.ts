@@ -7,6 +7,9 @@ import {
   Logger,
 } from "@nestjs/common"
 import sharp from "sharp"
+import { labelImage } from "../aigc/image-label"
+import { retryDelivery } from "../aigc/aigc-metadata"
+import { objectAigcMetadata } from "../aigc/media-delivery"
 import { createCropUpload, inspectCropPng } from "../spaces/crop-upload"
 import { SpacesService } from "../spaces/spaces.service"
 import { CHETAIDOU_ERROR_CODES } from "./chetaidou.constants"
@@ -154,7 +157,8 @@ export class ChetaidouStorageService {
 
   /** 生图产物转存（同 callId 固定 key，失败可重试同产物） */
   async hostArtifact(buffer: Buffer, key: string, mime: string): Promise<void> {
-    await this.spaces.uploadBuffer(buffer, key, mime, "private")
+    const result = await retryDelivery(() => labelImage(buffer, key))
+    await this.spaces.uploadBuffer(result.buffer, key, mime, "private", objectAigcMetadata(result.metadata))
   }
 
   /** 预览/下载短时效签名（5 分钟） */

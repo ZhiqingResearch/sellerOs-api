@@ -59,6 +59,8 @@ COPY prisma ./prisma
 COPY --from=production-deps /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
+RUN apk add --no-cache ffmpeg font-wqy-zenhei
+
 RUN addgroup -S appgroup \
     && adduser -S appuser -G appgroup \
     && mkdir -p /app/logs \

@@ -82,6 +82,16 @@ const succeededTask = (over: Record<string, unknown> = {}): ImageTask =>
     ...over,
   }) as unknown as ImageTask;
 
+it("交付恢复读取已成功网关任务，不重新提交收费生成", async () => {
+  const onGenerated = jest.fn().mockResolvedValue(undefined)
+  const gateway = makeGateway({ getImageTask: jest.fn().mockResolvedValue(succeededTask()) })
+  const provider = createGatewayImageProvider(gateway, "ZQ-Image-2")
+  await provider.generate(baseInput({ resumeTaskId: "gw-task-1", onGenerated }))
+  expect(gateway.getImageTask).toHaveBeenCalledWith("gw-task-1")
+  expect(gateway.createImageTask).not.toHaveBeenCalled()
+  expect(onGenerated).toHaveBeenCalledWith("gw-task-1")
+})
+
 function nativeSnapshot() {
   return {
     detail: { modality: "image", facts: {} },
@@ -734,3 +744,6 @@ describe("所有网关生图共用尺寸意图和交付规则", () => {
     expect(gw.createImageTask).not.toHaveBeenCalled()
   })
 })
+
+// 本文件只验证业务执行；真实文件标识由aigc/image-label.spec.ts覆盖。
+jest.mock("../aigc/image-label", () => ({ labelImage: jest.fn((buffer: Buffer) => Promise.resolve({ buffer, mime: "image/png" })) }))

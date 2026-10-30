@@ -1,4 +1,7 @@
-import sharp from "sharp"
+import { labelImage } from "../aigc/image-label"
+import { deliverVideo } from "../aigc/media-delivery"
+import { retryDelivery } from "../aigc/aigc-metadata"
+import { SpacesService } from "../spaces/spaces.service"
 import { modelDisplayNames, jsonObject, videoMetadata } from "../common/utils/generation-metadata"
 import {
   BadRequestException,
@@ -6,6 +9,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
   type OnModuleInit,
 } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
@@ -127,7 +131,8 @@ export class CustomerService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly gateway: AiGatewayProvider,
     private readonly gatewayWebhook: AiGatewayWebhookService,
-    private readonly usage: UsageService
+    private readonly usage: UsageService,
+    private readonly spaces: SpacesService
   ) {}
 
   /**
@@ -852,6 +857,10 @@ export class CustomerService implements OnModuleInit {
     const status: "GENERATING" | "SUCCESS" | "FAILED" =
       rawStatus === "SUCCESS" || rawStatus === "FAILED" ? rawStatus : "GENERATING"
 
+    if (status === "SUCCESS") {
+      if (!videoUrl) throw new ServiceUnavailableException("视频生成结果缺少文件地址")
+      videoUrl = await deliverVideo(this.spaces, videoUrl, `xiling:${taskId}`)
+    }
     const script = await this.prisma.script.update({
       where: { videoTaskId: taskId },
       data:
@@ -2277,13 +2286,13 @@ export class CustomerService implements OnModuleInit {
       const ext = image.mimeType.includes("jpeg") || image.mimeType.includes("jpg") ? "jpg" : "png"
       const key = `material-variant/${variantId}/${Date.now()}.${ext}`
       this.logger.log(`${tag} 步骤 2/2 上传 OSS key=${key}`)
-      const url = await this.oss.uploadBuffer(image.data, key, image.mimeType)
+      const labeled = await retryDelivery(() => labelImage(image.data, `material-variant:${variantId}`))
+      const url = await this.oss.uploadBuffer(labeled.buffer, key, labeled.mime)
 
-      const dimensions = await sharp(image.data).metadata()
       await this.prisma.materialImageVariant.update({
         where: { id: variantId },
         data: { status: "SUCCESS", url, errorMessage: null, generationMeta: { modelPublicId: GoogleProvider.IMAGE_MODEL, aspectRatio: params.aspectRatio,
-          width: dimensions.width ?? null, height: dimensions.height ?? null } },
+          width: labeled.width, height: labeled.height } },
       })
       this.logger.log(
         `${tag} 成功 ✓ url=${url} 总耗时=${((Date.now() - startedAt) / 1000).toFixed(1)}s`

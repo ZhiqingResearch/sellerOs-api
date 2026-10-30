@@ -9,6 +9,7 @@ import { ContentModerationService } from "./content-moderation.service"
 import { ContentSnapshotService } from "./content-snapshot.service"
 import { ModerationResponseInterceptor } from "./moderation-response.interceptor"
 import { TaskModerationService } from "./task-moderation.service"
+import { ModerationScopeMiddleware } from "./moderation-scope"
 
 @Global()
 @Module({
@@ -16,11 +17,12 @@ import { TaskModerationService } from "./task-moderation.service"
   controllers: [ContentModerationController],
   providers: [
     ContentModerationService,
+    ModerationScopeMiddleware,
     TaskModerationService,
     ContentSnapshotService,
     { provide: APP_PIPE, useClass: ContentModerationPipe },
     { provide: APP_INTERCEPTOR, useClass: ModerationResponseInterceptor },
   ],
-  exports: [ContentModerationService, TaskModerationService],
+  exports: [ContentModerationService, TaskModerationService, ModerationScopeMiddleware],
 })
 export class ContentModerationModule {}

@@ -1,3 +1,4 @@
+import { readImageAigc } from "../aigc/image-label"
 import type { ImageTaskArtifact } from "@zhiqingresearch/ai-ts-sdk"
 import axios from "axios"
 import sharp from "sharp"
@@ -76,7 +77,7 @@ describe("AiGatewayImageArtifactService", () => {
       deliveryPlan: { ...deliveryPlan, delivery: { ...deliveryPlan.delivery, strategy: "gateway" } },
     }, 101, artifact)
     expect(result).toMatchObject({ width: 300, height: 375, nativeWidth: 300, nativeHeight: 400 })
-    expect(spaces.uploadBuffer.mock.calls[0][0]).toEqual(bytes)
+    expect(readImageAigc(await sharp(spaces.uploadBuffer.mock.calls[0][0]).metadata())?.AIGC.Label).toBe("1")
     expect(result.originalUrl).not.toBe(result.url)
     expect(spaces.uploadBuffer).toHaveBeenCalledTimes(2)
   })
@@ -158,7 +159,9 @@ describe("AiGatewayImageArtifactService", () => {
     expect(spaces.uploadBuffer).toHaveBeenCalledWith(
       expect.any(Buffer),
       "ai-split-results/7/5/31/101.png",
-      "image/png"
+      "image/png",
+      "public-read",
+      expect.objectContaining({ "aigc-label": "1" })
     )
     expect(result.url).toBe("https://cdn.test/ai-split-results/7/5/31/101.png")
     expect(result.originalUrl).toBe("https://cdn.test/portrait-originals/7/5/31/101.png")
@@ -179,13 +182,13 @@ describe("人像与拆图统一交付并保留双文件", () => {
       deliveryPlan: { nativeSizing: true, requested: { aspectRatio: "16:9", width: 4096, height: 2304, resolutionTier: "4K" }, delivery: { width: 4096, height: 2304 } },
     }, 101, { url: "https://gw.test/raw.png" })
     expect(uploadBuffer).toHaveBeenCalledTimes(2)
-    expect(uploadBuffer.mock.calls[0]).toEqual([bytes, "portrait-originals/7/5/31/101.png", "image/png"])
+    expect(uploadBuffer.mock.calls[0].slice(1,3)).toEqual(["portrait-originals/7/5/31/101.png", "image/png"])
     expect(result).toMatchObject({ width: 160, height: 90, nativeWidth: width, nativeHeight: height,
       delivery: { strategy: cropped ? "crop_to_ratio" : "passthrough" } })
     expect(result.originalUrl).toBe("https://cdn.test/portrait-originals/7/5/31/101.png")
     expect(result.url).toContain(generationMode === "AI_SPLIT" ? "ai-split-results/" : "portrait-results/")
     const saved = uploadBuffer.mock.calls[1][0]
-    expect(saved.equals(bytes)).toBe(!cropped)
+    expect(readImageAigc(await sharp(saved).metadata())?.AIGC.Label).toBe("1")
     expect(await sharp(saved).metadata()).toMatchObject({ width: 160, height: 90 })
     expect(result.url).not.toBe(result.originalUrl)
   })

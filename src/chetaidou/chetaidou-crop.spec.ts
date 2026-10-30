@@ -61,7 +61,7 @@ function setup() {
   }
   db.$transaction.mockImplementation((action: (tx: typeof db) => Promise<unknown>) => action(db))
   const storage = {
-    inspectCropPng: jest.fn().mockResolvedValue({
+    inspectCropPng: jest.fn().mockResolvedValue({ url,
       fileKey: "chetaidou/crops/7/upload.png",
       mime: "image/png",
       width: 12,

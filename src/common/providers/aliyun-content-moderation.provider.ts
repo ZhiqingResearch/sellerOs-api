@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { createHash } from "node:crypto"
+import { moderationScope } from "../../content-moderation/moderation-scope"
 import {
   field,
   record,
@@ -48,7 +49,7 @@ export class AliyunContentModerationProvider {
       if (!input.content?.trim() || Array.from(input.content).length > 2000) {
         throw new BadRequestException({
           code: "MODERATION_INVALID_INPUT",
-          message: "待审核文本不能为空且不能超过2000个字符",
+          message: "待审核文本片段不能为空且不能超过2000个字符",
         })
       }
       return
@@ -57,6 +58,18 @@ export class AliyunContentModerationProvider {
   }
 
   async check(input: ModerationInput, timeoutMs = 10_000): Promise<ModerationResult> {
+    const scope = moderationScope.getStore()
+    if (!scope) return this.checkOnce(input, timeoutMs)
+    const key = this.inputKey(input)
+    let pending = scope.checks.get(key)
+    if (!pending) {
+      pending = this.checkOnce(input, timeoutMs)
+      scope.checks.set(key, pending)
+    }
+    return pending
+  }
+
+  private async checkOnce(input: ModerationInput, timeoutMs: number): Promise<ModerationResult> {
     this.validate(input)
     if (input.type !== "TEXT" && input.type !== "IMAGE") {
       throw new BadRequestException("视频和文档需要异步审核")
@@ -76,6 +89,22 @@ export class AliyunContentModerationProvider {
     input: ModerationInput,
     dataId: string,
     timeoutMs = 10_000
+  ): Promise<ModerationReceipt> {
+    const scope = moderationScope.getStore()
+    if (!scope) return this.submitOnce(input, dataId, timeoutMs)
+    const key = this.inputKey(input)
+    let pending = scope.submissions.get(key)
+    if (!pending) {
+      pending = this.submitOnce(input, dataId, timeoutMs)
+      scope.submissions.set(key, pending)
+    }
+    return pending
+  }
+
+  private async submitOnce(
+    input: ModerationInput,
+    dataId: string,
+    timeoutMs: number
   ): Promise<ModerationReceipt> {
     this.validate(input)
     if (input.type !== "VIDEO" && input.type !== "DOCUMENT") {
@@ -109,6 +138,10 @@ export class AliyunContentModerationProvider {
     receipt: ModerationReceipt,
     timeoutMs = 10_000
   ): Promise<ModerationResult | null> {
+    const scope = moderationScope.getStore()
+    const key = JSON.stringify([type, receipt.region, receipt.service, receipt.taskId])
+    const completed = scope?.completed.get(key)
+    if (completed) return completed
     const response = await this.request(
       type === "VIDEO" ? "VideoModerationResult" : "DescribeFileModerationResult",
       receipt.service,
@@ -117,7 +150,27 @@ export class AliyunContentModerationProvider {
       timeoutMs
     )
     if (String(field(response, "Code")) === "280") return null
-    return this.normalize(field(response, "Data"))
+    const result = this.normalize(field(response, "Data"))
+    scope?.completed.set(key, result)
+    return result
+  }
+
+  private inputKey(input: ModerationInput): string {
+    const identity =
+      input.type === "TEXT"
+        ? input.content
+        : moderationScope.getStore()?.aliases.get(input.url!) || input.url
+    return createHash("sha256")
+      .update(
+        JSON.stringify([
+          this.region,
+          this.service(input.type),
+          input.type,
+          identity,
+          input.documentType,
+        ])
+      )
+      .digest("hex")
   }
 
   decide(result: ModerationResult, service: string): ModerationDecision {

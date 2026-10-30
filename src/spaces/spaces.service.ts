@@ -13,8 +13,11 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 import { Injectable, Logger } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
-import { createReadStream } from "fs"
+import { createReadStream, createWriteStream } from "fs"
 import { stat } from "fs/promises"
+import type { Readable } from "node:stream"
+import { pipeline } from "node:stream/promises"
+import { aliasModerationMedia, moderationScope, registerModerationUpload } from "../content-moderation/moderation-scope"
 
 /**
  * DigitalOcean Spaces 封装（S3 兼容协议）。
@@ -64,12 +67,19 @@ export class SpacesService {
     })
   }
 
+  async downloadObjectToFile(key: string, path: string): Promise<void> {
+    const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: this.normalizeKey(key) }))
+    if (!result.Body) throw new Error("文件内容为空")
+    await pipeline(result.Body as Readable, createWriteStream(path), { signal: AbortSignal.timeout(10 * 60_000) })
+  }
+
   /** 上传 Buffer 到 Spaces，返回可公开访问 URL */
   async uploadBuffer(
     buffer: Buffer,
     key: string,
     mimeType: string,
-    acl: ObjectCannedACL = "public-read"
+    acl: ObjectCannedACL = "public-read",
+    metadata?: Record<string, string>
   ): Promise<string> {
     const normalizedKey = this.normalizeKey(key)
     await this.client.send(
@@ -79,9 +89,11 @@ export class SpacesService {
         Body: buffer,
         ContentType: mimeType,
         ACL: acl,
+        ...(metadata ? { Metadata: metadata } : {}),
       })
     )
     const url = this.getPublicUrl(normalizedKey)
+    registerModerationUpload(normalizedKey, url, buffer)
     this.logger.log(`Spaces 上传完成 [key=${normalizedKey}, size=${buffer.length}B]`)
     return url
   }
@@ -94,7 +106,8 @@ export class SpacesService {
     filePath: string,
     key: string,
     mimeType: string,
-    acl: ObjectCannedACL = "public-read"
+    acl: ObjectCannedACL = "public-read",
+    objectMetadata?: Record<string, string>
   ): Promise<string> {
     const normalizedKey = this.normalizeKey(key)
     const metadata = await stat(filePath)
@@ -106,6 +119,7 @@ export class SpacesService {
         ContentLength: metadata.size,
         ContentType: mimeType,
         ACL: acl,
+        ...(objectMetadata ? { Metadata: objectMetadata } : {}),
       })
     )
     const url = this.getPublicUrl(normalizedKey)
@@ -263,7 +277,7 @@ export class SpacesService {
     expiresIn = 3600,
     filename?: string
   ): Promise<string> {
-    return getSignedUrl(
+    const url = await getSignedUrl(
       this.client,
       new GetObjectCommand({
         Bucket: this.bucket,
@@ -281,6 +295,9 @@ export class SpacesService {
       }),
       { expiresIn }
     )
+    const digest = moderationScope.getStore()?.objects.get(this.normalizeKey(key))
+    if (digest) aliasModerationMedia(url, digest)
+    return url
   }
 
   /**
@@ -306,7 +323,7 @@ export class SpacesService {
     expiresIn?: number
     acl?: ObjectCannedACL
     metadata?: Record<string, string>
-  }): Promise<{
+  }, generatedArtifact = false): Promise<{
     uploadUrl: string
     publicUrl: string
     key: string
@@ -315,6 +332,8 @@ export class SpacesService {
   }> {
     const key = this.normalizeKey(options.key)
     if (key.startsWith("content-moderation/")) throw new Error("审核文件不允许客户端覆盖")
+    if (!generatedArtifact && /^(?:aigc\/|portrait-results\/|portrait-originals\/|ai-split-results\/|chetaidou\/generations\/|ai-creative\/openai-compatible\/)/.test(key))
+      throw new Error("生成交付文件不允许客户端覆盖")
     const acl: ObjectCannedACL = options.acl ?? "public-read"
     const expiresIn = options.expiresIn ?? 3600
 

@@ -1,3 +1,4 @@
+import type { ProviderGenerateResult } from "../core/types";
 // src/image-generation/executor/image-gen-item-runner.service.ts
 //
 // t2i/i2i(ImageGenJob/ImageGenItem)单图执行器,步骤对齐设计 §5.3:
@@ -199,6 +200,7 @@ export class ImageGenItemRunnerService {
         .catch(() => undefined);
     }, HEARTBEAT_MS);
     const attemptStartedAt = Date.now();
+    let deliveryPending = Boolean(item.deliverySource || item.providerJobId);
 
     try {
       const provider: ImageProvider = this.providerFactory(
@@ -212,7 +214,20 @@ export class ImageGenItemRunnerService {
       // 稳定幂等键(轨道 B):认领后的 item 行携带最新 attemptNo。前缀统一
       // IMAGE_PIPELINE_IDEMPOTENCY_PREFIX(webhook 据此识别管线任务的晚到回调)。
       input.idempotencyKey = `${IMAGE_PIPELINE_IDEMPOTENCY_PREFIX}${job.id}:${item.id}:${item.attemptNo ?? 0}`;
-      const result = await provider.generate(input);
+      input.resumeTaskId = item.providerJobId ?? undefined;
+      input.onGenerated = async (taskId) => {
+        deliveryPending = true;
+        await this.prisma.imageGenItem.updateMany({
+          where: { id: itemId, status: "RUNNING", leaseOwner: WORKER_ID },
+          data: { providerJobId: taskId },
+        });
+      };
+      const result = item.deliverySource as unknown as ProviderGenerateResult | null ?? await provider.generate(input);
+      deliveryPending = true;
+      if (!result.url.startsWith("data:")) await this.prisma.imageGenItem.updateMany({
+        where: { id: itemId, status: "RUNNING", leaseOwner: WORKER_ID },
+        data: { deliverySource: JSON.parse(JSON.stringify(result)) as import("@prisma/client").Prisma.InputJsonValue },
+      });
       const elapsedMs = Date.now() - attemptStartedAt;
       if (elapsedMs > SLOW_GENERATION_MS) {
         this.logger.warn(
@@ -258,7 +273,7 @@ export class ImageGenItemRunnerService {
       const kind = err instanceof RelayError ? err.kind : null;
       const attemptNo = item.attemptNo ?? 1;
       const elapsedMs = Date.now() - attemptStartedAt;
-      const transient = kind !== null && isTransient(kind);
+      const transient = deliveryPending || (kind !== null && isTransient(kind));
 
       // 瞬态且预算未耗尽 → CAS 退回 QUEUED(清租约,认领 CAS 立即可再认领),
       // 按退避档重投本进程;CAS 输(取消/对账抢先)则落常规失败收敛。
@@ -267,7 +282,7 @@ export class ImageGenItemRunnerService {
       if (
         transient &&
         attemptNo < MAX_ATTEMPTS &&
-        this.inProcessRetryEnabled() &&
+        (deliveryPending || this.inProcessRetryEnabled()) &&
         Date.now() - job.createdAt.getTime() < jobDeadlineMs(job.kind)
       ) {
         const requeued = await this.prisma.imageGenItem.updateMany({
@@ -329,7 +344,7 @@ export class ImageGenItemRunnerService {
         await new Promise((resolve) => setTimeout(resolve, delays[attempt - 1]));
       }
       try {
-        return await hostImage(url);
+        return await hostImage(url, "", `imagegen:${jobId}:${itemId}`);
       } catch (err) {
         lastErr = err;
         this.logger.warn(

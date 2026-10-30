@@ -10,7 +10,7 @@ import {
   uploadRemoteUrlToSpaces,
 } from "../core/storage";
 
-export async function hostImage(url: string, authToken = ""): Promise<string> {
+export async function hostImage(url: string, authToken = "", labelId?: string): Promise<string> {
   if (url.startsWith("data:")) {
     const mime = url.split(";")[0].split(":")[1] || "image/png";
     const base64Data = url.split(",")[1] ?? "";
@@ -19,14 +19,13 @@ export async function hostImage(url: string, authToken = ""): Promise<string> {
       mimeType: mime,
       scene: "IMAGE_CREATION_OUTPUT",
       authToken,
+      labelId,
     });
   }
-  if (!/\.digitaloceanspaces\.com\//i.test(url)) {
-    return uploadRemoteUrlToSpaces({
+  return uploadRemoteUrlToSpaces({
       url,
       scene: "IMAGE_CREATION_OUTPUT",
       authToken,
+      labelId,
     });
-  }
-  return url;
 }

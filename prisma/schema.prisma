@@ -2442,6 +2442,7 @@ model GeneratedImage {
   nativeWidth    Int? // 模型原生输出宽度
   nativeHeight   Int? // 模型原生输出高度
   deliveryMeta   Json? // 后处理策略、原生清晰度标记、降级原因
+  deliverySource Json? // 内部生成回执，标识/上传失败时恢复交付，禁止下发
 
   // ── 通用生图后端迁移(Track A):执行租约字段,只增不改 ──
   leaseOwner     String?   @db.VarChar(64)
@@ -2511,6 +2512,7 @@ model ImageGenItem {
   errorMessage String? @db.Text
   usage        Json?
   gatewayImage Json? // Gateway 实际尺寸及 requested/actual/changes 回显
+  deliverySource Json? // 内部生成回执，标识/上传失败时恢复交付，禁止下发
 
   providerJobId  String?   @db.VarChar(255)
   // 管线(imggen:)终态回调事件 id（审计，同 GeneratedImage.gatewayEventId 语义）

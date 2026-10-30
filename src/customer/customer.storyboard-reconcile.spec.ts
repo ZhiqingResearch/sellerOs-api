@@ -25,7 +25,7 @@ describe("CustomerService.findStoryboardsByIds 分镜视频读时对账", () => 
       {} as never,
       {} as never,
       gatewayWebhook as never,
-      {} as never
+      {} as never, {} as never
     )
     return { service, prisma, gatewayWebhook }
   }

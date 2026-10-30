@@ -11,6 +11,7 @@ import type { VideoAspectRatio } from "@zhiqingresearch/ai-ts-sdk"
 import { PrismaService } from "../../prisma/prisma.service"
 import { AiGatewayWebhookService } from "../../ai-gateway/ai-gateway-webhook.service"
 import { VideoProjectService } from "../video-project.service"
+import { setStoredModerationPrompts } from "../../content-moderation/moderation-scope"
 import {
   CreateSalesProjectDto,
   GenerateSalesDto,
@@ -333,6 +334,8 @@ export class SalesService {
     const maxBatch = tasks.reduce((m, t) => Math.max(m, batchOf(t)), 0)
     const batchNo = maxBatch + 1
     const latestInBatch = new Map<number | null, SalesVideoTask>()
+
+    await setStoredModerationPrompts(wf.segments.map(segment => segment.vidPrompt))
 
     if (outputMode === "ONESHOT") {
       await this.generateOneShot(

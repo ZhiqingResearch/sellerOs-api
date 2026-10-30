@@ -21,6 +21,7 @@ import { SalesService } from "../video-project/sales/sales.service"
 import { VideoProjectController } from "../video-project/video-project.controller"
 import { VideoProjectService } from "../video-project/video-project.service"
 import { contentInputs } from "./content-inputs"
+import { ModerationScopeMiddleware } from "./moderation-scope"
 import { ContentModerationController } from "./content-moderation.controller"
 import { ContentModerationPipe } from "./content-moderation.pipe"
 import { ContentModerationService } from "./content-moderation.service"
@@ -263,6 +264,8 @@ describe("HTTP→真实业务服务→审核状态机→网关SDK", () => {
       .useValue(auth)
       .compile()
     app = module.createNestApplication({ logger: false })
+    const scope = new ModerationScopeMiddleware()
+    app.use(scope.use.bind(scope))
     app.setGlobalPrefix("api")
     await app.init()
     await app.listen(0, "127.0.0.1")
@@ -339,6 +342,7 @@ describe("HTTP→真实业务服务→审核状态机→网关SDK", () => {
       const res = await request(app.getHttpServer()).post(path).send(body)
       expect(res.status).toBe(201)
       expect(submit).toHaveBeenCalledTimes(1)
+      expect(vendor.mock.calls.filter(([action]) => action === "TextModerationPlus")).toHaveLength(1)
       expect(vendor.mock.invocationCallOrder.at(-1)).toBeLessThan(
         submit.mock.invocationCallOrder[0]
       )

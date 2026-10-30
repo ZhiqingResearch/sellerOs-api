@@ -1,5 +1,7 @@
 import { BadRequestException, ServiceUnavailableException } from "@nestjs/common"
 import { randomUUID } from "crypto"
+import { labelImage } from "../aigc/image-label"
+import { objectAigcMetadata } from "../aigc/media-delivery"
 import type { SpacesService } from "./spaces.service"
 
 export async function createCropUpload(spaces: SpacesService, userId: number, directory: string) {
@@ -11,7 +13,7 @@ export async function createCropUpload(spaces: SpacesService, userId: number, di
   })
 }
 
-/** 仅检查前端直传成品，不下载原图、不改写文件。 */
+/** 核对归属后将裁剪成品重新标识，另存不可由客户端覆盖的交付文件。 */
 export async function inspectCropPng(
   spaces: SpacesService,
   userId: number,
@@ -52,5 +54,8 @@ export async function inspectCropPng(
   if (!width || !height || width > 2147483647 || height > 2147483647) {
     throw new BadRequestException("图片尺寸无效")
   }
-  return { fileKey, mime: "image/png", width, height }
+  const labeled = await labelImage(await spaces.downloadBuffer(fileKey), `crop:${fileKey}`)
+  const savedKey = `aigc/crops/${randomUUID()}.png`
+  const savedUrl = await spaces.uploadBuffer(labeled.buffer, savedKey, labeled.mime, "public-read", objectAigcMetadata(labeled.metadata))
+  return { fileKey: savedKey, url: savedUrl, mime: labeled.mime, width: labeled.width, height: labeled.height }
 }

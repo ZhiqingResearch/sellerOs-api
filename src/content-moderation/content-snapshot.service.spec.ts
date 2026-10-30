@@ -1,6 +1,12 @@
 import { lookup } from "node:dns/promises"
 import { Readable } from "node:stream"
+import { ContentModerationService } from "./content-moderation.service"
 import { ContentSnapshotService } from "./content-snapshot.service"
+import {
+  createModerationScope,
+  moderationScope,
+  registerModerationUpload,
+} from "./moderation-scope"
 
 jest.mock("node:dns/promises", () => ({ lookup: jest.fn() }))
 
@@ -30,6 +36,64 @@ describe("审核和业务共用不可覆盖的私有文件快照", () => {
     const service = new ContentSnapshotService(provider as never, http as never, spaces as never)
     return { provider, http, spaces, service }
   }
+
+  it("同请求的管道和模型层并发复用快照，不同请求重新读取", async () => {
+    const ctx = setup()
+    for (let request = 0; request < 2; request++) {
+      await moderationScope.run(
+        createModerationScope(() => Promise.resolve([])),
+        async () => {
+          const source = { imageUrl: "https://assets.test/a.png" }
+          const [first, second] = await Promise.all([
+            ctx.service.freeze(source),
+            ctx.service.freeze(source),
+          ])
+          expect(first.inputs).toEqual(second.inputs)
+          expect((await ctx.service.freeze(first.value)).inputs).toEqual(first.inputs)
+        }
+      )
+    }
+    expect(ctx.http.axiosRef.get).toHaveBeenCalledTimes(2)
+    expect(ctx.spaces.uploadFile).toHaveBeenCalledTimes(2)
+  })
+
+  it("上传文件送审后换成业务URL仍复用相同字节的快照，修改后的文件必须重新准备", async () => {
+    const ctx = setup()
+    const check = jest.fn().mockResolvedValue({ riskLevel: "none", dimensions: [] })
+    const provider = { check, decide: () => "PASSED", service: () => "image" }
+    const moderation = new ContentModerationService(
+      provider as never,
+      { ...ctx.spaces, deleteObject: jest.fn() } as never,
+      ctx.service
+    )
+    await moderationScope.run(
+      createModerationScope(() => Promise.resolve([])),
+      async () => {
+        await moderation.assertFile({
+          buffer: Buffer.from("file"),
+          originalname: "a.png",
+          mimetype: "image/png",
+        })
+        const checked = check.mock.calls[0][0].url
+        registerModerationUpload(
+          "uploads/a.png",
+          "https://assets.test/upload.png",
+          Buffer.from("file")
+        )
+        const reused = await ctx.service.freeze({ imageUrl: "https://assets.test/upload.png" })
+        expect(reused.inputs[0].url).toBe(checked)
+        expect(ctx.http.axiosRef.get).not.toHaveBeenCalled()
+        registerModerationUpload(
+          "uploads/b.png",
+          "https://assets.test/changed.png",
+          Buffer.from("changed")
+        )
+        const changed = await ctx.service.freeze({ imageUrl: "https://assets.test/changed.png" })
+        expect(changed.inputs[0].url).not.toBe(checked)
+        expect(ctx.http.axiosRef.get).toHaveBeenCalledTimes(1)
+      }
+    )
+  })
 
   it("无后缀文件按可信响应的MIME识别，审核和生成引用同一份私有快照，原始输入不被修改", async () => {
     const { service, http, spaces } = setup()

@@ -2711,7 +2711,7 @@ export class ChetaidouService {
               create: {
                 idx: 0,
                 status: "SUCCEEDED",
-                url,
+                url: asset.url,
                 fileKey: asset.fileKey,
                 mime: asset.mime,
                 width: asset.width,

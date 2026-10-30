@@ -133,7 +133,7 @@ export class ImageCropService {
               create: {
                 source: "platform",
                 status: "SUCCESS",
-                url: dto.url,
+                url: asset.url,
                 originalUrl: image.url,
                 width: asset.width,
                 height: asset.height,

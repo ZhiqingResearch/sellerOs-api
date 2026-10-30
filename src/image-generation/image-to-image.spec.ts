@@ -1,3 +1,4 @@
+import { withDeliveryCheckpoint } from "../aigc/test-prisma"
 // src/image-generation/image-to-image.spec.ts
 //
 // i2i 链路单测(mock Prisma + mock Provider + 假 Spaces transport):
@@ -78,7 +79,7 @@ async function makeServices(overrides?: {
       }) } },
       ImageGenItemRunnerService,
       { provide: DispatchQueueService, useValue: { enqueue: jest.fn() } },
-      { provide: PrismaService, useValue: prisma },
+      { provide: PrismaService, useValue: withDeliveryCheckpoint(prisma) },
       { provide: IMAGE_PROVIDER_FACTORY, useValue: () => provider },
       { provide: UsageService, useValue: usage },
     ],
@@ -971,3 +972,6 @@ describe("image-gen item runner (IMAGE_TO_IMAGE branch)", () => {
     expect(prisma.imageGenJob.updateMany.mock.calls[0][0].data.status).toBe("FAILED");
   });
 });
+
+// 本文件只验证业务执行；真实文件标识由aigc/image-label.spec.ts覆盖。
+jest.mock("../aigc/image-label", () => ({ labelImage: jest.fn((buffer: Buffer) => Promise.resolve({ buffer, mime: "image/png" })) }))

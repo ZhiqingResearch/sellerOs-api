@@ -1,4 +1,6 @@
-import sharp from "sharp"
+import { labelImage } from "../aigc/image-label"
+import { deliverVideo, objectAigcMetadata } from "../aigc/media-delivery"
+import { retryDelivery, AigcDeliveryError, contentId } from "../aigc/aigc-metadata"
 import { modelDisplayNames, jsonObject } from "../common/utils/generation-metadata"
 import {
   BadRequestException,
@@ -1105,6 +1107,8 @@ export class RpaCreationService implements OnModuleInit {
           ...transferred,
         })
       } catch (error: unknown) {
+        if (error instanceof AigcDeliveryError)
+          throw new ServiceUnavailableException({ code: error.code, message: error.message })
         this.logger.error(
           `转存 RPA 结果失败 taskId=${task.id} order=${order}: ${this.errorMessage(error)}`
         )
@@ -1119,6 +1123,14 @@ export class RpaCreationService implements OnModuleInit {
     const expectedType = task.mediaType === "IMAGE" ? "image/" : "video/"
     const maxSize = expectedType === "image/" ? MAX_IMAGE_SIZE : MAX_RESULT_VIDEO_SIZE
     const apiKey = this.config.get<string>("GEMINI_API_KEY", "").trim()
+    if (task.mediaType === "VIDEO") {
+      return { url: await deliverVideo(this.spaces, sourceUrl,
+        `rpa:${task.requestId}:${order}:${contentId(`${source.origin}${source.pathname}`)}`, {
+          maxBytes: MAX_RESULT_VIDEO_SIZE,
+          ...(this.matchesHostSuffix(source.hostname, "googleapis.com") && apiKey
+            ? { headers: { "x-goog-api-key": apiKey } } : {}),
+        }) }
+    }
     const response = await axios.get<ArrayBuffer>(source.toString(), {
       responseType: "arraybuffer",
       timeout: RESULT_DOWNLOAD_TIMEOUT_MS,
@@ -1146,15 +1158,10 @@ export class RpaCreationService implements OnModuleInit {
       throw new Error(`结果文件类型不正确：${reportedContentType}`)
     }
 
-    const contentType = reportedContentType.startsWith(expectedType)
-      ? reportedContentType
-      : task.mediaType === "IMAGE"
-        ? "image/png"
-        : "video/mp4"
     const key = `${RESULT_KEY_PREFIX}${task.requestId}/${Date.now()}-${order}`
-    const meta = task.mediaType === "IMAGE" ? await sharp(buffer).metadata() : null
-    return { url: await this.spaces.uploadBuffer(buffer, key, contentType),
-      ...(meta ? { deliveryMeta: { width: meta.width ?? null, height: meta.height ?? null } } : {}) }
+    const labeled = await retryDelivery(() => labelImage(buffer, `rpa:${task.requestId}:${order}:${contentId(buffer)}`))
+    return { url: await this.spaces.uploadBuffer(labeled.buffer, key, labeled.mime, "public-read", objectAigcMetadata(labeled.metadata)),
+      deliveryMeta: { width: labeled.width, height: labeled.height } }
   }
 
   private matchesHostSuffix(hostname: string, suffix: string) {

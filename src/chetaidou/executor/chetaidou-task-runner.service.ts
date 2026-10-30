@@ -1,3 +1,4 @@
+import { withAigcUser } from "../../aigc/text-audit"
 // 车泰斗素材工作台 — 文本任务执行器（方案 §6/§7）
 // BREAKDOWN/IDEATION/REFRESH_GROUP/DIVERGE/COMPOSE 的推进：
 // DB 排队扫描 + 状态 CAS + Call 账本（先落库再调模型）+ 校验通过后结算。
@@ -342,7 +343,7 @@ export class ChetaidouTaskRunnerService implements OnModuleInit {
     }
     let result: Awaited<ReturnType<AiGatewayProvider["completeMultimodal"]>>
     try {
-      result = await this.gateway.completeMultimodal(frozenRequest, undefined, true)
+      result = await withAigcUser(stored.ownerId, () => this.gateway.completeMultimodal(frozenRequest, undefined, true))
     } catch (error) {
       if (error instanceof GatewayTimeoutException) {
         await this.prisma.chetaidouCall.update({

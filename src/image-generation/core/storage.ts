@@ -13,6 +13,10 @@
 // in a direct SpacesService implementation later without touching callers.
 
 import { jitter, sleep } from "./retry-utils";
+import { randomUUID } from "node:crypto";
+import { labelImage } from "../../aigc/image-label";
+import { retryDelivery } from "../../aigc/aigc-metadata";
+import { registerModerationUpload } from "../../content-moderation/moderation-scope";
 
 // ─── Scene → keyPrefix catalogue (verbatim from @/lib/storage/scenes) ────────
 
@@ -184,6 +188,7 @@ export function resetSpacesPresignTransport(): void {
 // ─── Public upload helpers (verbatim behavior) ───────────────────────────────
 
 export interface UploadBytesToSpacesArgs {
+  labelId?: string;
   /** Raw bytes to upload. */
   bytes: Uint8Array;
   /** MIME type — sent as `contentType` to the backend AND as the PUT
@@ -210,7 +215,14 @@ export interface UploadBytesToSpacesArgs {
 export async function uploadBytesToSpaces(
   args: UploadBytesToSpacesArgs,
 ): Promise<string> {
-  const { bytes, mimeType, scene, authToken, filenameHint, signal } = args;
+  let { bytes, mimeType } = args;
+  const { scene, authToken, filenameHint, signal } = args;
+  if (scene === "IMAGE_CREATION_OUTPUT") {
+    const id = args.labelId ?? randomUUID();
+    const labeled = await retryDelivery(() => labelImage(Buffer.from(args.bytes), id));
+    bytes = labeled.buffer;
+    mimeType = labeled.mime;
+  }
   const ext = extensionForMime(mimeType);
   const filename = filenameHint ?? `upload${ext}`;
 
@@ -245,11 +257,13 @@ export async function uploadBytesToSpaces(
       );
     }
 
+    registerModerationUpload(presigned.key ?? presigned.publicUrl, presigned.publicUrl, bytes);
     return presigned.publicUrl;
   });
 }
 
 export interface UploadRemoteUrlToSpacesArgs {
+  labelId?: string;
   /** Remote image URL to re-host (a provider gateway / CDN link). */
   url: string;
   /** Scene → keyPrefix lookup. */
@@ -291,5 +305,5 @@ export async function uploadRemoteUrlToSpaces(
     };
   });
 
-  return uploadBytesToSpaces({ bytes, mimeType, scene, authToken, signal });
+  return uploadBytesToSpaces({ bytes, mimeType, scene, authToken, signal, labelId: args.labelId });
 }

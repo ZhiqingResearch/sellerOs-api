@@ -8,6 +8,8 @@ import {
   UnauthorizedException,
 } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
+import { deliverVideo } from "../aigc/media-delivery"
+import { SpacesService } from "../spaces/spaces.service"
 import { InvokeType, Prisma } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library"
 import {
@@ -94,6 +96,7 @@ export class AiGatewayWebhookService implements OnModuleInit {
     private readonly imageCallbacks: AiGatewayImageCallbacksService,
     private readonly chetaidouReceipts: ChetaidouGatewayReceiptService,
     private readonly moderation: TaskModerationService,
+    private readonly spaces: SpacesService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -591,7 +594,7 @@ export class AiGatewayWebhookService implements OnModuleInit {
       canceled: "CANCELLED",
       expired: "TIMEOUT",
     }[task.status]
-    const resultUrl = task.status === "succeeded" ? task.result.videos[0].url : null
+    let resultUrl = task.status === "succeeded" ? task.result.videos[0].url : null
     if ("error" in task) {
       this.logger.warn(
         `[AI Gateway] 视频任务失败 task=${task.id} status=${task.status} code=${task.error.code} type=${task.error.type}: ${task.error.message}`
@@ -649,6 +652,7 @@ export class AiGatewayWebhookService implements OnModuleInit {
       return false
     }
 
+    if (resultUrl) resultUrl = await deliverVideo(this.spaces, resultUrl, `gateway-video:${task.id}`)
     const deliveryMeta = {
       ...(durationSec != null ? { actualDurationSec: durationSec, durationSource: "gateway" } : {}),
       ...(resolution ? { actualResolution: resolution } : {}),
@@ -808,7 +812,8 @@ export class AiGatewayWebhookService implements OnModuleInit {
       canceled: "CANCELLED",
       expired: "TIMEOUT",
     }[task.status]
-    const url = task.status === "succeeded" ? task.result.videos[0].url : null
+    const url = task.status === "succeeded"
+      ? await deliverVideo(this.spaces, task.result.videos[0].url, `gateway-video:${task.id}`) : null
     const errorMessage =
       task.status === "failed"
         ? this.errorMessageOf(task)
@@ -961,7 +966,8 @@ export class AiGatewayWebhookService implements OnModuleInit {
       canceled: "CANCELLED",
       expired: "TIMEOUT",
     }[task.status]
-    const resultUrl = task.status === "succeeded" ? task.result.videos[0].url : null
+    const resultUrl = task.status === "succeeded"
+      ? await deliverVideo(this.spaces, task.result.videos[0].url, `gateway-video:${task.id}`) : null
     const errorMessage =
       task.status === "failed"
         ? this.errorMessageOf(task)

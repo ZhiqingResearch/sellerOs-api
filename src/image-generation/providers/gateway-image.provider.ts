@@ -298,7 +298,9 @@ export function createGatewayImageProvider(
         return task;
       };
 
-      const task = await submitAndWait(sizing, idempotencyKey);
+      const recovered = input.resumeTaskId ? await gateway.getImageTask(input.resumeTaskId) : null;
+      if (recovered && recovered.status !== "succeeded") throw terminalTaskError(recovered);
+      const task = recovered ?? await submitAndWait(sizing, idempotencyKey);
 
       // 同时保留网关回显供日志对账和结果展示。
       if (task.adaptation) {
@@ -318,6 +320,7 @@ export function createGatewayImageProvider(
         );
       }
       const metadata = images?.[0]?.metadata;
+      await input.onGenerated?.(task.id);
       const dimensions = gatewayImageDimensions({ metadata, adaptation: task.adaptation });
       const { width, height } = dimensions;
       const result: ProviderGenerateResult = {
@@ -343,7 +346,7 @@ export function createGatewayImageProvider(
       // 原图单独转存；留存失败不改变既有成品交付，也不重新发起收费生成。
       try {
         const originalUrl = await uploadRemoteUrlToSpaces({
-          url, scene: "IMAGE_CREATION_OUTPUT", authToken: "",
+          url, scene: "IMAGE_CREATION_OUTPUT", authToken: "", labelId: `gateway:${task.id}:original`,
           signal: input.signal ?? AbortSignal.timeout(30_000),
         });
         result.gatewayImage = { ...result.gatewayImage, originalUrl };
@@ -358,7 +361,7 @@ export function createGatewayImageProvider(
             const response = await fetch(url, { signal: input.signal ?? AbortSignal.timeout(30_000) })
             if (!response.ok) throw new Error(`下载生成结果失败: ${response.status}`)
             const finalized = await finalizeLocalRedraw(new Uint8Array(await response.arrayBuffer()), input.localRedraw)
-            result.url = await uploadBytesToSpaces({ bytes: finalized.bytes, mimeType: finalized.mimeType, scene: "IMAGE_CREATION_OUTPUT", authToken: "" })
+            result.url = await uploadBytesToSpaces({ bytes: finalized.bytes, mimeType: finalized.mimeType, scene: "IMAGE_CREATION_OUTPUT", authToken: "", labelId: `gateway:${task.id}:output` })
             result.mimeType = finalized.mimeType
             result.gatewayImage = { ...result.gatewayImage,
               width: finalized.width, height: finalized.height,

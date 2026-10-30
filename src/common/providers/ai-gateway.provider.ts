@@ -1,3 +1,4 @@
+import { auditText, auditTextStream } from "../../aigc/text-audit"
 import {
   BadGatewayException,
   HttpException,
@@ -98,7 +99,12 @@ export class AiGatewayProvider {
 
   constructor(private readonly config: ConfigService, private readonly moderation: ContentModerationService) {}
 
-  async generateJson<T>(
+  async generateJson<T>(systemPrompt: string, userPrompt: string, options?: AiGatewayJsonOptions<T>): Promise<AiGatewayJsonResult<T>> {
+    const model = options?.model?.trim() || options?.defaultModel?.trim() || "ZQ-Think-Flash"
+    return auditText(model, options?.userContent ?? userPrompt, () => this.generateJsonAudited(systemPrompt, userPrompt, options))
+  }
+
+  private async generateJsonAudited<T>(
     systemPrompt: string,
     userPrompt: string,
     options?: AiGatewayJsonOptions<T>
@@ -319,7 +325,12 @@ export class AiGatewayProvider {
     }
   }
 
-  async *streamChat(
+  async *streamChat(systemPrompt: string, userPrompt: string, options?: AiGatewayStreamOptions): AsyncGenerator<AiGatewayStreamEvent> {
+    const model = options?.model?.trim() || this.config.get<string>(options?.modelConfigKey ?? "AI_GATEWAY_LISTING_MODEL")?.trim() || options?.defaultModel?.trim() || "ZQ-Think-Flash"
+    yield* auditTextStream(model, options?.userContent ?? userPrompt, () => this.streamChatAudited(systemPrompt, userPrompt, options))
+  }
+
+  private async *streamChatAudited(
     systemPrompt: string,
     userPrompt: string,
     options?: AiGatewayStreamOptions

@@ -357,3 +357,6 @@ it("人像重绘失败重试沿用冻结规格，并恢复原项目生成中状�
   expect(prisma.generationTask.update.mock.calls[0][0].data.executionSpec).toBeUndefined()
   expect(queue.enqueue).toHaveBeenCalledTimes(1)
 })
+
+// 本文件只验证业务执行；真实文件标识由aigc/image-label.spec.ts覆盖。
+jest.mock("../aigc/image-label", () => ({ labelImage: jest.fn((buffer: Buffer) => Promise.resolve({ buffer, mime: "image/png" })) }))

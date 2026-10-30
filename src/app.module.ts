@@ -1,4 +1,5 @@
 import { HttpModule } from "@nestjs/axios"
+import { AigcModule, AigcAuditMiddleware } from "./aigc/aigc.module"
 import { MiddlewareConsumer, Module, NestModule } from "@nestjs/common"
 import { ConfigModule } from "@nestjs/config"
 import { ScheduleModule } from "@nestjs/schedule"
@@ -28,6 +29,7 @@ import { BillingModule } from "./billing/billing.module"
 import { ProvidersModule } from "./common/providers/providers.module"
 import { CustomerModule } from "./customer/customer.module"
 import { ContentModerationModule } from "./content-moderation/content-moderation.module"
+import { ModerationScopeMiddleware } from "./content-moderation/moderation-scope"
 import { ExternalApiModule } from "./external-api/external-api.module"
 import { ImageProjectModule } from "./image-project/image-project.module"
 import { InspirationRadarModule } from "./inspiration-radar/inspiration-radar.module"
@@ -69,6 +71,7 @@ import { WorkbenchModule } from "./workbench/workbench.module"
     WinstonModule.forRootAsync(winstonAsyncConfig),
     HttpModule.register({ global: true }),
     ProvidersModule,
+    AigcModule,
     ContentModerationModule,
     PrismaModule,
     AiGatewayModule,
@@ -124,6 +127,6 @@ import { WorkbenchModule } from "./workbench/workbench.module"
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(LoggerMiddleware).forRoutes("*")
+    consumer.apply(AigcAuditMiddleware, ModerationScopeMiddleware, LoggerMiddleware).forRoutes("*")
   }
 }

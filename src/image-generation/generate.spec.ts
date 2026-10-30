@@ -1,3 +1,4 @@
+import { withDeliveryCheckpoint } from "../aigc/test-prisma"
 // src/image-generation/generate.spec.ts
 //
 // 主生图(generate)链路单测(mock Prisma + mock Provider + 假 Spaces transport
@@ -130,7 +131,7 @@ async function makeServices(overrides?: {
       }) } },
       GenerationTaskRunnerService,
       { provide: DispatchQueueService, useValue: { enqueue: jest.fn() } },
-      { provide: PrismaService, useValue: prisma },
+      { provide: PrismaService, useValue: withDeliveryCheckpoint(prisma) },
       { provide: ImageProjectService, useValue: imageProject },
       { provide: UsageService, useValue: usage },
       { provide: IMAGE_PROVIDER_FACTORY, useValue: () => provider },
@@ -968,7 +969,8 @@ describe("generation task runner", () => {
     });
     prisma.generationTask.findUnique.mockResolvedValue(taskRow({ generatedImages: [{ status: "SUCCESS" }] }));
     const bytes = await sharp({ create: { width: 357, height: 211, channels: 3, background: "white" } }).png().toBuffer();
-    fetchMock.mockResolvedValueOnce({ ok: true, arrayBuffer: async () => bytes });
+    const measuredResponse = { ok: true, headers: { get: () => "image/png" }, arrayBuffer: async () => bytes };
+    fetchMock.mockResolvedValueOnce(measuredResponse).mockResolvedValueOnce(measuredResponse).mockResolvedValueOnce(measuredResponse);
     const url = "https://outputs.nyc3.digitaloceanspaces.com/final.png";
     const generate = jest.fn().mockResolvedValue({ url, gatewayImage: { modelPublicId: "ZQ-Image-1" } });
     const { runner } = await makeServices({ prisma, provider: { generate } });
@@ -976,7 +978,7 @@ describe("generation task runner", () => {
     await runner.executeGeneratedImage(10);
 
     expect(prisma.generatedImage.updateMany.mock.calls[1][0].data).toMatchObject({
-      status: "SUCCESS", url, width: 357, height: 211,
+      status: "SUCCESS", url: fakePresign.publicUrl, width: 357, height: 211,
     });
     expect(generate).toHaveBeenCalledTimes(1);
   });
@@ -1682,3 +1684,6 @@ describe("reconciliation (generate extension)", () => {
     });
   });
 });
+
+// 本文件只验证业务执行；真实文件标识由aigc/image-label.spec.ts覆盖。
+jest.mock("../aigc/image-label", () => ({ labelImage: jest.fn((buffer: Buffer) => Promise.resolve({ buffer, mime: "image/png" })) }))

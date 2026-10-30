@@ -1,4 +1,5 @@
 import sharp from "sharp"
+import sharp from "sharp"
 import { SpacesService } from "../spaces/spaces.service"
 import { ChetaidouStorageService } from "./chetaidou-storage.service"
 
@@ -100,8 +101,8 @@ describe("车泰斗裁剪公开直传", () => {
       getObjectMetadata: jest
         .fn()
         .mockResolvedValue({ contentType: "image/png", metadata: { "owner-id": "7" } }),
-      downloadBuffer: jest.fn().mockResolvedValue(png.subarray(0, 33)),
-      uploadBuffer: jest.fn(),
+      downloadBuffer: jest.fn((_key: string, range?: string) => range ? Promise.resolve(png.subarray(0,33)) : sharp({ create: { width: 400, height: 300, channels: 3, background: "white" } }).png().toBuffer()),
+      uploadBuffer: jest.fn((_buffer, key: string) => Promise.resolve(`https://assets.example/${key}`)),
       deleteObject: jest.fn(),
     }
     return { spaces, storage: new ChetaidouStorageService(spaces as unknown as SpacesService) }
@@ -116,16 +117,17 @@ describe("车泰斗裁剪公开直传", () => {
       metadata: { "owner-id": "7" },
     })
   })
-  it("只读真实 PNG 头获得尺寸，保存无需上传、删除或二次处理", async () => {
+  it("裁剪成品另存为带标识文件，原上传对象保持不变", async () => {
     const { storage, spaces } = setup()
     expect(await storage.inspectCropPng(userId, url)).toEqual({
-      fileKey,
-      width: 1,
-      height: 1,
+      fileKey: expect.stringMatching(/^aigc\/crops\//),
+      url: expect.stringContaining("/aigc/crops/"),
+      width: 400,
+      height: 300,
       mime: "image/png",
     })
     expect(spaces.downloadBuffer).toHaveBeenCalledWith(fileKey, "bytes=0-32")
-    expect(spaces.uploadBuffer).not.toHaveBeenCalled()
+    expect(spaces.uploadBuffer).toHaveBeenCalledTimes(1)
     expect(spaces.deleteObject).not.toHaveBeenCalled()
   })
   it.each([

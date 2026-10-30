@@ -1,5 +1,6 @@
 import Core from "@alicloud/pop-core"
 import { ConfigService } from "@nestjs/config"
+import { createModerationScope, moderationScope } from "../../content-moderation/moderation-scope"
 import { AliyunContentModerationProvider } from "./aliyun-content-moderation.provider"
 
 jest.mock("@alicloud/pop-core", () => jest.fn())
@@ -19,6 +20,62 @@ describe("AliyunContentModerationProvider", () => {
   }
 
   beforeEach(() => jest.clearAllMocks())
+
+  it.each(["high", "future_level", "unavailable"])(
+    "请求内并发及重试复用%s，不能改判为通过",
+    async mode => {
+      const provider = setup()
+      if (mode === "unavailable") request.mockRejectedValue(new Error("vendor unavailable"))
+      else request.mockResolvedValue({ Code: 200, Data: { RiskLevel: mode, Result: [] } })
+      const input = { key: "prompt", type: "TEXT" as const, content: "用户提示词" }
+      const scope = createModerationScope(() => Promise.resolve([input]))
+      await moderationScope.run(scope, async () => {
+        const results = await Promise.allSettled([
+          provider.check(input),
+          provider.check(input),
+          provider.check(input),
+        ])
+        if (mode === "unavailable") {
+          expect(results.every(result => result.status === "rejected")).toBe(true)
+          await expect(provider.check(input)).rejects.toMatchObject({ status: 503 })
+        } else {
+          const result = await provider.check(input)
+          expect(provider.decide(result, provider.service("TEXT"))).toBe(
+            mode === "high" ? "REJECTED" : "UNDETERMINED"
+          )
+        }
+      })
+      expect(request).toHaveBeenCalledTimes(1)
+    }
+  )
+
+  it("异步素材仅提交一次，处理中继续查询，完成后复用结果", async () => {
+    const provider = setup()
+    request
+      .mockResolvedValueOnce({ Code: 200, Data: { TaskId: "one-task" } })
+      .mockResolvedValueOnce({ Code: 280 })
+      .mockResolvedValueOnce({ Code: 200, Data: { RiskLevel: "none" } })
+    const input = { key: "video", type: "VIDEO" as const, url: "https://assets.example.com/v.mp4" }
+    await moderationScope.run(
+      createModerationScope(() => Promise.resolve([])),
+      async () => {
+        const [first, second] = await Promise.all([
+          provider.submit(input, "1"),
+          provider.submit(input, "2"),
+        ])
+        expect(first).toEqual(second)
+        expect(await provider.poll("VIDEO", first)).toBeNull()
+        const result = await provider.poll("VIDEO", second)
+        expect(result?.riskLevel).toBe("none")
+        expect(await provider.poll("VIDEO", first)).toBe(result)
+      }
+    )
+    expect(request.mock.calls.map(([action]) => action)).toEqual([
+      "VideoModeration",
+      "VideoModerationResult",
+      "VideoModerationResult",
+    ])
+  })
 
   it("文本使用增强版PLUS，保留原始等级和开放标签，不回传风险原文", async () => {
     request.mockResolvedValue({

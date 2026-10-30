@@ -1,3 +1,4 @@
+import { withDeliveryCheckpoint } from "../aigc/test-prisma"
 // src/image-generation/image-generation-t2i.spec.ts
 //
 // t2i 链路单测(mock Prisma + mock Provider + 假 Spaces transport):
@@ -62,7 +63,7 @@ async function makeServices(overrides?: {
       TextToImageService,
       ImageGenItemRunnerService,
       { provide: DispatchQueueService, useValue: { enqueue: jest.fn() } },
-      { provide: PrismaService, useValue: prisma },
+      { provide: PrismaService, useValue: withDeliveryCheckpoint(prisma) },
       { provide: IMAGE_PROVIDER_FACTORY, useValue: () => provider },
       { provide: UsageService, useValue: usage },
     ],
@@ -259,6 +260,10 @@ describe("image-gen item runner", () => {
     resetSpacesPresignTransport();
   });
 
+  beforeEach(() => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(""), headers: { get: () => "image/png" }, arrayBuffer: () => Promise.resolve(Buffer.from("fixture")) });
+  });
+
   it("skips silently when CAS claim loses", async () => {
     const prisma = mockPrisma();
     prisma.imageGenItem.updateMany.mockResolvedValueOnce({ count: 0 });
@@ -335,7 +340,8 @@ describe("image-gen item runner", () => {
     }) });
     prisma.imageGenItem.findMany.mockResolvedValue([{ status: "SUCCEEDED" }]);
     const bytes = await sharp({ create: { width: 357, height: 211, channels: 3, background: "white" } }).png().toBuffer();
-    const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValueOnce({ ok: true, arrayBuffer: async () => bytes } as unknown as Response);
+    const measured = { ok: true, headers: { get: () => "image/png" }, arrayBuffer: async () => bytes } as unknown as Response;
+    const fetchSpy = jest.spyOn(global, "fetch").mockResolvedValueOnce(measured).mockResolvedValueOnce(measured).mockResolvedValueOnce(measured);
     const url = "https://outputs.nyc3.digitaloceanspaces.com/final.png";
     const generate = jest.fn().mockResolvedValue({ url, gatewayTaskId: "gw-no-size" });
     const { runner } = await makeServices({ prisma, provider: { generate } });
@@ -343,7 +349,7 @@ describe("image-gen item runner", () => {
     await runner.executeItem(1);
 
     expect(prisma.imageGenItem.updateMany.mock.calls[1][0].data).toMatchObject({
-      status: "SUCCEEDED", url, width: 357, height: 211,
+      status: "SUCCEEDED", url: fakePresign.publicUrl, width: 357, height: 211,
       gatewayImage: { gatewayTaskId: "gw-no-size" },
     });
     expect(generate).toHaveBeenCalledTimes(1);
@@ -713,3 +719,6 @@ describe("image-gen item runner", () => {
     });
   });
 });
+
+// 本文件只验证业务执行；真实文件标识由aigc/image-label.spec.ts覆盖。
+jest.mock("../aigc/image-label", () => ({ labelImage: jest.fn((buffer: Buffer) => Promise.resolve({ buffer, mime: "image/png" })) }))

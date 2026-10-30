@@ -31,7 +31,7 @@ export function spacesServiceTransport(
         key,
         contentType: body.contentType,
         expiresIn: body.expiresIn,
-      });
+      }, body.keyPrefix === "ai-creative/openai-compatible/");
       return {
         uploadUrl: presigned.uploadUrl,
         publicUrl: presigned.publicUrl,

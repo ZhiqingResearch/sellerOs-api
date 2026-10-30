@@ -1,3 +1,4 @@
+import sharp from "sharp"
 import { ConflictException, NotFoundException } from "@nestjs/common"
 import { Prisma } from "@prisma/client"
 import { createHash } from "crypto"
@@ -80,8 +81,8 @@ function setup(type = "PORTRAIT") {
     getObjectMetadata: jest
       .fn()
       .mockResolvedValue({ contentType: "image/png", metadata: { "owner-id": "7" } }),
-    downloadBuffer: jest.fn().mockResolvedValue(header),
-    uploadBuffer: jest.fn(),
+    downloadBuffer: jest.fn((_key: string, range?: string) => range ? Promise.resolve(header) : sharp({ create: { width: 800, height: 600, channels: 3, background: "white" } }).png().toBuffer()),
+    uploadBuffer: jest.fn((_buffer, key: string) => Promise.resolve(`https://assets.example/${key}`)),
     deleteObject: jest.fn(),
   }
   const gateway = { reconcileImageTaskOnRead: jest.fn().mockResolvedValue(false) }
@@ -124,7 +125,7 @@ describe("人像及批量改图裁剪保存", () => {
       expect(data).not.toHaveProperty("deadlineAt")
       expect(data.generatedImages).toMatchObject({ create: { originalUrl: source.url } })
       expect(source).toEqual(before)
-      expect(spaces.uploadBuffer).not.toHaveBeenCalled()
+      expect(spaces.uploadBuffer).toHaveBeenCalledTimes(1)
       expect(spaces.deleteObject).not.toHaveBeenCalled()
     }
   )
