@@ -4,9 +4,9 @@
 
 ## 前端选择模型
 
-`GET /api/business-ai/models`（Bearer JWT）返回 `{ items: [{ publicId, displayName }] }`。
-目录和提交校验使用同一规则：仅 `qwen3.8-max`、`MiniMax-M3`，且 `AiGatewayModel` 中 `category=TEXT`、`modality=TEXT`、`enabled=true`、`gatewayActive=true`。
-目录按 `sortOrder`、`id` 排序，不自动指定或替换用户选择。现有通用 `/api/ai-models` 接口保持原样。
+`GET /api/ai-models?modality=TEXT&category=SELLER_BUSINESS`（Bearer JWT）返回 `{ items: [{ publicId, displayName }] }`。
+目录和提交校验使用同一规则：仅 `qwen3.8-max`、`MiniMax-M3`，且 `AiGatewayModel` 中 `category=SELLER_BUSINESS`、`modality=TEXT`、`enabled=true`、`gatewayActive=true`。
+目录按 `sortOrder`、`id` 排序，不自动指定或替换用户选择。复用通用 `/api/ai-models` 接口，查询必须显式传入 modality 和 category。旧 `/api/business-ai/models` 入口已移除。
 
 各调用仍使用原接口和字段：
 
@@ -31,6 +31,6 @@ MiniMax JSON 使用提示词、解析和结构校验，保留原重试次数；�
 
 ## 数据与部署
 
-不新增表，不修改 schema，也不自动启停数据库模型。
-运行环境需启用 TEXT 分类的目标模型，并保证网关对应上游通道可调用。
+沿用现有 AiGatewayModel 结构，不修改 Prisma schema。目标库需要先具备该表。运行 `node --env-file=.env -r ts-node/register scripts/init-seller-business-models.ts` 预览，追加 `--apply` 写入专属分类。跨库复制可追加 `--source-env <源库环境文件路径>`；不传时读取当前库的 TEXT 分类。脚本仅复制 TEXT 分类的两个模型到 SELLER_BUSINESS，已存在的记录跳过，不移动、覆盖或启停其他分类的模型。
+运行环境需启用 SELLER_BUSINESS 分类的目标模型，并保证网关对应上游通道可调用。
 依赖仍使用锁文件中的私有 SDK 0.14.0；正常安装需要具备 GitHub Packages 读取权限的 `PACKAGES_TOKEN`。

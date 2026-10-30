@@ -3,7 +3,7 @@ import { AiModelModality } from "@prisma/client"
 import { PrismaService } from "../../prisma/prisma.service"
 
 export const DOMESTIC_BUSINESS_MODELS = ["qwen3.8-max", "MiniMax-M3"] as const
-export const DOMESTIC_BUSINESS_MODEL_CATEGORY = "TEXT"
+export const DOMESTIC_BUSINESS_MODEL_CATEGORY = "SELLER_BUSINESS"
 
 /** 仅供 Listing（含一键上架）、竞品分析、新品推广、智能定价使用。 */
 @Injectable()
@@ -28,20 +28,5 @@ export class DomesticBusinessModels {
       select: { publicId: true },
     })
     if (!row) throw new BadRequestException("所选模型未启用或当前不可用，请重新选择")
-  }
-
-  async findAll() {
-    const items = await this.prisma.aiGatewayModel.findMany({
-      where: {
-        publicId: { in: [...DOMESTIC_BUSINESS_MODELS] },
-        category: DOMESTIC_BUSINESS_MODEL_CATEGORY,
-        modality: AiModelModality.TEXT,
-        enabled: true,
-        gatewayActive: true,
-      },
-      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
-      select: { publicId: true, displayName: true },
-    })
-    return { items }
   }
 }
