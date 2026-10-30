@@ -2,6 +2,9 @@ import { BadRequestException, ForbiddenException, NotFoundException } from "@nes
 import { JwtService } from "@nestjs/jwt"
 import { Test } from "@nestjs/testing"
 import * as argon2 from "argon2"
+import { DefaultMemberRoleService } from "../common/services/default-member-role.service"
+import { CreditService } from "../membership/credit.service"
+import { InviteService } from "../membership/invite.service"
 import { PrismaService } from "../prisma/prisma.service"
 import { SmsService } from "../sms/sms.service"
 import { AuthService } from "./auth.service"
@@ -33,6 +36,9 @@ describe("AuthService", () => {
         { provide: PrismaService, useValue: prisma },
         { provide: JwtService, useValue: jwtService },
         { provide: SmsService, useValue: smsService },
+        { provide: CreditService, useValue: {} },
+        { provide: DefaultMemberRoleService, useValue: {} },
+        { provide: InviteService, useValue: {} },
       ],
     }).compile()
 

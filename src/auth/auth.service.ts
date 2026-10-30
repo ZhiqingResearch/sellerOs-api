@@ -1,17 +1,23 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from "@nestjs/common"
 import { JwtService } from "@nestjs/jwt"
-import { InviteAppStatus, Prisma } from "@prisma/client"
+import { CreditBucket, CreditTxnType, InviteAppStatus, Prisma } from "@prisma/client"
 import * as argon2 from "argon2"
+import { DefaultMemberRoleService } from "../common/services/default-member-role.service"
+import { CreditService } from "../membership/credit.service"
+import { InviteService } from "../membership/invite.service"
+import { SIGNUP_BONUS_CREDITS, signupBonusExpiresAt } from "../membership/membership.constants"
 import { PrismaService } from "../prisma/prisma.service"
 import { SmsService } from "../sms/sms.service"
 import { LoginDto } from "./dto/login.dto"
 import { MePermissionGroupDto, MeResponseDto, PermissionsResponseDto } from "./dto/me.dto"
+import { RegisterDto } from "./dto/register.dto"
 import { SmsLoginDto } from "./dto/sms-login.dto"
 import { mergeUserPermissions, mergeUserRoles, userRolesSelect } from "./role-permissions.util"
 
@@ -22,8 +28,79 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly smsService: SmsService
+    private readonly smsService: SmsService,
+    private readonly credit: CreditService,
+    private readonly defaultMemberRole: DefaultMemberRoleService,
+    private readonly invite: InviteService
   ) {}
+
+  async register(dto: RegisterDto) {
+    await this.assertRegistrationAvailable(dto.phone, this.prisma)
+    const password = await argon2.hash(dto.password)
+    try {
+      const user = await this.prisma.$transaction(
+        async tx => {
+          const inviteData = dto.inviteCode
+            ? await this.invite.registrationInviteData(tx, dto.inviteCode)
+            : {}
+          await this.assertRegistrationAvailable(dto.phone, tx)
+          // 错码返回后提交事务，保留失败次数；建号失败则成功核销随建号一起回滚。
+          if (!(await this.smsService.verifyCode(dto.phone, dto.code, tx))) return null
+
+          const created = await tx.user.create({
+            data: {
+              username: dto.username,
+              phone: dto.phone,
+              password,
+              balance: 0,
+              lastLoginAt: new Date(),
+              ...inviteData,
+            },
+          })
+          await this.defaultMemberRole.assign(tx, created.id)
+          await this.credit.grant(
+            created.id,
+            CreditBucket.GIFT,
+            SIGNUP_BONUS_CREDITS,
+            {
+              type: CreditTxnType.SIGNUP_BONUS,
+              source: dto.inviteCode ? "invite.signup" : "phone.signup",
+              expiresAt: signupBonusExpiresAt(new Date()),
+            },
+            tx
+          )
+          return tx.user.findUniqueOrThrow({ where: { id: created.id }, include: LOGIN_INCLUDE })
+        },
+        { timeout: 15_000, isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }
+      )
+
+      if (!user) throw new BadRequestException("验证码无效或已过期")
+      this.logger.log(`User ${user.id} registered via phone`)
+      return this.generateToken(user, null)
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const target = error.meta?.target
+        if (
+          Array.isArray(target)
+            ? target.includes("phone")
+            : typeof target === "string" && target.toLowerCase().includes("phone")
+        ) {
+          throw new ConflictException("该手机号已注册，请直接登录")
+        }
+      }
+      throw error
+    }
+  }
+
+  private async assertRegistrationAvailable(phone: string, tx: Prisma.TransactionClient) {
+    const user = await tx.user.findUnique({ where: { phone }, select: { id: true } })
+    if (user) throw new ConflictException("该手机号已注册，请直接登录")
+    const pending = await tx.inviteApplication.findFirst({
+      where: { phone, status: InviteAppStatus.PENDING },
+      select: { id: true },
+    })
+    if (pending) throw new ConflictException("该手机号已提交注册申请，审核中，请联系平台顾问")
+  }
 
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({

@@ -4,6 +4,7 @@ import { AuthService } from "./auth.service"
 import { ChangePasswordDto } from "./dto/change-password.dto"
 import { LoginDto } from "./dto/login.dto"
 import { MeResponseDto, PermissionsResponseDto } from "./dto/me.dto"
+import { RegisterDto } from "./dto/register.dto"
 import { SendCodeDto } from "./dto/send-code.dto"
 import { SmsLoginDto } from "./dto/sms-login.dto"
 import { SwitchOrgDto } from "./dto/switch-org.dto"
@@ -14,6 +15,14 @@ import { AuthenticatedUser } from "./types"
 @Controller("auth")
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
+
+  @Post("register")
+  @ApiOperation({
+    summary: "手机号自助注册（短信验证、可选邀请码、无需审核，直接返回 access_token）",
+  })
+  register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto)
+  }
 
   @Post("login")
   @ApiOperation({ summary: "密码登录" })

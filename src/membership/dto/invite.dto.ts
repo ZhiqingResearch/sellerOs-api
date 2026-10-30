@@ -77,7 +77,7 @@ export class InviteConfigDto {
 
   @ApiPropertyOptional({
     example: 50,
-    description: "邀请名额（审批通过计 1）；传 null 表示不限",
+    description: "邀请名额（实际建号计1，含手机号自助注册）；传 null 表示不限",
     nullable: true,
   })
   @IsOptional()
