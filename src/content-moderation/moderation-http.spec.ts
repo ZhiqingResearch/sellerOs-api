@@ -219,4 +219,78 @@ describe("生成入口HTTP前置审核：实际管道、解析和决策", () => 
     expect(spaces.uploadBuffer).toHaveBeenCalled()
     expect(business).not.toHaveBeenCalled()
   })
+
+  it.each(["generate", "image-to-image"])("%s 的审核拒绝保留真实原因及错误码", async route => {
+    vendor.mockResolvedValue({ Code: 200, Data: { RiskLevel: "high", Result: [] } })
+    const response = await request(app.getHttpServer())
+      .post(`/api/image-generation/${route}`)
+      .field("form", JSON.stringify({ prompt: "测试内容" }))
+      .expect(400)
+    expect(response.body).toEqual({
+      error: "输入内容未通过安全审核，请修改后重试",
+      code: "MODERATION_REJECTED",
+    })
+    expect(business).not.toHaveBeenCalled()
+  })
+
+  it.each(["generate", "image-to-image"])("%s 的真实multipart格式错误保留原协议", async route => {
+    const response = await request(app.getHttpServer())
+      .post(`/api/image-generation/${route}`)
+      .set("Content-Type", "multipart/form-data")
+      .send("invalid boundary")
+      .expect(400)
+    expect(response.body).toEqual({ error: "Invalid multipart/form-data body" })
+    expect(vendor).not.toHaveBeenCalled()
+    expect(business).not.toHaveBeenCalled()
+  })
+
+  it.each(["none", "high"])("公网商品源图无需域名名单，但仍须审核：%s", async riskLevel => {
+    vendor.mockImplementation((action: string) =>
+      Promise.resolve(
+        action === "ImageModeration"
+          ? { Code: 200, Data: { RiskLevel: riskLevel, Result: [] } }
+          : normal
+      )
+    )
+    const response = await request(app.getHttpServer())
+      .post("/api/image-generation/generate")
+      .field(
+        "form",
+        JSON.stringify({
+          prompt: "生成电脑",
+          productInfo: {
+            commerceData: { sourceImages: ["https://m.media-amazon.com/images/a.jpg"] },
+          },
+        })
+      )
+    expect(vendor.mock.calls.some(([action]) => action === "ImageModeration")).toBe(true)
+    if (riskLevel === "none") {
+      expect(response.status).toBe(201)
+      expect(business).toHaveBeenCalledTimes(1)
+    } else {
+      expect(response.status).toBe(400)
+      expect(response.body).toMatchObject({ code: "MODERATION_REJECTED" })
+      expect(business).not.toHaveBeenCalled()
+    }
+  })
+
+  it("危险商品源图被公网地址校验拒绝时，不再伪装为multipart错误", async () => {
+    const response = await request(app.getHttpServer())
+      .post("/api/image-generation/generate")
+      .field(
+        "form",
+        JSON.stringify({
+          prompt: "生成电脑",
+          productInfo: {
+            commerceData: { sourceImages: ["https://127.0.0.1/sample.jpg"] },
+          },
+        })
+      )
+      .expect(400)
+    expect(response.body).toEqual({
+      error: "素材地址必须是安全的公网 HTTPS 域名地址",
+      code: "MODERATION_INVALID_INPUT",
+    })
+    expect(business).not.toHaveBeenCalled()
+  })
 })

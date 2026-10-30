@@ -14,12 +14,8 @@
 // 文件字段(legacy 模式 main 必填;image-creation 模式 mainImages 多文件)。
 
 import {
-  ArgumentsHost,
-  BadRequestException,
   Body,
-  Catch,
   Controller,
-  ExceptionFilter,
   Param,
   Post,
   Req,
@@ -32,20 +28,11 @@ import {
 import { FileFieldsInterceptor } from "@nestjs/platform-express";
 import type { Request, Response } from "express";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { InvalidMultipartFilter } from "./invalid-multipart.filter";
 import {
   GenerateService,
   type GenerateUploadFiles,
 } from "./generate.service";
-
-/** multipart 解析失败(FileFieldsInterceptor/multer 抛 400)对齐源路由
- *  `request.formData()` 失败分支:400 {error: "Invalid multipart/form-data body"}。 */
-@Catch(BadRequestException)
-class InvalidMultipartFilter implements ExceptionFilter {
-  catch(_exception: BadRequestException, host: ArgumentsHost): void {
-    const res = host.switchToHttp().getResponse<Response>();
-    res.status(400).json({ error: "Invalid multipart/form-data body" });
-  }
-}
 
 @Controller("image-generation")
 @UseGuards(JwtAuthGuard)

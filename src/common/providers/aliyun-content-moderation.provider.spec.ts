@@ -196,10 +196,11 @@ describe("AliyunContentModerationProvider", () => {
     )
   })
 
-  it("签名私有地址复用存储配置，拒绝假后缀域名和带凭据地址", () => {
+  it("支持任意公网HTTPS域名，旧域名名单不再限制；拒绝不安全URL", () => {
     const provider = setup({
       SPACES_ENDPOINT: "https://nyc3.digitaloceanspaces.com",
       SPACES_BUCKET: "test",
+      CONTENT_MODERATION_ALLOWED_ORIGINS: "https://assets.example.com",
     })
     expect(() =>
       provider.validate({
@@ -208,11 +209,19 @@ describe("AliyunContentModerationProvider", () => {
         url: "https://test.nyc3.digitaloceanspaces.com/a.jpg?signature=test",
       })
     ).not.toThrow()
+    expect(() =>
+      provider.validate({
+        key: "image",
+        type: "IMAGE",
+        url: "https://m.media-amazon.com/images/a.jpg",
+      })
+    ).not.toThrow()
     for (const url of [
-      "https://assets.example.com.evil.test/a.jpg",
       "http://assets.example.com/a.jpg",
       "https://user:secret@assets.example.com/a.jpg",
       "https://127.0.0.1/a.jpg",
+      "https://localhost/a.jpg",
+      "https://assets.example.com:8443/a.jpg",
     ]) {
       expect(() => provider.validate({ key: "image", type: "IMAGE", url })).toThrow()
     }

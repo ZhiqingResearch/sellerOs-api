@@ -1,13 +1,20 @@
+import { lookup } from "node:dns/promises"
 import { Readable } from "node:stream"
 import { ContentSnapshotService } from "./content-snapshot.service"
 
+jest.mock("node:dns/promises", () => ({ lookup: jest.fn() }))
+
 describe("审核和业务共用不可覆盖的私有文件快照", () => {
+  beforeEach(() => {
+    jest.mocked(lookup).mockResolvedValue([{ address: "93.184.216.34", family: 4 }] as never)
+  })
   function setup() {
     const provider = { validate: jest.fn() }
     const http = {
       axiosRef: {
         get: jest.fn().mockImplementation(async () => ({
           data: Readable.from([Buffer.from("content")]),
+          status: 200,
           headers: { "content-type": "image/png" },
         })),
       },
@@ -33,7 +40,13 @@ describe("审核和业务共用不可覆盖的私有文件快照", () => {
     expect(original.references[0].url).toBe("https://assets.test/opaque")
     expect(http.axiosRef.get).toHaveBeenCalledWith(
       "https://assets.test/opaque",
-      expect.objectContaining({ maxRedirects: 0, responseType: "stream" })
+      expect.objectContaining({
+        maxRedirects: 0,
+        responseType: "stream",
+        proxy: false,
+        adapter: "http",
+        httpsAgent: expect.any(Object) as unknown,
+      })
     )
     expect(spaces.uploadFile).toHaveBeenCalledWith(
       expect.any(String),
@@ -86,5 +99,30 @@ describe("审核和业务共用不可覆盖的私有文件快照", () => {
     await service.cleanup()
     expect(spaces.pruneExpiredObjects).toHaveBeenCalledWith("content-moderation/temporary/", 1)
     expect(spaces.pruneExpiredObjects).toHaveBeenCalledWith("content-moderation/snapshots/", 2)
+  })
+
+  it("域名解析到内网或混合地址时拒绝，绝不发出下载或上传请求", async () => {
+    const ctx = setup()
+    jest.mocked(lookup).mockResolvedValue([
+      { address: "93.184.216.34", family: 4 },
+      { address: "169.254.169.254", family: 4 },
+    ] as never)
+    await expect(
+      ctx.service.freeze({ imageUrl: "https://untrusted.example/a.png" })
+    ).rejects.toMatchObject({ response: { code: "MODERATION_INVALID_INPUT" } })
+    expect(ctx.http.axiosRef.get).not.toHaveBeenCalled()
+    expect(ctx.spaces.uploadFile).not.toHaveBeenCalled()
+  })
+
+  it("下载器禁止代理和跳转", async () => {
+    const ctx = setup()
+    await ctx.service.freeze({ imageUrl: "https://external.example/a.png" })
+    const options = (ctx.http.axiosRef.get.mock.calls[0] as unknown[])[1] as {
+      validateStatus: (status: number) => boolean
+      proxy: boolean
+    }
+    expect(options.proxy).toBe(false)
+    expect(options.validateStatus(200)).toBe(true)
+    expect(options.validateStatus(302)).toBe(false)
   })
 })

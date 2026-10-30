@@ -8,7 +8,6 @@ import {
 } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { createHash } from "node:crypto"
-import { isIP } from "node:net"
 import {
   field,
   record,
@@ -20,6 +19,7 @@ import {
   type ModerationReceipt,
   type ModerationResult,
 } from "../../content-moderation/moderation.types"
+import { validatePublicMediaUrl } from "../utils/public-media-url"
 
 const SERVICES: Record<ModerationMediaType, string> = {
   TEXT: "ugc_moderation_byllm",
@@ -53,7 +53,7 @@ export class AliyunContentModerationProvider {
       }
       return
     }
-    this.validateUrl(input.url)
+    validatePublicMediaUrl(input.url)
   }
 
   async check(input: ModerationInput, timeoutMs = 10_000): Promise<ModerationResult> {
@@ -158,53 +158,6 @@ export class AliyunContentModerationProvider {
       return "UNDETERMINED"
     if (allowed.includes(result.riskLevel)) return "PASSED"
     return ["high", "medium", "low"].includes(result.riskLevel) ? "REJECTED" : "UNDETERMINED"
-  }
-
-  private validateUrl(value: string | undefined): void {
-    let url: URL
-    try {
-      url = new URL(value || "")
-    } catch {
-      throw new BadRequestException("待审核文件地址不合法")
-    }
-    const configured = this.config.get<string>("CONTENT_MODERATION_ALLOWED_ORIGINS")
-    const origins = configured
-      ? configured.split(",")
-      : [this.config.get<string>("SPACES_BASE_URL"), this.config.get<string>("OSS_BASE_URL")]
-    const allowed = origins.filter(Boolean).map(origin => {
-      try {
-        return new URL(origin!.trim()).origin
-      } catch {
-        return ""
-      }
-    })
-    // 私有 Spaces 的签名地址使用 bucket.endpoint，而不是公开 CDN 域名。
-    if (!configured) {
-      const endpoint = this.config.get<string>("SPACES_ENDPOINT")
-      const bucket = this.config.get<string>("SPACES_BUCKET")
-      if (endpoint && bucket) {
-        try {
-          const parsed = new URL(endpoint)
-          allowed.push(`${parsed.protocol}//${bucket}.${parsed.host}`)
-        } catch {
-          /* 无效的存储配置不能扩大允许范围。 */
-        }
-      }
-    }
-    if (
-      url.protocol !== "https:" ||
-      url.username ||
-      url.password ||
-      url.hash ||
-      (url.port && url.port !== "443") ||
-      isIP(url.hostname.replace(/^\[|\]$/g, "")) ||
-      !allowed.includes(url.origin)
-    ) {
-      throw new BadRequestException({
-        code: "MODERATION_INVALID_INPUT",
-        message: "审核文件必须来自已配置的可信存储地址",
-      })
-    }
   }
 
   private async request(

@@ -1,14 +1,16 @@
 import { HttpService } from "@nestjs/axios"
-import { Injectable, ServiceUnavailableException } from "@nestjs/common"
+import { HttpException, Injectable, ServiceUnavailableException } from "@nestjs/common"
 import { Interval } from "@nestjs/schedule"
 import { randomUUID } from "node:crypto"
 import { createWriteStream } from "node:fs"
 import { mkdtemp, rm } from "node:fs/promises"
+import type { Agent } from "node:https"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import type { Readable } from "node:stream"
 import { pipeline } from "node:stream/promises"
 import { AliyunContentModerationProvider } from "../common/providers/aliyun-content-moderation.provider"
+import { publicMediaDownloadAgent } from "../common/utils/public-media-url"
 import { SpacesService } from "../spaces/spaces.service"
 import { contentInputs } from "./content-inputs"
 import type { ModerationInput } from "./moderation.types"
@@ -64,20 +66,12 @@ export class ContentSnapshotService {
         input.url || ""
       )
       if (!inline) {
-        try {
-          this.provider.validate(input)
-        } catch (error) {
-          if (!input.detectMime) throw error
-          // 无文件类型提示的外部链接作为文字审核，不抓取第三方网页。
-          input.type = "TEXT"
-          input.content = input.url
-          delete input.url
-          continue
-        }
+        this.provider.validate(input)
       }
       const directory = await mkdtemp(join(tmpdir(), "moderation-"))
+      let agent: Agent | undefined
       try {
-        // 只取已验证的存储地址，不跟随重定向；视频通过磁盘流转，不读入Node堆。
+        // 公网素材固定到已验证IP，不跟随重定向；视频通过磁盘流转，不读入Node堆。
         const extension = inline
           ? inline[1].split("/")[1].replace(/[^a-zA-Z0-9]/g, "")
           : new URL(input.url!).pathname
@@ -94,9 +88,14 @@ export class ContentSnapshotService {
           )
         else {
           const signal = AbortSignal.timeout(60_000)
+          agent = await publicMediaDownloadAgent(input.url!)
           const response = await this.http.axiosRef.get<Readable>(input.url!, {
+            adapter: "http",
+            httpsAgent: agent,
+            proxy: false,
             responseType: "stream",
             maxRedirects: 0,
+            validateStatus: status => status === 200,
             timeout: 60_000,
             signal,
           })
@@ -116,12 +115,14 @@ export class ContentSnapshotService {
         const url = await this.spaces.generateSignedDownloadUrl(key, 24 * 3600)
         frozen = replace(frozen, input.url!, url)
         input.url = url
-      } catch {
+      } catch (error) {
+        if (error instanceof HttpException) throw error
         throw new ServiceUnavailableException({
           code: "MODERATION_SNAPSHOT_FAILED",
           message: "无法准备审核文件，请稍后重试",
         })
       } finally {
+        agent?.destroy()
         await rm(directory, { recursive: true, force: true })
       }
     }

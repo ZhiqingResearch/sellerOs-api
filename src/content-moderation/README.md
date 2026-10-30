@@ -22,17 +22,18 @@ ZQ_ACCESS_KEY_SECRET=实际阿里云AccessKeySecret
 | `CONTENT_MODERATION_IMAGE_SERVICE` | `postImageCheckByVL`（大小模型融合图片审核），`ImageModeration` |
 | `CONTENT_MODERATION_VIDEO_SERVICE` | `videoDetection`，`VideoModeration` / `VideoModerationResult` |
 | `CONTENT_MODERATION_DOCUMENT_SERVICE` | `document_detection`，`FileModeration` / `DescribeFileModerationResult` |
-| `CONTENT_MODERATION_ALLOWED_ORIGINS` | 从 `SPACES_BASE_URL`、`OSS_BASE_URL`、Spaces 私有下载域名推导；显式配置时为逗号分隔的 HTTPS origin 白名单 |
 | `CONTENT_MODERATION_PASS_RISK_LEVELS` | 四类内容均默认仅原始 `none` 放行；JSON 对象按实际 Service 覆盖指定项，其余保持默认 |
 
 Service 标识具体审核场景，检测标签、词库和阈值在对应 Service 的控制台规则中配置。文本参数为 `content`，图片参数为单个 `imageUrl`；无需配置护栏产品的 `query_security_check` 或 `img_query_security_check`。切换 Service 前核实动作和响应协议；未知等级及缺字段均不放行。
+
+素材地址默认支持所有公网 HTTPS 域名，无需配置域名名单。旧 `CONTENT_MODERATION_ALLOWED_ORIGINS` 已不再读取，可以删除。下载仅使用 443 端口，禁止 URL 中的账号口令、片段、IP 字面量、本地域名及重定向；所有 DNS 结果必须为公网地址，排除内网、回环、云元数据及其他特殊用途网段。下载固定连接到已校验 IP，同时校验原域名的 TLS 证书和实际连接地址，禁用 HTTP 代理，防止 DNS 重绑定。部署网络需允许直接 HTTPS 出站；代理的 fake-IP DNS（例如 `198.18.0.0/15`）会被拒绝，需为素材域名使用真实公网解析。
 
 其他环境部署顺序：`npx prisma db push` → `npx prisma generate` → `npm run build` → 按原部署流程重启。仅在已有三个任务表增加可空字段及索引，无迁移文件。配置变更后需要重启进程；不要因阿里云失败关闭审核或默认通过。
 
 ## 执行与恢复
 
 1. 普通接口审核自由文本、嵌套业务内容、图片/视频/文档 URL 以及 multipart 文件。文本按最多 2000 个 Unicode 字符分片，相邻片保留 200 字符重叠；分片无法保证跨长距离上下文的语义检测，准确性仍受供应商能力限制。文件大小和格式能力以阿里云服务为准。
-2. 有明确文件类型的 URL 必须属于可信存储，不允许 HTTP、IP、用户口令或重定向。无后缀的存储文件按 MIME 补充类型；无文件提示的外部网页链接仅按文字审核，不抓取网页正文。
+2. 素材 URL 按上述公网下载规则验证；无后缀的素材文件按响应 MIME 补充类型。无文件提示的普通网页链接仅按文字审核，不抓取网页正文。素材下载或安全校验失败时停止业务，不降级为文字审核。
 3. 普通资料接口保留原素材 URL。曦灵形象训练必须提供已有的 `trainingUrl` 字段，`fileId` 改为可选兼容字段；后端对审核通过的视频快照重新上传，避免用安全URL审核、却用另一个fileId训练。仅传fileId的旧客户端需补充trainingUrl。AI Gateway、国产业务模型适配器及 Google 在调用模型前再次核对实际输入；模型媒体与视频任务使用服务端私有文件快照，审核和调用引用相同文件。存量历史资料不会因上线自动重新审核，使用上述模型入口时会重新核对。
 4. 网关视频提交统一受服务层审核闸门保护，包括通用视频、动作复刻、带货成片、VidFlowOS、美妆和客户分镜。审核期间状态 `WAITING_MODERATION`；所有实际输入通过后 CAS 认领并进入原 `GENERATING` 流程，实际首次提交前再进行必要的网关估价、余额预检及生成；已记录提交阶段的恢复沿原幂等键对账，不重复做可能阻塞既有任务关联的余额预检。固定价的本地余额检查可提前执行。
 5. 每 10 秒扫描到期任务；背景查询间隔至少 30 秒。单任务详情 GET 主动查询，不受背景间隔限制；客户已有按 ID 查询分镜的轮询接口同步推进对应席位。普通列表不逐项启动审核。状态查询使用 `Cache-Control: no-store`。
@@ -42,6 +43,8 @@ Service 标识具体审核场景，检测标签、词库和阈值在对应 Servi
 已有关联网关 ID 的历史任务继续原回调与对账。历史 `GENERATING/TIMEOUT` 且没有审核记录、没有网关 ID 的孤儿任务无法证明此前是否已提交，按提交未知失败收敛，不自动重发；需人工核对或新建任务。
 
 2026-10-30 入口复查补齐：主生图、图生图、VidFlowOS 改图、局部重绘显式绑定 Body，multipart `form` JSON 按结构解析；Multer 无原型文件集合逐文件审核。RPA 创作首次派发/重试及商品上架文件在发送影刀前审核实际输入，使用审核过的快照；移除 RPA 输入原文日志。带货预览轮询同时推进待审视频。音色克隆的 Provider 也阻止内部调用绕过独立音频限制。
+
+主生图、图生图保留审核拒绝的真实原因和错误码；仅真正的 multipart 格式错误返回 `Invalid multipart/form-data body`，避免业务校验失败被错误包装。
 
 HTTP 安全回归见 `moderation-http.spec.ts`、`moderation-task-http.spec.ts`：使用真实控制器、全局管道、供应商结果解析和审核状态机；通用视频、VidFlowOS、动作复刻、带货生成保留真实业务服务及网关适配器，数据库/外部 SDK 使用测试替身。图片、美妆、分镜的入口测试断言拒绝时不进入业务创建；三个任务载体另验证拒绝后查询/定时任务不能续跑。覆盖拒绝、不可用、未知结果、异步待审、取消、全部通过后仅提交一次。此测试不连接真实生成供应商、不验证真实鉴权或生产数据库。
 

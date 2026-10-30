@@ -11,12 +11,8 @@
 // service 按源路由文案拒绝(批量上限 400)。
 
 import {
-  ArgumentsHost,
-  BadRequestException,
   Body,
-  Catch,
   Controller,
-  ExceptionFilter,
   Get,
   Param,
   Post,
@@ -30,20 +26,11 @@ import {
 import { FileFieldsInterceptor } from "@nestjs/platform-express";
 import type { Request, Response } from "express";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { InvalidMultipartFilter } from "./invalid-multipart.filter";
 import {
   ImageToImageService,
   type I2IUploadFiles,
 } from "./image-to-image.service";
-
-/** multipart 解析失败(FileFieldsInterceptor/multer 抛 400)对齐源路由
- *  `request.formData()` 失败分支:400 {error: "Invalid multipart/form-data body"}。 */
-@Catch(BadRequestException)
-class InvalidMultipartFilter implements ExceptionFilter {
-  catch(_exception: BadRequestException, host: ArgumentsHost): void {
-    const res = host.switchToHttp().getResponse<Response>();
-    res.status(400).json({ error: "Invalid multipart/form-data body" });
-  }
-}
 
 @Controller("image-generation/image-to-image")
 @UseGuards(JwtAuthGuard)
