@@ -118,7 +118,7 @@ describe("AiGatewayWebhookService", () => {
       usage as never,
       artifacts as never,
       imageCallbacks as never,
-      chetaidouReceipts as never
+      chetaidouReceipts as never, { refresh: jest.fn(), registerContinuation: jest.fn() } as never
     )
     return { service, tx, prisma, gateway, usage, artifacts, imageCallbacks, chetaidouReceipts, rawResults }
   }
@@ -211,7 +211,7 @@ describe("AiGatewayWebhookService", () => {
       usage as never,
       artifacts as never,
       imageCallbacks as never,
-      chetaidouReceipts as never
+      chetaidouReceipts as never, { refresh: jest.fn(), registerContinuation: jest.fn() } as never
     )
     return { service, tx, prisma, gateway, usage, artifacts, imageCallbacks, chetaidouReceipts }
   }
@@ -1356,6 +1356,15 @@ describe("AiGatewayWebhookService", () => {
   })
 
   describe("reconcileVideoTaskOnRead（读时对账）", () => {
+    it("待审视频先查询审核，拒绝后不查生成任务或重新提交", async () => {
+      const { service, gateway } = setup()
+      const moderation = service["moderation"].refresh as jest.Mock
+      moderation.mockResolvedValue({ id: 10, status: "FAILED", gatewayTaskId: null })
+      expect(await service.reconcileVideoTaskOnRead({ id: 10, status: "WAITING_MODERATION", gatewayTaskId: null })).toBe(true)
+      expect(moderation).toHaveBeenCalledWith("video-task:10")
+      expect(gateway.getTask).not.toHaveBeenCalled()
+      expect(gateway.createVideoTask).not.toHaveBeenCalled()
+    })
     it("对已关联网关任务的 GENERATING 行查询网关并走统一终态处理", async () => {
       const { service, gateway } = setup()
       gateway.getTask.mockResolvedValue(gatewayTask)

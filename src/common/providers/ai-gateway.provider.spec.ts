@@ -92,7 +92,7 @@ describe("AiGatewayProvider", () => {
         { type: "text", text: "商品文字" },
         { type: "image_url", image_url: { url: "data:image/jpeg;base64,test", detail: "high" } },
       ]
-      const provider = new AiGatewayProvider(config)
+      const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
       const events: AiGatewayStreamEvent[] = []
       for await (const event of provider.streamChat("system", "user", { model, userContent }))
         events.push(event)
@@ -122,7 +122,7 @@ describe("AiGatewayProvider", () => {
         },
       ])
     )
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     const result = await provider.generateJson<{ ok: boolean }>("system", "user")
 
@@ -147,7 +147,7 @@ describe("AiGatewayProvider", () => {
     mockedFetch.mockResolvedValueOnce(
       createSseResponse([{ choices: [{ delta: { content: '{"ok":true}' } }] }])
     )
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     await provider.generateJson<{ ok: boolean }>("system", "user", {
       maxOutputTokens: 3000,
@@ -168,7 +168,7 @@ describe("AiGatewayProvider", () => {
         createSseResponse([{ choices: [{ delta: { content: '{"ok":true}' } }] }], "req-billing-1")
       )
       .mockResolvedValueOnce(createUsageResponse("req-billing-1", "0.0049761"))
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     const result = await provider.generateJson<{ ok: boolean }>("system", "user", {
       resolveBilling: true,
@@ -191,7 +191,7 @@ describe("AiGatewayProvider", () => {
     "单次模式不因格式/空正文/结构错误再次请求 AI：%s",
     async content => {
       mockedFetch.mockResolvedValueOnce(createSseResponse([{ choices: [{ delta: { content } }] }]))
-      const provider = new AiGatewayProvider(config)
+      const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
       await expect(
         provider.generateJson("system", "user", {
           maxAttempts: 1,
@@ -212,7 +212,7 @@ describe("AiGatewayProvider", () => {
       )
       .mockResolvedValueOnce(createUsageResponse("req-retry-1", "0.01"))
       .mockResolvedValueOnce(createUsageResponse("req-retry-2", "0.02"))
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     const result = await provider.generateJson<{ ok: boolean }>("system", "user", {
       resolveBilling: true,
@@ -229,7 +229,7 @@ describe("AiGatewayProvider", () => {
     mockedFetch.mockResolvedValueOnce(
       createSseResponse([{ choices: [{ delta: { content: '{"ok":true}' } }] }])
     )
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     const result = await provider.generateJson<{ ok: boolean }>("system", "user", {
       model: "ZQ-Think-Pro",
@@ -248,7 +248,7 @@ describe("AiGatewayProvider", () => {
         ])
       )
       .mockResolvedValueOnce(createSseResponse([{ choices: [{ delta: { content: "x" } }] }]))
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     const events: AiGatewayStreamEvent[] = []
     for await (const event of provider.streamChat("system", "user", {
@@ -288,7 +288,7 @@ describe("AiGatewayProvider", () => {
         )
       )
       .mockResolvedValueOnce(createUsageResponse("req-stream-1", "0.02"))
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
     const events: AiGatewayStreamEvent[] = []
 
     for await (const event of provider.streamChat("system", "user", { resolveBilling: true })) {
@@ -341,7 +341,7 @@ describe("AiGatewayProvider", () => {
           { choices: [], usage: { prompt_tokens: 12, completion_tokens: 3 } },
         ])
       )
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     await expect(provider.generateJson<{ ok: boolean }>("system", "user")).resolves.toMatchObject({
       data: { ok: true },
@@ -374,7 +374,7 @@ describe("AiGatewayProvider", () => {
           },
         ])
       )
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     const result = await provider.generateJson<{ summary: Record<string, unknown> }>(
       "system",
@@ -402,7 +402,7 @@ describe("AiGatewayProvider", () => {
       .mockResolvedValueOnce(
         createSseResponse([{ choices: [{ delta: { content: '{"summary":{}}' } }] }])
       )
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     await expect(
       provider.generateJson<{ summary: Record<string, unknown> }>("system", "user", {
@@ -426,7 +426,7 @@ describe("AiGatewayProvider", () => {
         },
       ])
     )
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     await expect(provider.generateJson<{ ok: boolean }>("system", "user")).resolves.toMatchObject({
       data: { ok: true },
@@ -440,7 +440,7 @@ describe("AiGatewayProvider", () => {
       .mockResolvedValueOnce(
         createSseResponse([{ choices: [{ delta: { content: "still-not-json" } }] }])
       )
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     await expect(provider.generateJson("system", "user")).rejects.toBeInstanceOf(
       BadGatewayException
@@ -457,7 +457,7 @@ describe("AiGatewayProvider", () => {
         { status: 500, headers: { "content-type": "application/json" } }
       )
     )
-    const provider = new AiGatewayProvider(config)
+    const provider = new AiGatewayProvider(config, { assertContent: jest.fn(async value => value) } as never)
 
     await expect(provider.generateJson("system", "user")).rejects.toThrow(
       "AI Gateway 内部异常（HTTP 500），请稍后重试"
@@ -465,7 +465,7 @@ describe("AiGatewayProvider", () => {
     expect(mockedFetch.mock.calls).toHaveLength(1)
   })
 
-  it("开启调试开关后打印完整 SDK 请求和聚合响应但不打印 API Key", async () => {
+  it("开启调试开关后不打印用户输入、系统提示词或API Key", async () => {
     const debugLogger = jest.spyOn(Logger.prototype, "debug").mockImplementation(() => undefined)
     const debugConfig = {
       get: jest.fn((name: string, fallback?: string) => {
@@ -476,14 +476,14 @@ describe("AiGatewayProvider", () => {
     mockedFetch.mockResolvedValueOnce(
       createSseResponse([{ choices: [{ delta: { content: '{"ok":true}' } }] }], "req-debug")
     )
-    const provider = new AiGatewayProvider(debugConfig)
+    const provider = new AiGatewayProvider(debugConfig, { assertContent: jest.fn(async value => value) } as never)
 
     await provider.generateJson("完整系统提示词", "完整用户提示词")
 
     const debugOutput = debugLogger.mock.calls.map(([message]) => String(message)).join("\n")
     expect(debugOutput).toContain("url=https://gateway.example/v1/chat/completions")
-    expect(debugOutput).toContain("完整系统提示词")
-    expect(debugOutput).toContain("完整用户提示词")
+    expect(debugOutput).not.toContain("完整系统提示词")
+    expect(debugOutput).not.toContain("完整用户提示词")
     expect(debugOutput).toContain('"content": "{\\"ok\\":true}"')
     expect(debugOutput).not.toContain("test-key")
   })

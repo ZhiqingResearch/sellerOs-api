@@ -23,7 +23,7 @@ describe("VideoProjectService.removeVideos", () => {
         )
       }),
     }
-    const service = new VideoProjectService(prisma as never, {} as never, {} as never, {} as never)
+    const service = new VideoProjectService(prisma as never, {} as never, {} as never, {} as never, { refresh: jest.fn() } as never)
     return { service, videoTask }
   }
 

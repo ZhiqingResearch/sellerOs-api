@@ -13,6 +13,7 @@
 import {
   ArgumentsHost,
   BadRequestException,
+  Body,
   Catch,
   Controller,
   ExceptionFilter,
@@ -66,10 +67,10 @@ export class ImageToImageController {
   )
   async create(
     @UploadedFiles() files: I2IUploadFiles,
+    @Body("form") form: unknown,
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    const form = (req.body as Record<string, unknown> | undefined)?.form;
     const result = await this.i2i.create(
       { form, files },
       (req.user as { id: number }).id,

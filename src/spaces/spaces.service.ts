@@ -314,6 +314,7 @@ export class SpacesService {
     expiresIn: number
   }> {
     const key = this.normalizeKey(options.key)
+    if (key.startsWith("content-moderation/")) throw new Error("审核文件不允许客户端覆盖")
     const acl: ObjectCannedACL = options.acl ?? "public-read"
     const expiresIn = options.expiresIn ?? 3600
 

@@ -4,6 +4,11 @@
  * 前端设置 BUSINESS_AI_SMOKE_URL=http://127.0.0.1:8013 后运行 business-ai-live.test.ts。
  */
 import { UnauthorizedException, ValidationPipe, type ExecutionContext } from "@nestjs/common"
+import { HttpService } from "@nestjs/axios"
+import { AliyunContentModerationProvider } from "../src/common/providers/aliyun-content-moderation.provider"
+import { ContentModerationService } from "../src/content-moderation/content-moderation.service"
+import { ContentSnapshotService } from "../src/content-moderation/content-snapshot.service"
+import { SpacesService } from "../src/spaces/spaces.service"
 import { ConfigService } from "@nestjs/config"
 import { Test } from "@nestjs/testing"
 import "dotenv/config"
@@ -28,6 +33,11 @@ async function main() {
     providers: [
       BusinessAiService,
       AiGatewayProvider,
+      AliyunContentModerationProvider,
+      ContentModerationService,
+      ContentSnapshotService,
+      SpacesService,
+      HttpService,
       PrismaService,
       {
         provide: ConfigService,

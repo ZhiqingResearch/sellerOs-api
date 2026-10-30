@@ -20,6 +20,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>()
     const request = ctx.getRequest<Request>()
     const keybSensitive = isKeybSensitiveUrl(request.url)
+    const malformedJson = isRecord(exception) && exception.type === "entity.parse.failed"
 
     let status: number = HttpStatus.INTERNAL_SERVER_ERROR
     let message: string | string[] = "服务器内部错误"
@@ -49,6 +50,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       const redact = (text: string) => text.replace(/(?:zk-|sk_)[A-Za-z0-9_-]+/gi, "[凭证已隐藏]")
       message = Array.isArray(message) ? message.map(redact) : redact(message)
     }
+    if (malformedJson) message = "请求 JSON 格式不正确"
 
     const errorResponse = {
       statusCode: status,
@@ -59,7 +61,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
 
     // 5xx 错误记录完整堆栈，4xx 记录 warn 级别
     if (status >= 500) {
-      const logMessage = keybSensitive
+      const logMessage = keybSensitive || malformedJson
         ? Array.isArray(message)
           ? message.join(", ")
           : message
@@ -67,15 +69,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
           ? exception.message
           : String(exception)
       this.logger.error(
-        `${request.method} ${keybSafeLogUrl(request.url)} ${status} - ${logMessage}`,
+        `${request.method} ${keybSafeLogUrl(request.url.split("?")[0])} ${status} - ${logMessage}`,
         {
           context: "ExceptionFilter",
-          stack: !keybSensitive && exception instanceof Error ? exception.stack : undefined,
+          stack: !keybSensitive && !malformedJson && exception instanceof Error ? exception.stack : undefined,
         }
       )
     } else if (status >= 400) {
       this.logger.warn(
-        `${request.method} ${keybSafeLogUrl(request.url)} ${status} - ${Array.isArray(message) ? message.join(", ") : message}`,
+        `${request.method} ${keybSafeLogUrl(request.url.split("?")[0])} ${status} - ${Array.isArray(message) ? message.join(", ") : message}`,
         { context: "ExceptionFilter" }
       )
     }

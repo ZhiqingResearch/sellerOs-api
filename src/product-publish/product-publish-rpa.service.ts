@@ -21,6 +21,7 @@ import {
 } from "@prisma/client"
 import { createHash, randomUUID, timingSafeEqual } from "node:crypto"
 import { setTimeout as delay } from "node:timers/promises"
+import { ContentModerationService } from "../content-moderation/content-moderation.service"
 import {
   YingdaoProvider,
   YingdaoRequestError,
@@ -138,7 +139,8 @@ export class ProductPublishRpaService {
     private readonly config: ConfigService,
     private readonly yingdao: YingdaoProvider,
     private readonly productPublishService: ProductPublishService,
-    private readonly eventsService: ProductPublishEventsService
+    private readonly eventsService: ProductPublishEventsService,
+    private readonly moderation: ContentModerationService
   ) {}
 
   /**
@@ -841,6 +843,17 @@ export class ProductPublishRpaService {
 
   /** 调度接口只负责启动脚本；业务结果不在 startTask 响应中读取。 */
   private async dispatch(input: DispatchInput): Promise<YingdaoStartTaskResult | null> {
+    if (input.operation === ProductPublishRpaOperation.SUBMIT_PUBLISH) {
+      input = {
+        ...input,
+        request: (await this.moderation.assertContent(input.request, "publish", [
+          "business_type",
+          "task_type",
+          "category",
+          "skus",
+        ])) as ProductPublishRpaRequest,
+      }
+    }
     const startedAt = Date.now()
     const log = await this.prisma.productPublishRpaLog.create({
       data: {

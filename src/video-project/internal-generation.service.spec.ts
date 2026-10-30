@@ -36,7 +36,7 @@ function createHarness() {
     prisma as unknown as PrismaService,
     gateway as unknown as AiGatewayProvider,
     gatewayWebhook as unknown as AiGatewayWebhookService,
-    usage as unknown as UsageService
+    usage as unknown as UsageService, { refresh: jest.fn() } as never
   )
   return { service, prisma, gateway, gatewayWebhook, usage }
 }
@@ -232,7 +232,7 @@ describe("InternalGenerationService", () => {
       })
     ).rejects.toThrow(BadRequestException)
     expect(prisma.videoTask.updateMany).toHaveBeenCalledWith({
-      where: { id: 901, status: "GENERATING", deletedAt: null },
+      where: { id: 901, status: { in: ["GENERATING", "WAITING_MODERATION"] }, deletedAt: null },
       data: { status: "FAILED", errorMessage: "AI Gateway 视频任务提交失败" },
     })
   })

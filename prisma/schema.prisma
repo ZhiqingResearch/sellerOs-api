@@ -1061,6 +1061,11 @@ model Storyboard {
 
 // 分镜头席位（每个分镜头最多 2 个席位，通过 AI Gateway 异步生成）
 model StoryboardVideo {
+  moderationPassedAt DateTime?
+  moderationStatus String? @db.VarChar(20)
+  moderation Json?
+  moderationClaimUntil DateTime?
+  moderationNextCheckAt DateTime?
   id               Int     @id @default(autoincrement())
   url              String? @db.VarChar(1000) // 生成的视频 URL（Gateway 已存储到 Space）
   approved         Boolean @default(false) // 是否采纳（占用席位）
@@ -1078,6 +1083,8 @@ model StoryboardVideo {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
   generationMeta Json? // 预览墙公开生成/交付元信息
+
+  @@index([moderationStatus, moderationNextCheckAt])
 
 }
 
@@ -2692,6 +2699,11 @@ model VideoProject {
 
 // 一个 VideoTask = 任务中心一条 = 一个输出视频（后端驱动，单视频，无席位子表）
 model VideoTask {
+  moderationPassedAt DateTime?
+  moderationStatus String? @db.VarChar(20)
+  moderation Json?
+  moderationClaimUntil DateTime?
+  moderationNextCheckAt DateTime?
   id        Int          @id @default(autoincrement())
   projectId Int
   project   VideoProject @relation(fields: [projectId], references: [id])
@@ -2746,6 +2758,7 @@ model VideoTask {
   deletedAt DateTime?
 
   @@index([projectId, deletedAt])
+  @@index([moderationStatus, moderationNextCheckAt])
   @@index([userId, status, createdAt])
   // 覆盖 loadHistory：按向导筛 + 按 createdAt 倒序取历史
   @@index([salesWorkflowId, createdAt])
@@ -2859,6 +2872,11 @@ model BeautyProject {
 }
 
 model BeautyTask {
+  moderationPassedAt DateTime?
+  moderationStatus String? @db.VarChar(20)
+  moderation Json?
+  moderationClaimUntil DateTime?
+  moderationNextCheckAt DateTime?
   id        Int           @id @default(autoincrement())
   projectId Int
   project   BeautyProject @relation(fields: [projectId], references: [id])
@@ -2906,6 +2924,7 @@ model BeautyTask {
   deletedAt DateTime?
 
   @@unique([batchKey, batchIndex, attempt])
+  @@index([moderationStatus, moderationNextCheckAt])
   @@index([projectId, deletedAt])
   @@index([userId, status, createdAt])
   @@index([sourceDigitalHumanId])

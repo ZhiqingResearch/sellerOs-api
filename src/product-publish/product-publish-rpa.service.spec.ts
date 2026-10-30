@@ -255,7 +255,8 @@ describe("ProductPublishRpaService 异步调度与回调", () => {
       config as unknown as ConfigService,
       yingdao as unknown as YingdaoProvider,
       productPublishService as unknown as ProductPublishService,
-      eventsService as unknown as ProductPublishEventsService
+      eventsService as unknown as ProductPublishEventsService,
+      { assertContent: jest.fn(async value => value) } as never
     ) as CallbackCapableService
   })
 
@@ -324,6 +325,15 @@ describe("ProductPublishRpaService 异步调度与回调", () => {
       },
     })
     expect(logWrites().some(write => write.data.success === true)).toBe(false)
+  })
+
+  it("上架文件审核拒绝时，不向影刀上传参数或启动上架", async () => {
+    const moderate = service["moderation"].assertContent as jest.Mock
+    moderate.mockRejectedValue(new BadRequestException("文档未通过审核"))
+    await expect(service.submitPublish(baseTask.taskId, "https://files.example.com/input.xlsx", submittedSkus, baseTask.userId)).rejects.toThrow()
+    expect(moderate).toHaveBeenCalled()
+    expect(yingdao.uploadFile).not.toHaveBeenCalled()
+    expect(yingdao.startTask).not.toHaveBeenCalled()
   })
 
   it("调度失败时永久保留 submitRequestId，后续不允许重新上架", async () => {

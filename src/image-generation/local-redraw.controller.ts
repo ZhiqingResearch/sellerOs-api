@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   ExecutionContext,
   HttpCode,
@@ -85,8 +86,11 @@ export class LocalRedrawController {
       { limits: { fileSize: 50 * 1024 * 1024, files: 11 } }
     )
   )
-  async create(@Req() req: Request, @UploadedFiles() files: LocalRedrawFiles) {
-    const body = (req.body ?? {}) as Record<string, unknown>
+  async create(
+    @Req() req: Request,
+    @UploadedFiles() files: LocalRedrawFiles,
+    @Body() body: Record<string, unknown>
+  ) {
     const internal = req.headers["x-internal-token"] !== undefined
     let userId: number
     if (internal) {

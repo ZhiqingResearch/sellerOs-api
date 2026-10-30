@@ -7,12 +7,11 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { AiModelExecMode, AiModelModality, Prisma } from "@prisma/client"
-import { Decimal } from "@prisma/client/runtime/library"
 import type { VideoGenerationRequest } from "@zhiqingresearch/ai-ts-sdk"
 import { randomUUID } from "node:crypto"
 import { AiGatewayWebhookService } from "../ai-gateway/ai-gateway-webhook.service"
 import { AiGatewayProvider } from "../ai-gateway/ai-gateway.provider"
-import { safeMultiplier } from "../common/price-multiplier.util"
+import { moderationBusinessTimeout } from "../content-moderation/task-moderation.service"
 import { PrismaService } from "../prisma/prisma.service"
 import { UsageService } from "../usage/usage.service"
 import { fixedVideoRequestCredits, sumFixedVideoCredits } from "../usage/video-fixed-pricing"
@@ -101,7 +100,7 @@ export class BeautyWorkflowService {
   async deleteProject(projectId: number, userId: number) {
     await this.assertProjectOwned(projectId, userId)
     const generatingCount = await this.prisma.beautyTask.count({
-      where: { projectId, status: "GENERATING" },
+      where: { projectId, status: { in: ["GENERATING", "WAITING_MODERATION"] } },
     })
     if (generatingCount > 0) {
       throw new BadRequestException("项目中有正在生成的任务，请等待任务结束后再删除")
@@ -174,20 +173,8 @@ export class BeautyWorkflowService {
         )
       )
     )
-    if (fixedTotal) {
-      await this.usage.assertExactCreditsAffordable(userId, fixedTotal)
-    } else {
-      const estimates = await Promise.all(
-        requests.map(request => this.gateway.estimateVideoPrice(request))
-      )
-      const beautyMultiplier = safeMultiplier(model.priceMultiplier)
-      const estimatedAmount = estimates.reduce(
-        (total, estimate) =>
-          total.plus(this.gateway.maximumQuoteAmount(estimate.variants).mul(beautyMultiplier)),
-        new Decimal(0)
-      )
-      await this.usage.assertGatewayAffordable(userId, estimatedAmount)
-    }
+    if (fixedTotal) await this.usage.assertExactCreditsAffordable(userId, fixedTotal)
+    // 需要外部估价时，在全部素材审核通过后由Gateway提交入口统一预检。
 
     const digitalHumanSnapshot = {
       sourceId: digitalHuman.id,
@@ -229,7 +216,7 @@ export class BeautyWorkflowService {
             resolution: task.resolution,
             generateAudio: false,
             referenceImageUrls: task.referenceImageUrls as JsonIn,
-            status: "GENERATING",
+            status: "WAITING_MODERATION",
           },
         })
       )
@@ -315,6 +302,11 @@ export class BeautyWorkflowService {
 
   async cancelTask(taskId: number, userId: number) {
     const task = await this.assertTaskOwned(taskId, userId)
+    if (task.status === "WAITING_MODERATION") {
+      const cancelled = await this.prisma.beautyTask.updateMany({ where: { id: taskId, userId, status: "WAITING_MODERATION", deletedAt: null }, data: { status: "CANCELLED", finishedAt: new Date() } })
+      if (!cancelled.count) throw new BadRequestException("任务已进入提交，请刷新后重试取消")
+      return this.findOneTask(taskId, userId)
+    }
     if (task.status !== "GENERATING") throw new BadRequestException("仅等待提交的任务可取消")
     if (task.submittedAt || task.gatewayTaskId) {
       throw new BadRequestException("任务已开始生成并提交至上游，暂不支持取消")
@@ -338,7 +330,7 @@ export class BeautyWorkflowService {
 
   async deleteTask(taskId: number, userId: number) {
     const task = await this.assertTaskOwned(taskId, userId)
-    if (task.status === "GENERATING") {
+    if (["GENERATING", "WAITING_MODERATION"].includes(task.status)) {
       throw new BadRequestException(
         task.submittedAt ? "任务已开始生成，暂不能删除" : "任务正在等待提交，请先取消后再删除"
       )
@@ -377,7 +369,7 @@ export class BeautyWorkflowService {
       if (tasks.length !== ids.length) {
         throw new BadRequestException("部分 Beauty 视频不存在、已被移除或不属于当前项目")
       }
-      if (tasks.some(task => task.status === "GENERATING")) {
+      if (tasks.some(task => ["GENERATING", "WAITING_MODERATION"].includes(task.status))) {
         throw new BadRequestException("生成中的 Beauty 视频不可移除，请等待生成完成")
       }
 
@@ -387,7 +379,7 @@ export class BeautyWorkflowService {
           projectId,
           userId,
           deletedAt: null,
-          status: { not: "GENERATING" },
+          status: { notIn: ["GENERATING", "WAITING_MODERATION"] },
         },
         data: { deletedAt: new Date() },
       })
@@ -408,7 +400,7 @@ export class BeautyWorkflowService {
 
   private async submitTask(taskId: number, request: VideoGenerationRequest) {
     const claimed = await this.prisma.beautyTask.updateMany({
-      where: { id: taskId, status: "GENERATING", submittedAt: null, deletedAt: null },
+      where: { id: taskId, status: { in: ["GENERATING", "WAITING_MODERATION"] }, submittedAt: null, deletedAt: null },
       data: { submittedAt: new Date() },
     })
     if (claimed.count === 0) return
@@ -447,7 +439,7 @@ export class BeautyWorkflowService {
       where: {
         ...where,
         status: "GENERATING",
-        createdAt: { lte: new Date(Date.now() - BEAUTY_TASK_TIMEOUT_MS) },
+        AND: [where, moderationBusinessTimeout(new Date(Date.now() - BEAUTY_TASK_TIMEOUT_MS))],
         deletedAt: null,
         ...(excludeIds?.size ? { id: { notIn: [...excludeIds] } } : {}),
       },

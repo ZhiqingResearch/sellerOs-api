@@ -156,8 +156,8 @@ describe("BeautyWorkflowService.createTaskBatch", () => {
       n: 1,
       callback: true,
     }
-    expect(gateway.estimateVideoPrice).toHaveBeenCalledWith(request)
-    expect(usage.assertGatewayAffordable).toHaveBeenCalledWith(7, new Decimal("1.20"))
+    expect(gateway.estimateVideoPrice).not.toHaveBeenCalled()
+    expect(usage.assertGatewayAffordable).not.toHaveBeenCalled()
     expect(prisma.beautyTask.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         model: "sourcing-beauty-seedance-mini",
@@ -193,7 +193,10 @@ describe("BeautyWorkflowService.getTaskStats", () => {
       where: expect.objectContaining({
         userId: 7,
         status: "GENERATING",
-        createdAt: { lte: expect.any(Date) as Date },
+        AND: expect.arrayContaining([expect.objectContaining({ OR: [
+          { moderationPassedAt: { lte: expect.any(Date) } },
+          { moderationPassedAt: null, createdAt: { lte: expect.any(Date) } },
+        ] })]),
         deletedAt: null,
       }) as Record<string, unknown>,
       data: {

@@ -18,6 +18,7 @@ import { Decimal } from "@prisma/client/runtime/library"
 import axios from "axios"
 import { randomUUID, timingSafeEqual } from "node:crypto"
 import { YingdaoProvider } from "../common/providers/yingdao.provider"
+import { ContentModerationService } from "../content-moderation/content-moderation.service"
 import { PrismaService } from "../prisma/prisma.service"
 import { SpacesService } from "../spaces/spaces.service"
 import { UsageService } from "../usage/usage.service"
@@ -90,7 +91,8 @@ export class RpaCreationService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly spaces: SpacesService,
     private readonly yingdao: YingdaoProvider,
-    private readonly usage: UsageService
+    private readonly usage: UsageService,
+    private readonly moderation: ContentModerationService
   ) {}
 
   async onModuleInit() {
@@ -841,8 +843,10 @@ export class RpaCreationService implements OnModuleInit {
 
     try {
       const payload = this.buildRpaPayload(task)
-      const rawParams = [payload]
-      this.logger.log(`传递给 RPA 的原始参数 taskId=${task.id}: ${JSON.stringify(rawParams)}`)
+      const rawParams = await this.moderation.assertContent([payload], "rpa", [
+        "mediaType",
+        "inputMode",
+      ])
       const fileContent = Buffer.from(JSON.stringify(rawParams, null, 2), "utf8")
       const fileName = `rpa-creation-${task.requestId}.txt`
       const { fileKey } = await this.yingdao.uploadFile(fileContent, fileName)
@@ -917,8 +921,10 @@ export class RpaCreationService implements OnModuleInit {
 
   private async runRetry(task: RpaCreationTask, quantity: number) {
     const payload = this.buildRpaPayload(task, quantity)
-    const rawParams = [payload]
-    this.logger.log(`传递给 RPA 的重试参数 taskId=${task.id}: ${JSON.stringify(rawParams)}`)
+    const rawParams = await this.moderation.assertContent([payload], "rpa", [
+      "mediaType",
+      "inputMode",
+    ])
     const fileContent = Buffer.from(JSON.stringify(rawParams, null, 2), "utf8")
     const fileName = `rpa-creation-${task.requestId}-retry.txt`
     const { fileKey } = await this.yingdao.uploadFile(fileContent, fileName)

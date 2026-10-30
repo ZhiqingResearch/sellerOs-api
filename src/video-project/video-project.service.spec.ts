@@ -86,7 +86,7 @@ describe("VideoProjectService AI Gateway 视频任务", () => {
       prisma as never,
       gateway as never,
       gatewayWebhook as never,
-      usage as never
+      usage as never, { refresh: jest.fn() } as never
     )
     return { service, prisma, gateway, gatewayWebhook, usage, task, gatewayTask }
   }
@@ -216,8 +216,8 @@ describe("VideoProjectService AI Gateway 视频任务", () => {
       n: 1,
       prompt: "海边日出",
     })
-    expect(gateway.estimateVideoPrice).toHaveBeenCalledWith(request)
-    expect(usage.assertGatewayAffordable).toHaveBeenCalledWith(7, new Decimal("1.50"))
+    expect(gateway.estimateVideoPrice).not.toHaveBeenCalled()
+    expect(usage.assertGatewayAffordable).not.toHaveBeenCalled()
     expect(gateway.createVideoTask).toHaveBeenCalledWith(request, "video-task:10")
     expect(prisma.videoTask.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -312,7 +312,7 @@ describe("VideoProjectService AI Gateway 视频任务", () => {
       )
     ).rejects.toBeInstanceOf(BadRequestException)
     expect(prisma.videoTask.updateMany).toHaveBeenCalledWith({
-      where: { id: 10, status: "GENERATING", deletedAt: null },
+      where: { id: 10, status: { in: ["GENERATING", "WAITING_MODERATION"] }, deletedAt: null },
       data: { status: "FAILED", errorMessage: "AI Gateway 视频任务提交失败" },
     })
   })
@@ -363,11 +363,30 @@ describe("VideoProjectService AI Gateway 视频任务", () => {
       where: {
         id: 10,
         status: "GENERATING",
-        createdAt: { lte: expect.any(Date) },
+        OR: [
+          { moderationPassedAt: { lte: expect.any(Date) } },
+          { moderationPassedAt: null, createdAt: { lte: expect.any(Date) } },
+        ],
         deletedAt: null,
       },
       data: { status: "TIMEOUT", errorMessage: "视频生成超时" },
     })
+  })
+
+  it("审核结束与取消竞争时，未成功认领取消不能返回取消成功", async () => {
+    const { service, prisma, gateway, task } = setup()
+    prisma.videoTask.findUnique.mockResolvedValue({ ...task, status: "WAITING_MODERATION" })
+    prisma.videoTask.updateMany.mockResolvedValueOnce({ count: 0 })
+    await expect(service.cancelTask(10, 7)).rejects.toThrow("任务已进入提交")
+    expect(gateway.cancelVideoTask).not.toHaveBeenCalled()
+  })
+
+  it("审核等待不计入生成超时", async () => {
+    const { service, prisma, task } = setup()
+    prisma.videoTask.findUnique.mockResolvedValue({ ...task, createdAt: new Date(Date.now() - 40 * 60_000),
+      moderationStatus: "PASSED", moderationPassedAt: new Date(), project: { id: 3, name: "项目" } })
+    await expect(service.findOneTask(10, 7)).resolves.toMatchObject({ status: "GENERATING" })
+    expect(prisma.videoTask.updateMany).not.toHaveBeenCalled()
   })
 
   it("轮询时读时对账拿到网关终态并返回最新状态", async () => {
@@ -430,7 +449,7 @@ describe("VideoProjectService AI Gateway 视频任务", () => {
     expect(result.items.find(item => item.id === 11)).toMatchObject({ status: "FAILED" })
   })
 
-  it("最高报价为空时按预估价校验，实际扣费允许透支", async () => {
+  it("入口不在素材审核之前进行外部报价", async () => {
     const { service, gateway, usage } = setup()
     gateway.estimateVideoPrice.mockResolvedValue({
       currency: "CNY",
@@ -457,7 +476,7 @@ describe("VideoProjectService AI Gateway 视频任务", () => {
       7
     )
 
-    expect(usage.assertGatewayAffordable).toHaveBeenCalledWith(7, new Decimal("1.20"))
+    expect(usage.assertGatewayAffordable).not.toHaveBeenCalled()
   })
 })
 
@@ -535,7 +554,7 @@ describe("VideoProjectService 动作复刻 Gateway 迁移", () => {
       prisma as never,
       gateway as never,
       gatewayWebhook as never,
-      usage as never
+      usage as never, { refresh: jest.fn() } as never
     )
     const batchDto = {
       prompt: "   ",
@@ -549,7 +568,7 @@ describe("VideoProjectService 动作复刻 Gateway 迁移", () => {
     return { service, prisma, gateway, gatewayWebhook, usage, task, gatewayTask, batchDto }
   }
 
-  it("批量按 motion_control 提交 Gateway，prompt 空时兜底，报价合计校验余额", async () => {
+  it("批量按 motion_control 提交 Gateway，prompt 空时兜底，外部报价由审核后的提交入口处理", async () => {
     const { service, prisma, gateway, gatewayWebhook, usage, batchDto } = setup()
 
     const result = await service.createMotionControlBatch(3, batchDto, 7)
@@ -567,24 +586,8 @@ describe("VideoProjectService 动作复刻 Gateway 迁移", () => {
       })
     )
     expect(result.total).toBe(2)
-    expect(gateway.estimateVideoPrice).toHaveBeenCalledTimes(2)
-    expect(gateway.estimateVideoPrice).toHaveBeenCalledWith(
-      expect.objectContaining({
-        model: "sourcing-kling-v2-6-motion-control",
-        prompt: "动作复刻",
-        mode: "motion_control",
-        duration_seconds: 8,
-        resolution: "720p",
-        generate_audio: false,
-        keep_source_audio: true,
-        character_orientation: "video",
-        reference_images: [{ url: "https://example.com/a.png" }],
-        reference_videos: [{ url: "https://example.com/action.mp4" }],
-        n: 1,
-        callback: true,
-      })
-    )
-    expect(usage.assertGatewayAffordable).toHaveBeenCalledWith(7, new Decimal("3.60"))
+    expect(gateway.estimateVideoPrice).not.toHaveBeenCalled()
+    expect(usage.assertGatewayAffordable).not.toHaveBeenCalled()
     expect(gateway.createVideoTask).toHaveBeenCalledTimes(2)
     expect(gateway.createVideoTask).toHaveBeenCalledWith(
       expect.objectContaining({

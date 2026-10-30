@@ -34,6 +34,11 @@ import {
 } from "@zhiqingresearch/ai-ts-sdk"
 import { Agent, fetch as undiciFetch, type RequestInit as UndiciRequestInit } from "undici"
 
+import { safeMultiplier } from "../common/price-multiplier.util"
+import { ContentModerationService } from "../content-moderation/content-moderation.service"
+import { TaskModerationService } from "../content-moderation/task-moderation.service"
+import { UsageService } from "../usage/usage.service"
+import { fixedVideoRequestCredits } from "../usage/video-fixed-pricing"
 import { gatewayImageRequestSizing } from "./gateway-image-sizing"
 
 const DEFAULT_AI_GATEWAY_TIMEOUT_MS = 300_000
@@ -54,7 +59,12 @@ export class AiGatewayProvider {
   private readonly vidflowosGateway: AiGatewayClient | null
   private readonly waitingGateway: AiGatewayClient | null
 
-  constructor(config: ConfigService) {
+  constructor(
+    config: ConfigService,
+    private readonly moderation: TaskModerationService,
+    private readonly contentModeration: ContentModerationService,
+    private readonly usage: UsageService
+  ) {
     const apiKey = config.get<string>("AI_GATEWAY_API_KEY")?.trim() ?? ""
     const baseURL = config.get<string>("AI_GATEWAY_BASE_URL")?.trim() ?? ""
     if (!apiKey || !baseURL) {
@@ -118,13 +128,16 @@ export class AiGatewayProvider {
     idempotencyKey: string,
     keyOwner: GatewayKeyOwner = "platform"
   ): Promise<ImageTask> {
+    params = (await this.contentModeration.assertContent(params)) as ImageTaskRequest
     const gateway = this.getGateway(keyOwner)
     if (!idempotencyKey.trim()) {
       throw new BadRequestException("AI Gateway 图片任务缺少幂等键")
     }
 
     try {
-      const request = gatewayImageRequestSizing(params as unknown as Record<string, unknown>) as unknown as ImageTaskRequest
+      const request = gatewayImageRequestSizing(
+        params as unknown as Record<string, unknown>
+      ) as unknown as ImageTaskRequest
       const response = await gateway.images.withResponse.createTask(request, { idempotencyKey })
       this.logger.log(
         `[AI Gateway] 图片任务已提交 model=${params.model} task=${response.data.id}${this.requestIdSuffix(response.response.requestId)}`
@@ -141,6 +154,20 @@ export class AiGatewayProvider {
     options?: JsonRequestOptions,
     waitForCompletion = false
   ): Promise<MultimodalCompletionResult> {
+    const userMessages = request.messages.filter(
+      message => message.role !== "system" && message.role !== "developer"
+    )
+    const checked = (await this.contentModeration.assertContent(
+      userMessages,
+      "messages"
+    )) as ChatCompletionRequest["messages"]
+    let index = 0
+    request = {
+      ...request,
+      messages: request.messages.map(message =>
+        message.role === "system" || message.role === "developer" ? message : checked[index++]
+      ),
+    }
     try {
       const gateway = waitForCompletion
         ? (this.waitingGateway ?? this.getGateway())
@@ -314,10 +341,18 @@ export class AiGatewayProvider {
     idempotencyKey: string,
     keyOwner: GatewayKeyOwner = "platform"
   ): Promise<VideoTask> {
-    const gateway = this.getGateway(keyOwner)
     if (!idempotencyKey.trim()) {
       throw new BadRequestException("AI Gateway 视频任务缺少幂等键")
     }
+
+    const gateway = this.getGateway(keyOwner)
+    params = (await this.moderation.requirePassed(
+      idempotencyKey,
+      params
+    )) as unknown as VideoGenerationRequest
+    await this.moderation.beforeBusinessSubmission(idempotencyKey, () =>
+      this.assertModeratedVideoAffordable(idempotencyKey, params)
+    )
 
     try {
       this.logPayload("请求", "提交视频任务", { params, idempotencyKey })
@@ -342,6 +377,19 @@ export class AiGatewayProvider {
       return task
     } catch (error: unknown) {
       throw this.toGatewayException("查询任务", error)
+    }
+  }
+
+  private async assertModeratedVideoAffordable(key: string, params: VideoGenerationRequest) {
+    const owner = await this.moderation.billingOwner(key)
+    const fixed = await fixedVideoRequestCredits(this.usage, params.model, owner.category, params)
+    if (fixed) await this.usage.assertExactCreditsAffordable(owner.userId, fixed)
+    else {
+      const estimate = await this.estimateVideoPrice(params)
+      await this.usage.assertGatewayAffordable(
+        owner.userId,
+        this.maximumQuoteAmount(estimate.variants).mul(safeMultiplier(owner.priceMultiplier))
+      )
     }
   }
 
@@ -503,7 +551,7 @@ export class AiGatewayProvider {
     return requestId ? ` [requestId=${requestId}]` : ""
   }
 
-  private logPayload(direction: "请求" | "响应", action: string, payload: unknown): void {
-    this.logger.log(`[AI Gateway][${direction}] ${action} payload=${JSON.stringify(payload)}`)
+  private logPayload(direction: "请求" | "响应", action: string, _payload: unknown): void {
+    this.logger.log(`[AI Gateway][${direction}] ${action}`)
   }
 }

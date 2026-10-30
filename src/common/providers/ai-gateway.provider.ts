@@ -19,6 +19,7 @@ import {
   type ChatStreamRequest,
 } from "@zhiqingresearch/ai-ts-sdk"
 import { jsonrepair } from "jsonrepair"
+import { ContentModerationService } from "../../content-moderation/content-moderation.service"
 
 const BILLING_POLL_DELAYS_MS = [0, 100, 250, 500, 1_000]
 const DEFAULT_AI_GATEWAY_TIMEOUT_MS = 300_000
@@ -95,13 +96,14 @@ export interface AiGatewayStreamEvent {
 export class AiGatewayProvider {
   private readonly logger = new Logger(AiGatewayProvider.name)
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService, private readonly moderation: ContentModerationService) {}
 
   async generateJson<T>(
     systemPrompt: string,
     userPrompt: string,
     options?: AiGatewayJsonOptions<T>
   ): Promise<AiGatewayJsonResult<T>> {
+    const moderatedContent = await this.moderation.assertContent(options?.userContent ?? userPrompt, "userContent")
     const apiKey = this.config.get<string>("AI_GATEWAY_API_KEY")?.trim()
     const baseUrl = this.config.get<string>(
       "AI_GATEWAY_BASE_URL",
@@ -128,7 +130,7 @@ export class AiGatewayProvider {
       model,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: options?.userContent ?? userPrompt },
+        { role: "user", content: moderatedContent },
       ],
       stream: true,
       stream_options: { include_usage: true },
@@ -148,7 +150,7 @@ export class AiGatewayProvider {
 
     if (isDebugLoggingEnabled) {
       this.logger.debug(
-        `AI Gateway SDK 请求\nurl=${requestUrl}\nbody=${this._formatDebugValue(requestBody)}`
+        `AI Gateway SDK 请求 model=${model}`
       )
     }
 
@@ -179,7 +181,7 @@ export class AiGatewayProvider {
                     role: "system",
                     content: `${systemPrompt}\n\n这是格式纠错重试：必须只输出一个可由 JSON.parse 直接解析的完整 JSON 对象。不要输出解释、Markdown 代码块、注释或省略号。${options?.retryInstruction ? `\n${options.retryInstruction}` : ""}`,
                   },
-                  { role: "user", content: options?.userContent ?? userPrompt },
+                  { role: "user", content: moderatedContent },
                 ],
                 temperature: 0,
               }
@@ -322,6 +324,7 @@ export class AiGatewayProvider {
     userPrompt: string,
     options?: AiGatewayStreamOptions
   ): AsyncGenerator<AiGatewayStreamEvent> {
+    const moderatedContent = await this.moderation.assertContent(options?.userContent ?? userPrompt, "userContent")
     const apiKey = this.config.get<string>("AI_GATEWAY_API_KEY")?.trim()
     const baseUrl = this.config.get<string>(
       "AI_GATEWAY_BASE_URL",
@@ -357,7 +360,7 @@ export class AiGatewayProvider {
       model,
       messages: [
         ...(systemPrompt ? [{ role: "system" as const, content: systemPrompt }] : []),
-        { role: "user", content: options?.userContent ?? userPrompt },
+        { role: "user", content: moderatedContent },
       ],
       stream: true,
       stream_options: { include_usage: true },

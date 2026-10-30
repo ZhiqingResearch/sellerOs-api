@@ -16,6 +16,7 @@
 import {
   ArgumentsHost,
   BadRequestException,
+  Body,
   Catch,
   Controller,
   ExceptionFilter,
@@ -67,10 +68,10 @@ export class GenerateController {
   )
   async create(
     @UploadedFiles() files: GenerateUploadFiles,
+    @Body("form") form: unknown,
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    const form = (req.body as Record<string, unknown> | undefined)?.form;
     const result = await this.generate.create(
       { form, files },
       (req.user as { id: number }).id,

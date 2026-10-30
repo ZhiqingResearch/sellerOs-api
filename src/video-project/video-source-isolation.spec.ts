@@ -54,7 +54,7 @@ function setup(source: string, projectSource: string) {
     prisma as never,
     gateway as never,
     webhook as never,
-    {} as never
+    {} as never, { refresh: jest.fn() } as never
   )
   return { prisma, gateway, webhook, service }
 }
@@ -109,7 +109,7 @@ describe("视频创作来源隔离", () => {
       internal.prisma as never,
       {} as never,
       internal.webhook as never,
-      {} as never
+      {} as never, { refresh: jest.fn() } as never
     )
     await expect(service.getVideoTask(90)).resolves.toMatchObject({
       status: "SUCCESS",

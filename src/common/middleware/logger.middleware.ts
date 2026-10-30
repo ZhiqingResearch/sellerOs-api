@@ -10,7 +10,7 @@ export class LoggerMiddleware implements NestMiddleware {
 
   use(req: Request, res: Response, next: NextFunction) {
     const { method, ip } = req
-    const originalUrl = keybSafeLogUrl(req.originalUrl)
+    const originalUrl = keybSafeLogUrl(req.originalUrl.split("?")[0])
     const userAgent = isKeybSensitiveUrl(req.originalUrl) ? "" : (req.get("user-agent") ?? "")
     const start = Date.now()
 

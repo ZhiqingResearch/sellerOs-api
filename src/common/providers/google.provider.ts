@@ -1,6 +1,7 @@
 import { GenerateVideosOperation, GoogleGenAI } from "@google/genai"
 import { Injectable, Logger } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
+import { ContentModerationService } from "../../content-moderation/content-moderation.service"
 import axios from "axios"
 import type { Readable } from "stream"
 
@@ -97,7 +98,7 @@ export class GoogleProvider {
   private static readonly VIDEO_POLL_INTERVAL_MS = 10_000
   private static readonly VIDEO_MAX_POLL_MS = 20 * 60 * 1000
 
-  constructor(private readonly config: ConfigService) {
+  constructor(private readonly config: ConfigService, private readonly moderation: ContentModerationService) {
     this.apiKey = this.config.get<string>("GEMINI_API_KEY") || ""
     this.ai = new GoogleGenAI({ apiKey: this.apiKey })
   }
@@ -106,6 +107,7 @@ export class GoogleProvider {
 
   /** 调用 Gemini 生成文本 */
   async generateText(systemPrompt: string, userPrompt: string): Promise<string | null> {
+    await this.moderation.assertContent(userPrompt, "prompt")
     try {
       const response = await this.ai.models.generateContent({
         model: GoogleProvider.TEXT_MODEL,
@@ -124,6 +126,7 @@ export class GoogleProvider {
 
   /** 调用 Gemini 并开启 Google 搜索工具（web grounding），用于实时信息类任务 */
   async generateTextWithSearch(systemPrompt: string, userPrompt: string): Promise<string | null> {
+    await this.moderation.assertContent(userPrompt, "prompt")
     try {
       const response = await this.ai.models.generateContent({
         model: GoogleProvider.TEXT_MODEL,
@@ -143,6 +146,7 @@ export class GoogleProvider {
 
   /** 调用 Gemini Deep Research（Interactions API） */
   async deepSearch(query: string): Promise<string | null> {
+    await this.moderation.assertContent(query, "query")
     try {
       const interaction = await this.ai.interactions.create({
         input: query,
@@ -200,6 +204,8 @@ export class GoogleProvider {
     prompt: string,
     options: GenerateImageOptions = {}
   ): Promise<GeneratedImage | null> {
+    const checked = await this.moderation.assertContent({ prompt, refImageUrls: options.refImageUrls }) as { prompt: string; refImageUrls?: string[] }
+    options = { ...options, refImageUrls: checked.refImageUrls }
     const startedAt = Date.now()
     try {
       const parts: Array<Record<string, unknown>> = [{ text: prompt }]
@@ -264,6 +270,7 @@ export class GoogleProvider {
     prompt: string,
     options: GenerateVideoOptions = {}
   ): Promise<VeoOperation | null> {
+    options = await this.moderation.assertContent({ ...options, prompt }) as GenerateVideoOptions
     try {
       const aspectRatio =
         options.aspectRatio && VIDEO_SUPPORTED_ASPECT_RATIOS.has(options.aspectRatio)
@@ -382,6 +389,7 @@ export class GoogleProvider {
    * 与 AtlasProvider.startVideo 对齐：成功返回 { id }（= operation.name），失败返回 { error }（原样上游报错）。
    */
   async submitVeo(params: SubmitVeoParams): Promise<{ id: string } | { error: string }> {
+    params = await this.moderation.assertContent(params) as SubmitVeoParams
     const model = params.model ?? GoogleProvider.VIDEO_FLASH_MODEL
     try {
       const aspectRatio =

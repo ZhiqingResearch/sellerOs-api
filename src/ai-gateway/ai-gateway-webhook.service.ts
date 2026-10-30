@@ -32,6 +32,7 @@ import {
   parseImagePipelineIdempotencyKey,
 } from "./ai-gateway-image-callbacks.service"
 import { AiGatewayProvider } from "./ai-gateway.provider"
+import { TaskModerationService } from "../content-moderation/task-moderation.service"
 import {
   ChetaidouGatewayReceiptService,
   isChetaidouCallRequestId,
@@ -91,10 +92,23 @@ export class AiGatewayWebhookService implements OnModuleInit {
     private readonly usage: UsageService,
     private readonly artifacts: AiGatewayImageArtifactService,
     private readonly imageCallbacks: AiGatewayImageCallbacksService,
-    private readonly chetaidouReceipts: ChetaidouGatewayReceiptService
+    private readonly chetaidouReceipts: ChetaidouGatewayReceiptService,
+    private readonly moderation: TaskModerationService,
   ) {}
 
   async onModuleInit(): Promise<void> {
+    this.moderation.registerContinuation(async (key, row) => {
+      const request = this.videoRequest(row.generationParams)
+      if (!request) throw new BadRequestException("任务参数不完整，无法继续审核")
+      const task = await this.gateway.createVideoTask(request, key, this.keyOwnerOf(row.source))
+      const { kind, id } = this.moderation.parse(key)
+      const data = { gatewayTaskId: task.id }
+      const where = { id, status: "GENERATING", deletedAt: null, gatewayTaskId: null, moderationStatus: "PASSED" }
+      if (kind === "video-task") await this.prisma.videoTask.updateMany({ where, data })
+      else if (kind === "beauty-task") await this.prisma.beautyTask.updateMany({ where, data })
+      else await this.prisma.storyboardVideo.updateMany({ where, data })
+      await this.applyVideoTask(task)
+    })
     await Promise.all([
       this.recoverVideoTasks(),
       this.recoverStoryboardVideoTasks(),
@@ -445,6 +459,11 @@ export class AiGatewayWebhookService implements OnModuleInit {
     gatewayTaskId: string | null
     source?: string | null
   }): Promise<boolean> {
+    if (task.status === "WAITING_MODERATION") {
+      const latest = await this.moderation.refresh(`video-task:${task.id}`)
+      await this.reconcileGatewayTaskOnRead("视频任务", latest)
+      return latest.status !== task.status || latest.gatewayTaskId !== task.gatewayTaskId
+    }
     return this.reconcileGatewayTaskOnRead("视频任务", task)
   }
 
@@ -454,6 +473,11 @@ export class AiGatewayWebhookService implements OnModuleInit {
     status: string
     gatewayTaskId: string | null
   }): Promise<boolean> {
+    if (video.status === "WAITING_MODERATION") {
+      const latest = await this.moderation.refresh(`storyboard-video:${video.id}`)
+      await this.reconcileGatewayTaskOnRead("分镜视频", latest)
+      return latest.status !== video.status || latest.gatewayTaskId !== video.gatewayTaskId
+    }
     return this.reconcileGatewayTaskOnRead("分镜视频", video)
   }
 
@@ -463,6 +487,11 @@ export class AiGatewayWebhookService implements OnModuleInit {
     status: string
     gatewayTaskId: string | null
   }): Promise<boolean> {
+    if (task.status === "WAITING_MODERATION") {
+      const latest = await this.moderation.refresh(`beauty-task:${task.id}`)
+      await this.reconcileGatewayTaskOnRead("美妆视频", latest)
+      return latest.status !== task.status || latest.gatewayTaskId !== task.gatewayTaskId
+    }
     return this.reconcileGatewayTaskOnRead("美妆视频", task)
   }
 

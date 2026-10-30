@@ -4,7 +4,8 @@ import { Decimal } from "@prisma/client/runtime/library"
 import type { VideoGenerationRequest } from "@zhiqingresearch/ai-ts-sdk"
 import { AiGatewayWebhookService } from "../ai-gateway/ai-gateway-webhook.service"
 import { AiGatewayProvider } from "../ai-gateway/ai-gateway.provider"
-import { safeMultiplier } from "../common/price-multiplier.util"
+import { ModerationPendingException, TaskModerationService } from "../content-moderation/task-moderation.service"
+import { moderationSnapshot } from "../content-moderation/task-moderation.service"
 import { PrismaService } from "../prisma/prisma.service"
 import { UsageService } from "../usage/usage.service"
 import { fixedVideoRequestCredits } from "../usage/video-fixed-pricing"
@@ -34,7 +35,8 @@ export class InternalGenerationService {
     private readonly prisma: PrismaService,
     private readonly gateway: AiGatewayProvider,
     private readonly gatewayWebhook: AiGatewayWebhookService,
-    private readonly usage: UsageService
+    private readonly usage: UsageService,
+    private readonly moderation: TaskModerationService,
   ) {}
 
   /** 代提交视频任务：手机号查用户 → 容器项目 → createTask 同款内核（vidflowos Key） */
@@ -81,14 +83,6 @@ export class InternalGenerationService {
     )
     if (fixedCredits !== null) {
       await this.usage.assertExactCreditsAffordable(user.id, fixedCredits)
-    } else {
-      const estimate = await this.gateway.estimateVideoPrice(request)
-      await this.usage.assertGatewayAffordable(
-        user.id,
-        this.gateway
-          .maximumQuoteAmount(estimate.variants)
-          .mul(safeMultiplier(model.priceMultiplier))
-      )
     }
 
     const projectId = await this.ensureContainerProject(user.id)
@@ -109,7 +103,7 @@ export class InternalGenerationService {
         lastFrameUrl: request.last_frame?.url ?? null,
         refMaterials: this.referenceSnapshots(request),
         generationParams: request as unknown as JsonIn,
-        status: "GENERATING",
+        status: "WAITING_MODERATION",
       },
     })
 
@@ -134,6 +128,10 @@ export class InternalGenerationService {
         `[内部生成] VidFlowOS 任务已提交 task=${task.id} gatewayTask=${gatewayTask.id} user=${user.id}`
       )
     } catch (error) {
+      if (error instanceof ModerationPendingException) {
+        const waiting = await this.prisma.videoTask.findUnique({ where: { id: task.id }, select: { status: true } })
+        return { taskId: task.id, status: waiting?.status ?? "WAITING_MODERATION" }
+      }
       this.logger.error(
         `[内部生成] Gateway 提交失败 task=${task.id}: ${error instanceof Error ? error.message : String(error)}`
       )
@@ -141,7 +139,7 @@ export class InternalGenerationService {
       // 429/5xx/超时保留 GENERATING，等启动恢复按行 source 用 vidflowos Key 重提
       if (error instanceof BadRequestException) {
         await this.prisma.videoTask.updateMany({
-          where: { id: task.id, status: "GENERATING", deletedAt: null },
+          where: { id: task.id, status: { in: ["GENERATING", "WAITING_MODERATION"] }, deletedAt: null },
           data: { status: "FAILED", errorMessage: "AI Gateway 视频任务提交失败" },
         })
         throw error
@@ -161,6 +159,11 @@ export class InternalGenerationService {
       where: { id: taskId, source: "vidflowos", deletedAt: null },
     })
     if (!task) throw new NotFoundException("任务不存在")
+
+    if (task.moderationStatus) {
+      await this.moderation.refresh(`video-task:${taskId}`)
+      task = (await this.prisma.videoTask.findFirst({ where: { id: taskId, source: "vidflowos", deletedAt: null } })) ?? task
+    }
 
     if (task.status === "GENERATING" && task.gatewayTaskId) {
       await this.gatewayWebhook.reconcileVideoTaskOnRead(task)
@@ -184,6 +187,8 @@ export class InternalGenerationService {
 
     return {
       status: task.status,
+      moderationStatus: task.moderationStatus,
+      contentModeration: moderationSnapshot(task),
       resultUrl: task.resultUrl,
       errorMessage: task.errorMessage,
       costCny: costCny ? costCny.toString() : null,
@@ -200,6 +205,11 @@ export class InternalGenerationService {
       select: { status: true, gatewayTaskId: true },
     })
     if (!task) throw new NotFoundException("任务不存在")
+    if (task.status === "WAITING_MODERATION") {
+      const cancelled = await this.prisma.videoTask.updateMany({ where: { id: taskId, source: "vidflowos", status: "WAITING_MODERATION", deletedAt: null }, data: { status: "CANCELLED" } })
+      if (!cancelled.count) throw new BadRequestException("任务已进入提交，请刷新后重试取消")
+      return { status: "CANCELLED" }
+    }
     if (task.status !== "GENERATING") throw new BadRequestException("仅运行中的任务可取消")
     if (!task.gatewayTaskId) throw new BadRequestException("任务正在提交，请稍后取消")
 

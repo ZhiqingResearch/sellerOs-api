@@ -214,21 +214,21 @@ export class CreateAvatarDto {
   @IsString()
   description?: string
 
-  @ApiProperty({
-    example: "1234567890",
-    description: "曦灵 fileId（前端调曦灵文件上传接口后拿到）",
-  })
-  @IsNotEmpty()
-  @IsString()
-  fileId: string
-
   @ApiPropertyOptional({
-    example: "https://oss.example.com/avatar.mp4",
-    description: "训练视频 URL（可选，仅用于后台留档展示）",
+    example: "1234567890",
+    description: "兼容旧客户端fileId；不作为审核依据，后端使用已审核视频重新上传",
   })
   @IsOptional()
   @IsString()
-  trainingUrl?: string
+  fileId?: string
+
+  @ApiProperty({
+    example: "https://oss.example.com/avatar.mp4",
+    description: "训练视频URL，内容审核必填；后端审核快照通过后再上传曦灵训练",
+  })
+  @IsNotEmpty({ message: "请提供可审核的训练视频trainingUrl" })
+  @IsString()
+  trainingUrl: string
 }
 
 export class QueryAvatarDto {

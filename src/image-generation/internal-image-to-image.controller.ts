@@ -9,6 +9,7 @@
 
 import {
   BadRequestException,
+  Body,
   Controller,
   Get,
   HttpException,
@@ -64,6 +65,7 @@ export class InternalImageToImageController {
   )
   async create(
     @UploadedFiles() files: I2IUploadFiles,
+    @Body() body: Record<string, unknown>,
     @Req() req: Request,
   ): Promise<{
     jobId: string;
@@ -73,7 +75,6 @@ export class InternalImageToImageController {
     items: Array<{ index: number; typeKey: string; label: string }>;
     localRedraw?: LocalRedrawPlan;
   }> {
-    const body = req.body as Record<string, unknown> | undefined;
     const user = await this.mapUser(String(body?.phone ?? ""));
     const result = await this.i2i.create({ form: body?.form, files }, user.id, "vidflowos");
     if (!result.ok) {

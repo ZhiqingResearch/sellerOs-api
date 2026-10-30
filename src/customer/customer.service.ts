@@ -20,12 +20,11 @@ import {
   TagCategory,
   type Voice,
 } from "@prisma/client"
-import { Decimal } from "@prisma/client/runtime/library"
 import type { VideoGenerationRequest } from "@zhiqingresearch/ai-ts-sdk"
 import axios from "axios"
 import { AiGatewayWebhookService } from "src/ai-gateway/ai-gateway-webhook.service"
 import { AiGatewayProvider } from "src/ai-gateway/ai-gateway.provider"
-import { safeMultiplier } from "src/common/price-multiplier.util"
+import { moderationBusinessTimeout } from "../content-moderation/task-moderation.service"
 import {
   type AvatarWebhookPayload,
   BaiduXilingProvider,
@@ -629,6 +628,7 @@ export class CustomerService implements OnModuleInit {
 
     const figureId = await this.baiduXiling.createAvatar({
       fileId: dto.fileId,
+      trainingUrl: dto.trainingUrl,
       name: dto.name,
       gender: dto.gender,
       callbackUrl: `${this.config.get<string>("API_BASE_URL")}/api/customer/webhook/avatar`,
@@ -1756,7 +1756,7 @@ export class CustomerService implements OnModuleInit {
     // 读时对账：轮询时对 GENERATING 席位视频顺带查网关（Gateway 回调丢失时自愈）；
     // 拿到网关权威结论（含仍在 running）的行不进下面的本地墙钟超时
     const generating = await this.prisma.storyboardVideo.findMany({
-      where: { storyboardId: { in: ids }, status: "GENERATING", deletedAt: null },
+      where: { storyboardId: { in: ids }, status: { in: ["GENERATING", "WAITING_MODERATION"] }, deletedAt: null },
       select: { id: true, status: true, gatewayTaskId: true },
     })
     const authoritative = new Set<number>()
@@ -1772,7 +1772,7 @@ export class CustomerService implements OnModuleInit {
       where: {
         storyboardId: { in: ids },
         status: "GENERATING",
-        createdAt: { lt: new Date(Date.now() - CustomerService.STORYBOARD_VIDEO_TIMEOUT_MS) },
+        ...moderationBusinessTimeout(new Date(Date.now() - CustomerService.STORYBOARD_VIDEO_TIMEOUT_MS)),
         deletedAt: null,
         ...(authoritative.size ? { id: { notIn: [...authoritative] } } : {}),
       },
@@ -1855,25 +1855,8 @@ export class CustomerService implements OnModuleInit {
         )
       )
     )
-    if (fixedTotal) {
-      await this.usage.assertExactCreditsAffordable(userId, fixedTotal)
-    } else {
-      const storyboardMultiplier = safeMultiplier(model.priceMultiplier)
-      const estimates = await Promise.all(
-        jobs.map(job => this.gateway.estimateVideoPrice(job.request))
-      )
-      const estimatedAmount = estimates.reduce(
-        (total, estimate, index) =>
-          total.plus(
-            this.gateway
-              .maximumQuoteAmount(estimate.variants)
-              .mul(jobs[index].needCount)
-              .mul(storyboardMultiplier)
-          ),
-        new Decimal(0)
-      )
-      await this.usage.assertGatewayAffordable(userId, estimatedAmount)
-    }
+    if (fixedTotal) await this.usage.assertExactCreditsAffordable(userId, fixedTotal)
+    // 需要外部估价时，在全部素材审核通过后由Gateway提交入口统一预检。
 
     let totalPlaceholders = 0
     for (const { item, aspectRatio, request } of jobs) {
@@ -1953,7 +1936,7 @@ export class CustomerService implements OnModuleInit {
         include: { videos: { where: { deletedAt: null } } },
       })
       if (!storyboard) throw new NotFoundException("分镜头不存在")
-      if (storyboard.videos.some(video => video.status === "GENERATING")) {
+      if (storyboard.videos.some(video => ["GENERATING", "WAITING_MODERATION"].includes(video.status))) {
         throw new BadRequestException(`分镜头 ${item.id} 的视频正在生成，请稍后再试`)
       }
 
@@ -1984,7 +1967,7 @@ export class CustomerService implements OnModuleInit {
         const video = await tx.storyboardVideo.create({
           data: {
             storyboardId: item.id,
-            status: "GENERATING",
+            status: "WAITING_MODERATION",
             generationParams: request as unknown as Prisma.InputJsonValue,
           },
         })

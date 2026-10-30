@@ -27,6 +27,7 @@ import { AuditModule } from "./audit/audit.module"
 import { BillingModule } from "./billing/billing.module"
 import { ProvidersModule } from "./common/providers/providers.module"
 import { CustomerModule } from "./customer/customer.module"
+import { ContentModerationModule } from "./content-moderation/content-moderation.module"
 import { ExternalApiModule } from "./external-api/external-api.module"
 import { ImageProjectModule } from "./image-project/image-project.module"
 import { InspirationRadarModule } from "./inspiration-radar/inspiration-radar.module"
@@ -68,6 +69,7 @@ import { WorkbenchModule } from "./workbench/workbench.module"
     WinstonModule.forRootAsync(winstonAsyncConfig),
     HttpModule.register({ global: true }),
     ProvidersModule,
+    ContentModerationModule,
     PrismaModule,
     AiGatewayModule,
     AnnouncementModule,

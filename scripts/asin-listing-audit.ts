@@ -1,4 +1,9 @@
 import { ConfigService } from "@nestjs/config"
+import { HttpService } from "@nestjs/axios"
+import { AliyunContentModerationProvider } from "../src/common/providers/aliyun-content-moderation.provider"
+import { ContentModerationService } from "../src/content-moderation/content-moderation.service"
+import { ContentSnapshotService } from "../src/content-moderation/content-snapshot.service"
+import { SpacesService } from "../src/spaces/spaces.service"
 import axios from "axios"
 import { config as loadEnv } from "dotenv"
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs"
@@ -532,9 +537,11 @@ export async function runListingAudit(argv = process.argv.slice(2)) {
     const crawlerBaseUrl = (
       process.env.CRAWLER_API_BASE_URL || "http://47.108.114.243:6666"
     ).replace(/\/+$/, "")
-    const gateway = new AiGatewayProvider(
-      new ConfigService({ ...process.env, AI_GATEWAY_DEBUG_LOGGING: "false" })
-    )
+    const gatewayConfig = new ConfigService({ ...process.env, AI_GATEWAY_DEBUG_LOGGING: "false" })
+    const moderationProvider = new AliyunContentModerationProvider(gatewayConfig)
+    const spaces = new SpacesService(gatewayConfig)
+    const snapshots = new ContentSnapshotService(moderationProvider, new HttpService(), spaces)
+    const gateway = new AiGatewayProvider(gatewayConfig, new ContentModerationService(moderationProvider, spaces, snapshots))
     const fetchSnapshot = async (task: AuditTask, endpoint: Endpoint): Promise<Snapshot> => {
       const startedAt = Date.now()
       const response = await axios.post(

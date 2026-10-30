@@ -11,15 +11,17 @@ import {
   type AiGatewayTokenUsage,
 } from "../providers/ai-gateway.provider"
 import { DomesticBusinessModels } from "./domestic-business-models"
+import { ContentModerationService } from "../../content-moderation/content-moderation.service"
 
 /** 模块专用适配器，不替换全局 AiGatewayProvider。 */
 @Injectable()
 export class DomesticBusinessGateway extends AiGatewayProvider {
   constructor(
     config: ConfigService,
-    private readonly models: DomesticBusinessModels
+    private readonly models: DomesticBusinessModels,
+    moderation: ContentModerationService,
   ) {
-    super(config)
+    super(config, moderation)
   }
 
   override async *streamChat(

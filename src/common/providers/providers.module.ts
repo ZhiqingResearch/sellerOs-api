@@ -1,5 +1,6 @@
 import { Global, Module } from "@nestjs/common"
 import { AiGatewayProvider } from "./ai-gateway.provider"
+import { AliyunContentModerationProvider } from "./aliyun-content-moderation.provider"
 import { AllinpayProvider } from "./allinpay.provider"
 import { ApifyProvider } from "./apify.provider"
 import { AtlasProvider } from "./atlas.provider"
@@ -15,6 +16,7 @@ import { YingdaoProvider } from "./yingdao.provider"
 import { ZixiaoyunProvider } from "./zixiaoyun.provider"
 
 const providers = [
+  AliyunContentModerationProvider,
   AllinpayProvider,
   AiGatewayProvider,
   GoogleProvider,

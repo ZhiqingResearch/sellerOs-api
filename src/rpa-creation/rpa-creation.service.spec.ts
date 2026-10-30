@@ -51,7 +51,8 @@ describe("RPA 模型参数与派发", () => {
       config as never,
       {} as never,
       yingdao as never,
-      {} as never
+      {} as never,
+      { assertContent: jest.fn(async value => value) } as never
     )
     service["dispatchTask"] = jest.fn()
     return { service, prisma, yingdao }
@@ -169,6 +170,22 @@ describe("RPA 模型参数与派发", () => {
     })
   })
 
+  it("存量任务首次派发及重试都必须先审核，拒绝时不上传也不启动RPA", async () => {
+    const { service, prisma, yingdao } = setup()
+    const created = await service.createTask(3, video, 7, "request")
+    const task = { ...created, yingdaoTaskUuid: null } as RpaCreationTask
+    prisma.rpaCreationTask.findUnique.mockResolvedValue(task)
+    const moderate = service["moderation"].assertContent as jest.Mock
+    moderate.mockRejectedValue(new BadRequestException("内容未通过审核"))
+    const tx = { rpaCreationTask: prisma.rpaCreationTask, rpaCreationOutput: { updateMany: jest.fn() } }
+    Object.assign(prisma, { $transaction: jest.fn(async callback => callback(tx)) })
+    await expect(service["runDispatch"](task.id)).rejects.toThrow("内容未通过审核")
+    await expect(service["runRetry"](task, 1)).rejects.toThrow("内容未通过审核")
+    expect(moderate).toHaveBeenCalledTimes(2)
+    expect(yingdao.uploadFile).not.toHaveBeenCalled()
+    expect(yingdao.startTask).not.toHaveBeenCalled()
+  })
+
   it("旧任务空分辨率回落 720p，历史非法时长在上传前拒绝", async () => {
     const { service, yingdao } = setup()
     const task = {
@@ -231,7 +248,8 @@ describe("RpaCreationService.removeResults", () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never
+      {} as never,
+      { assertContent: jest.fn(async value => value) } as never
     )
     return { service, tx }
   }
@@ -353,7 +371,8 @@ describe("RpaCreationService.completeTask 扣费", () => {
       config as never,
       {} as never,
       {} as never,
-      usage as never
+      usage as never,
+      { assertContent: jest.fn(async value => value) } as never
     )
     ;(
       service as unknown as {

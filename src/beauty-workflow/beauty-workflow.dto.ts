@@ -19,6 +19,7 @@ import {
 import { PaginationDto } from "../common/dto/pagination.dto"
 
 export const BEAUTY_TASK_STATUSES = [
+  "WAITING_MODERATION",
   "GENERATING",
   "SUCCESS",
   "TIMEOUT",

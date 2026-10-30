@@ -8,7 +8,7 @@ describe("业务专用国产模型网关（不改变公共 Provider）", () => {
   const assertEnabled = jest.fn()
   const gateway = new DomesticBusinessGateway(new ConfigService(), {
     assertEnabled,
-  } as unknown as DomesticBusinessModels)
+  } as unknown as DomesticBusinessModels, { assertContent: jest.fn(async value => value) } as never)
   afterEach(() => jest.restoreAllMocks())
   beforeEach(() => {
     assertEnabled.mockReset().mockResolvedValue(undefined)

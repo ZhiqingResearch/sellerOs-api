@@ -5,6 +5,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
+import { Decimal } from "@prisma/client/runtime/library"
 import {
   AiGatewayClient,
   GatewayApiError,
@@ -17,6 +18,7 @@ import {
 } from "@zhiqingresearch/ai-ts-sdk"
 import { createServer } from "node:http"
 import { AiGatewayProvider } from "./ai-gateway.provider"
+import { ModerationPendingException } from "../content-moderation/task-moderation.service"
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- 中断测试需替换 CommonJS 的 fetch 导出。
 import undici = require("undici")
 
@@ -36,7 +38,10 @@ describe("AiGatewayModule AiGatewayProvider", () => {
     const config = {
       get: jest.fn((key: string) => values[key]),
     }
-    return new AiGatewayProvider(config as unknown as ConfigService)
+    return new AiGatewayProvider(config as unknown as ConfigService,
+      { requirePassed: jest.fn(async (_key, params) => params), beforeBusinessSubmission: jest.fn((_key, precheck) => precheck()), billingOwner: jest.fn().mockResolvedValue({ userId: 7, category: "NORMAL" }) } as never,
+      { assertContent: jest.fn(async value => value) } as never,
+      { resolveFixedVideoTier: jest.fn().mockResolvedValue({ creditsPerSec: new Decimal(1), flat: false }), assertExactCreditsAffordable: jest.fn() } as never)
   }
 
   function getGateway(provider: AiGatewayProvider): AiGatewayClient {
@@ -44,6 +49,26 @@ describe("AiGatewayModule AiGatewayProvider", () => {
     if (!gateway) throw new Error("测试未配置 AI Gateway")
     return gateway
   }
+
+  it("审核未完成时不调用报价或视频生成SDK", async () => {
+    const provider = createProvider(gatewayConfig)
+    const moderation = (provider as unknown as { moderation: { requirePassed: jest.Mock } }).moderation
+    moderation.requirePassed.mockRejectedValueOnce(new ModerationPendingException())
+    const submit = jest.spyOn(getGateway(provider).videos.withResponse, "generate")
+    const estimate = jest.spyOn(provider, "estimateVideoPrice")
+    await expect(provider.createVideoTask({ model: "model", prompt: "内容" }, "video-task:1")).rejects.toBeInstanceOf(ModerationPendingException)
+    expect(submit).not.toHaveBeenCalled()
+    expect(estimate).not.toHaveBeenCalled()
+  })
+
+  it("图片审核拒绝时不调用生成SDK", async () => {
+    const provider = createProvider(gatewayConfig)
+    const moderation = (provider as unknown as { contentModeration: { assertContent: jest.Mock } }).contentModeration
+    moderation.assertContent.mockRejectedValueOnce(new BadRequestException("未通过审核"))
+    const submit = jest.spyOn(getGateway(provider).images.withResponse, "generate")
+    await expect(provider.createImageTask({ model: "model", prompt: "内容" }, "image-task:1")).rejects.toMatchObject({ status: 400 })
+    expect(submit).not.toHaveBeenCalled()
+  })
 
   it("通过 SDK 提交视频任务并传入稳定幂等键", async () => {
     const provider = createProvider(gatewayConfig)

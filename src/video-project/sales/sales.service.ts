@@ -147,8 +147,11 @@ export class SalesService {
     const wf = await this.loadOwnedWorkflow(projectId, userId)
     let tasks = await this.loadTasks(wf.id)
 
-    // 读时对账：成片预览轮询时对 GENERATING 行顺带查网关（Gateway 回调丢失时自愈），对账后重读
-    const generating = tasks.filter(task => task.status === "GENERATING" && task.gatewayTaskId)
+    // 待审任务也由预览轮询推进；已提交任务继续按网关状态对账。
+    const generating = tasks.filter(
+      task =>
+        task.status === "WAITING_MODERATION" || (task.status === "GENERATING" && task.gatewayTaskId)
+    )
     if (generating.length) {
       await Promise.all(
         generating.map(task => this.gatewayWebhook.reconcileVideoTaskOnRead(task))

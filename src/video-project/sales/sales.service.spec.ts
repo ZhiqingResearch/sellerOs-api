@@ -68,6 +68,15 @@ describe("SalesService getWorkflow 读时对账", () => {
     expect(prisma.videoTask.findMany).toHaveBeenCalledTimes(1)
   })
 
+  it("带货预览轮询推进没有网关ID的待审任务，并返回最新状态", async () => {
+    const { service, prisma, gatewayWebhook } = setup()
+    prisma.videoTask.findMany.mockResolvedValueOnce([{ ...baseTask, status: "WAITING_MODERATION", gatewayTaskId: null }])
+      .mockResolvedValueOnce([{ ...baseTask, status: "FAILED", gatewayTaskId: null }])
+    const result = await service.getWorkflow(26, 7)
+    expect(gatewayWebhook.reconcileVideoTaskOnRead).toHaveBeenCalledWith(expect.objectContaining({ status: "WAITING_MODERATION", gatewayTaskId: null }))
+    expect(result.outputs[0].videos[0].status).toBe("FAILED")
+  })
+
   it("非本人向导拒绝访问", async () => {
     const { service, prisma, wf } = setup()
     prisma.salesWorkflow.findUnique.mockResolvedValueOnce({ ...wf, userId: 8 })

@@ -8,12 +8,11 @@ import {
   OnModuleInit,
 } from "@nestjs/common"
 import { AiModelExecMode, AiModelModality, Prisma, type VideoTask } from "@prisma/client"
-import { Decimal } from "@prisma/client/runtime/library"
 import type { MediaReference, VideoGenerationRequest } from "@zhiqingresearch/ai-ts-sdk"
 import { AiGatewayWebhookService } from "../ai-gateway/ai-gateway-webhook.service"
 import { AiGatewayProvider } from "../ai-gateway/ai-gateway.provider"
 import type { AiGatewayVideoRequestDto } from "../ai-gateway/dto/ai-gateway-model.dto"
-import { safeMultiplier } from "../common/price-multiplier.util"
+import { TaskModerationService, ModerationPendingException, moderationBusinessTimeout } from "../content-moderation/task-moderation.service"
 import { PrismaService } from "../prisma/prisma.service"
 import { UsageService } from "../usage/usage.service"
 import { fixedVideoRequestCredits, sumFixedVideoCredits } from "../usage/video-fixed-pricing"
@@ -42,7 +41,8 @@ export class VideoProjectService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly gateway: AiGatewayProvider,
     private readonly gatewayWebhook: AiGatewayWebhookService,
-    private readonly usage: UsageService
+    private readonly usage: UsageService,
+    private readonly moderation: TaskModerationService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -154,7 +154,7 @@ export class VideoProjectService implements OnModuleInit {
         projectId: id,
         source: "platform",
         project: { source: "platform" },
-        status: "GENERATING",
+        status: { in: ["GENERATING", "WAITING_MODERATION"] },
       },
     })
     if (generating > 0) throw new BadRequestException("项目存在生成中的视频，请先取消")
@@ -207,14 +207,6 @@ export class VideoProjectService implements OnModuleInit {
     )
     if (fixedCredits) {
       await this.usage.assertExactCreditsAffordable(userId, fixedCredits)
-    } else {
-      const estimate = await this.gateway.estimateVideoPrice(request)
-      await this.usage.assertGatewayAffordable(
-        userId,
-        this.gateway
-          .maximumQuoteAmount(estimate.variants)
-          .mul(safeMultiplier(model.priceMultiplier))
-      )
     }
 
     const references = this.referenceSnapshots(request)
@@ -235,7 +227,7 @@ export class VideoProjectService implements OnModuleInit {
         lastFrameUrl: this.referenceUrl(request.last_frame),
         refMaterials: references.length ? (references as Prisma.InputJsonValue) : Prisma.JsonNull,
         generationParams: request as unknown as Prisma.InputJsonValue,
-        status: "GENERATING",
+        status: "WAITING_MODERATION",
       },
     })
 
@@ -243,6 +235,7 @@ export class VideoProjectService implements OnModuleInit {
     try {
       gatewayTask = await this.gateway.createVideoTask(request, `video-task:${task.id}`)
     } catch (error) {
+      if (error instanceof ModerationPendingException) return this.findOneTask(task.id, userId)
       this.logger.error(
         `[VideoTask] Gateway 提交失败 task=${task.id}: ${error instanceof Error ? error.message : String(error)}`
       )
@@ -252,7 +245,7 @@ export class VideoProjectService implements OnModuleInit {
         return (await this.publicTasks([task]))[0]
       }
       await this.prisma.videoTask.updateMany({
-        where: { id: task.id, status: "GENERATING", deletedAt: null },
+        where: { id: task.id, status: { in: ["GENERATING", "WAITING_MODERATION"] }, deletedAt: null },
         data: {
           status: "FAILED",
           errorMessage: "AI Gateway 视频任务提交失败",
@@ -345,17 +338,6 @@ export class VideoProjectService implements OnModuleInit {
     )
     if (fixedTotal) {
       await this.usage.assertExactCreditsAffordable(userId, fixedTotal)
-    } else {
-      const estimates = await Promise.all(
-        jobs.map(job => this.gateway.estimateVideoPrice(job.request))
-      )
-      const motionMultiplier = safeMultiplier(model.priceMultiplier)
-      const estimatedAmount = estimates.reduce(
-        (sum, estimate) =>
-          sum.plus(this.gateway.maximumQuoteAmount(estimate.variants).mul(motionMultiplier)),
-        new Decimal(0)
-      )
-      await this.usage.assertGatewayAffordable(userId, estimatedAmount)
     }
 
     const tasks: VideoTask[] = []
@@ -441,6 +423,14 @@ export class VideoProjectService implements OnModuleInit {
     if (!task) throw new NotFoundException("任务不存在")
     this.ensureOwner(task.userId, userId)
 
+    if (task.moderationStatus) {
+      await this.moderation.refresh(`video-task:${taskId}`)
+      task = (await this.prisma.videoTask.findUnique({
+        where: { id: taskId, source: "platform", project: { source: "platform" } },
+        include: { project: { select: { id: true, name: true } } },
+      })) ?? task
+    }
+
     // 读时对账：轮询时顺带查网关真实状态（Gateway 回调丢失时自愈）。
     // 拿到网关权威结论（含仍在 running）时以网关为准，跳过本地墙钟超时。
     const reconciled = await this.gatewayWebhook.reconcileVideoTaskOnRead(task)
@@ -453,12 +443,12 @@ export class VideoProjectService implements OnModuleInit {
     }
 
     const timeoutBefore = new Date(Date.now() - VIDEO_TASK_TIMEOUT_MS)
-    if (!reconciled && task.status === "GENERATING" && task.createdAt <= timeoutBefore) {
+    if (!reconciled && task.status === "GENERATING" && (task.moderationPassedAt ?? task.createdAt) <= timeoutBefore) {
       await this.prisma.videoTask.updateMany({
         where: {
           id: taskId,
           status: "GENERATING",
-          createdAt: { lte: timeoutBefore },
+          ...moderationBusinessTimeout(timeoutBefore),
           deletedAt: null,
         },
         data: { status: "TIMEOUT", errorMessage: "视频生成超时" },
@@ -474,6 +464,11 @@ export class VideoProjectService implements OnModuleInit {
 
   async cancelTask(taskId: number, userId: number) {
     const task = await this.assertTaskOwned(taskId, userId)
+    if (task.status === "WAITING_MODERATION") {
+      const cancelled = await this.prisma.videoTask.updateMany({ where: { id: taskId, userId, status: "WAITING_MODERATION", deletedAt: null }, data: { status: "CANCELLED" } })
+      if (!cancelled.count) throw new BadRequestException("任务已进入提交，请刷新后重试取消")
+      return this.findOneTask(taskId, userId)
+    }
     if (task.status !== "GENERATING") throw new BadRequestException("仅运行中的任务可取消")
     if (!task.gatewayTaskId) throw new BadRequestException("任务正在提交，请稍后取消")
 
@@ -491,7 +486,7 @@ export class VideoProjectService implements OnModuleInit {
 
   async deleteTask(taskId: number, userId: number) {
     const task = await this.assertTaskOwned(taskId, userId)
-    if (task.status === "GENERATING") {
+    if (["GENERATING", "WAITING_MODERATION"].includes(task.status)) {
       throw new BadRequestException("生成中的视频不可删除，请先取消")
     }
     await this.prisma.videoTask.update({
@@ -568,7 +563,7 @@ export class VideoProjectService implements OnModuleInit {
       if (tasks.length !== ids.length) {
         throw new BadRequestException("部分视频不存在、已被移除或不属于当前项目")
       }
-      if (tasks.some(task => task.status === "GENERATING")) {
+      if (tasks.some(task => ["GENERATING", "WAITING_MODERATION"].includes(task.status))) {
         throw new BadRequestException("生成中的视频不可移除，请先取消或等待生成完成")
       }
       const removed = await tx.videoTask.updateMany({
@@ -578,7 +573,7 @@ export class VideoProjectService implements OnModuleInit {
           userId,
           source: "platform",
           project: { source: "platform" },
-          status: { not: "GENERATING" },
+          status: { notIn: ["GENERATING", "WAITING_MODERATION"] },
           deletedAt: null,
         },
         data: { deletedAt: new Date() },
@@ -618,7 +613,7 @@ export class VideoProjectService implements OnModuleInit {
           { type: "image", url: job.targetImage.url, name: job.targetImage.name },
         ],
         generationParams: request as unknown as Prisma.InputJsonValue,
-        status: "GENERATING",
+        status: "WAITING_MODERATION",
       },
     })
 
@@ -638,6 +633,9 @@ export class VideoProjectService implements OnModuleInit {
       this.logger.log(`[动作复刻] Gateway 任务已提交 task=${task.id} gatewayTask=${gatewayTask.id}`)
       return updated
     } catch (error) {
+      if (error instanceof ModerationPendingException) {
+        return (await this.prisma.videoTask.findUnique({ where: { id: task.id } })) ?? task
+      }
       this.logger.error(
         `[动作复刻] Gateway 提交失败 task=${task.id}: ${error instanceof Error ? error.message : String(error)}`
       )
@@ -647,7 +645,7 @@ export class VideoProjectService implements OnModuleInit {
         return task
       }
       await this.prisma.videoTask.updateMany({
-        where: { id: task.id, status: "GENERATING", deletedAt: null },
+        where: { id: task.id, status: { in: ["GENERATING", "WAITING_MODERATION"] }, deletedAt: null },
         data: { status: "FAILED", errorMessage: "AI Gateway 视频任务提交失败" },
       })
       return { ...task, status: "FAILED", errorMessage: "AI Gateway 视频任务提交失败" }

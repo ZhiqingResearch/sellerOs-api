@@ -1,8 +1,15 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common"
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+} from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import axios from "axios"
 import crypto from "crypto"
 import FormData from "form-data"
+import type { Readable } from "node:stream"
+import { ContentModerationService } from "../../content-moderation/content-moderation.service"
 
 const BASE_URL = "https://open.xiling.baidu.com/api/digitalhuman/open/v1"
 
@@ -70,7 +77,10 @@ export class BaiduXilingProvider {
   private readonly appId: string
   private readonly secretKey: string
 
-  constructor(private readonly config: ConfigService) {
+  constructor(
+    private readonly config: ConfigService,
+    private readonly moderation: ContentModerationService
+  ) {
     this.appId = this.config.get<string>("XILING_APP_ID", "")
     this.secretKey = this.config.get<string>("XILING_SECRET_KEY", "")
   }
@@ -92,12 +102,16 @@ export class BaiduXilingProvider {
 
   /** 上传文件到曦灵平台（音色克隆仍由后端代上传） */
   private async uploadFile(
-    fileBuffer: Buffer,
+    fileBuffer: Buffer | Readable,
     fileName: string,
-    providerType: "OPEN_CUSTOMIZATION_2D_GENERAL" | "OPEN_TTS_CLONE_LITE"
+    providerType: "OPEN_CUSTOMIZATION_2D_GENERAL" | "OPEN_TTS_CLONE_LITE",
+    knownLength?: number
   ): Promise<string> {
     const formData = new FormData()
-    formData.append("file", fileBuffer, { filename: fileName })
+    formData.append("file", fileBuffer, {
+      filename: fileName,
+      ...(knownLength !== undefined ? { knownLength } : {}),
+    })
     formData.append("providerType", providerType)
     formData.append("sourceFileName", fileName)
 
@@ -106,6 +120,7 @@ export class BaiduXilingProvider {
       message: { global: string }
       result: { fileId: string }
     }>(`${BASE_URL}/file/upload`, formData, {
+      timeout: 300_000,
       headers: {
         ...formData.getHeaders(),
         Authorization: this.generateAuth().authorization,
@@ -118,13 +133,41 @@ export class BaiduXilingProvider {
 
   // ==================== 数字人 ====================
 
-  /** 创建数字人形象（异步训练，通过 webhook 回调）。fileId 由前端直传拿到。 */
+  /** 训练文件必须来自审核后的快照，客户端fileId不能证明文件已通过。 */
   async createAvatar(params: {
-    fileId: string
+    fileId?: string
+    trainingUrl?: string
     name: string
     gender: AvatarGender
     callbackUrl: string
   }): Promise<string> {
+    if (!params.trainingUrl)
+      throw new BadRequestException({
+        code: "MODERATION_SOURCE_REQUIRED",
+        message: "创建形象需提供可审核的trainingUrl，不能仅提交fileId",
+      })
+    const checked = (await this.moderation.assertContent({
+      name: params.name,
+      trainingVideoUrl: params.trainingUrl,
+    })) as { trainingVideoUrl: string }
+    let fileId: string
+    try {
+      const response = await axios.get<Readable>(checked.trainingVideoUrl, {
+        responseType: "stream",
+        maxRedirects: 0,
+        signal: AbortSignal.timeout(300_000),
+      })
+      const extension = new URL(checked.trainingVideoUrl).pathname.split(".").pop() || "mp4"
+      const length = response.headers["content-length"]
+      fileId = await this.uploadFile(
+        response.data,
+        `training.${extension}`,
+        "OPEN_CUSTOMIZATION_2D_GENERAL",
+        typeof length === "string" && /^\d+$/.test(length) ? Number(length) : undefined
+      )
+    } catch {
+      throw new ServiceUnavailableException("数字人训练素材准备失败，请稍后重试")
+    }
     const { data } = await axios.post<{
       code: number
       message: { global: string }
@@ -136,7 +179,7 @@ export class BaiduXilingProvider {
         customizeType: "LITE_2D_GENERAL",
         gender: params.gender,
         keepBackground: true,
-        templateVideoId: params.fileId,
+        templateVideoId: fileId,
         callbackUrl: params.callbackUrl,
       },
       { headers: { Authorization: this.generateAuth().authorization } }
@@ -215,6 +258,11 @@ export class BaiduXilingProvider {
     describe?: string
     callbackUrl: string
   }): Promise<string> {
+    await this.moderation.assertFile({
+      buffer: params.audioBuffer,
+      originalname: "voice.wav",
+      mimetype: "audio/wav",
+    })
     const fileId = await this.uploadFile(
       params.audioBuffer,
       params.audioFileName,
@@ -260,6 +308,7 @@ export class BaiduXilingProvider {
     volume?: number
     pitch?: number
   }): Promise<string> {
+    await this.moderation.assertContent(params.text, "text")
     const { data } = await axios.post<{
       code: number
       message: { global: string }
