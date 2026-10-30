@@ -2,8 +2,6 @@ name: prod
 
 on:
   workflow_dispatch:
-      - release
-      - dev
 
 jobs:
   build:
