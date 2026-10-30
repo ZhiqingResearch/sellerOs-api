@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
-import { CreditBucket, CreditTxnType, InviteAppStatus, Prisma, TeamStatus } from "@prisma/client"
+import { CreditBucket, CreditTxnType, Prisma, TeamStatus } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library"
 import { PaginationDto } from "../common/dto/pagination.dto"
 import { beijingMonthStart } from "../common/utils/datetime"
@@ -304,7 +304,7 @@ export class AdminDistService {
   /**
    * 用量看板「邀请分销概览」（产品 §8 P7）：4 张汇总卡 + 分销代理明细表。
    * 汇总口径（全量累计，不分月）：inviterCount=可邀请用户数（canInvite=true）；
-   * invitedTotal=累计审批通过申请数（与名额已用同口径）；inviteeConsumed=全部被邀用户
+   * invitedTotal=实际已建号的被邀请用户数（与名额已用同口径）；inviteeConsumed=全部被邀用户
    * （invitedById != null，任意层级）的累计消耗（CONSUME+TEAM_CONSUME）；rebateTotal=累计返利入账（REBATE_IN）。
    * 明细行（按返利倒序，内存分页——分销代理量级小）：invitedCount=直接下级数；
    * inviteeConsumed=其直接下级累计消耗；rebateEarned=其累计返利入账（含二级层）。
@@ -315,7 +315,7 @@ export class AdminDistService {
     const [inviterCount, invitedTotal, inviteeConsumedAgg, rebateTotalAgg, inviters] =
       await Promise.all([
         this.prisma.user.count({ where: { canInvite: true } }),
-        this.prisma.inviteApplication.count({ where: { status: InviteAppStatus.APPROVED } }),
+        this.prisma.user.count({ where: { invitedById: { not: null } } }),
         this.prisma.creditTransaction.aggregate({
           where: {
             type: { in: [CreditTxnType.CONSUME, CreditTxnType.TEAM_CONSUME] },
@@ -678,10 +678,8 @@ export class AdminDistService {
 
     const [ruleRow, inviteQuotaUsed, level1Users] = await Promise.all([
       this.prisma.rebateRule.findFirst({ orderBy: { id: "asc" } }),
-      // 已用名额 = 已批 APPROVED 申请数（与 approve 名额校验同口径）
-      this.prisma.inviteApplication.count({
-        where: { inviterId: userId, status: InviteAppStatus.APPROVED },
-      }),
+      // 已用名额 = 实际建号的直接下级数（含手机号自助注册）
+      this.prisma.user.count({ where: { invitedById: userId } }),
       this.prisma.user.findMany({
         where: { invitedById: userId },
         orderBy: { id: "asc" },

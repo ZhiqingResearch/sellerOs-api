@@ -44,6 +44,6 @@ import { WalletService } from "./wallet.service"
     CreditExpiryTask,
     PlanActivationTask,
   ],
-  exports: [CreditService, WalletService, DefaultMemberRoleService],
+  exports: [CreditService, WalletService, DefaultMemberRoleService, InviteService],
 })
 export class MembershipModule {}

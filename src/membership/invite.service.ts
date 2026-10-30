@@ -103,12 +103,10 @@ export class InviteService {
     if (dto.rebateEnabled !== undefined) data.rebateEnabled = dto.rebateEnabled
     if (dto.level2RebateRate !== undefined) data.level2RebateRate = dto.level2RebateRate
 
-    // 名额边界（2026-09-02 bug29）：显式设置名额时仅当「上限 < 已批人数」才拒绝保存；
+    // 名额边界（2026-09-02 bug29）：显式设置名额时仅当「上限 < 已建号人数」才拒绝保存；
     // 上限=已用是合法配置（邀请码/新增入口按名额已满拦截，存量关系不受影响）
     if (dto.inviteQuota != null) {
-      const used = await this.prisma.inviteApplication.count({
-        where: { inviterId: userId, status: InviteAppStatus.APPROVED },
-      })
+      const used = await this.prisma.user.count({ where: { invitedById: userId } })
       if (dto.inviteQuota < used) {
         throw new BadRequestException(`邀请名额上限不能小于当前已用人数（当前已用 ${used} 人）`)
       }
@@ -273,10 +271,8 @@ export class InviteService {
         orderBy: { createdAt: "desc" },
         select: { id: true, username: true, email: true, phone: true, createdAt: true },
       }),
-      // 已用名额 = 已批 APPROVED 申请数（与 approve 名额校验同口径）
-      this.prisma.inviteApplication.count({
-        where: { inviterId: userId, status: InviteAppStatus.APPROVED },
-      }),
+      // 已用名额 = 实际建号的直接下级数（含手机号自助注册）
+      this.prisma.user.count({ where: { invitedById: userId } }),
       // 占用中企业管理员身份（2026-09-01 统计卡复修：其企业池消耗/剩余卷起挂到该下级所在层，
       // 与关系树/我邀请的用户列表同口径；批次带 userId=管理员，必须按 teamId 查池、个人侧剔除 teamId 行防双计）
       this.prisma.user.findMany({
@@ -770,6 +766,23 @@ export class InviteService {
     return { valid: true, inviterId: inviter.id, inviterName: inviter.username }
   }
 
+  /** 自助注册与旧审批锁同一邀请人行，名额和邀请配置在锁内重新校验；不复制组织。 */
+  async registrationInviteData(tx: Prisma.TransactionClient, code: string) {
+    await tx.$queryRaw`SELECT id FROM \`User\` WHERE inviteCode = ${code} FOR UPDATE`
+    const inviter = await this.findValidInviter(code, tx)
+    return {
+      invitedById: inviter.id,
+      discount: inviter.discount,
+      ...(inviter.subInviteAllowed
+        ? {
+            canInvite: true,
+            inviteCode: await this.generateUniqueCode(tx),
+            inviteCodeExpiresAt: new Date(Date.now() + CODE_TTL_MS),
+          }
+        : {}),
+    }
+  }
+
   /** 发送邮箱注册验证码（60s 限频）。重发即作废旧码：同一邮箱仅最新一条验证码可用。 */
   async sendEmailCode(email: string) {
     const recent = await this.prisma.emailCode.findFirst({
@@ -853,7 +866,7 @@ export class InviteService {
   // ==================== 审批（邀请人） ====================
 
   /** 审批通过：建/启用被邀请人账号（普通用户，可自助订阅/充值）、继承邀请人折扣、发放 200 注册赠送积分。
-   *  名额消费点：approve 成功计 1；邀请人 inviteQuota 非 null 且已批数量达上限 → 拒绝。 */
+   *  名额消费点：实际建号计 1；邀请人 inviteQuota 非 null 且已用数量达上限 → 拒绝。 */
   async approve(applicationId: number, inviterId: number) {
     const app = await this.prisma.inviteApplication.findFirst({
       where: { id: applicationId, inviterId },
@@ -970,12 +983,10 @@ export class InviteService {
         if (claim.count === 0) throw new BadRequestException("该申请已处理")
         // 名额校验（锁内重数，防并发超批）
         if (inviter.inviteQuota != null) {
-          const used = await tx.inviteApplication.count({
-            where: { inviterId, status: InviteAppStatus.APPROVED },
-          })
-          if (used > inviter.inviteQuota) {
+          const used = await tx.user.count({ where: { invitedById: inviterId } })
+          if (used >= inviter.inviteQuota) {
             throw new BadRequestException(
-              `邀请名额已用完（${used - 1}/${inviter.inviteQuota}），请联系平台调整`
+              `邀请名额已用完（${used}/${inviter.inviteQuota}），请联系平台调整`
             )
           }
         }
@@ -1130,8 +1141,8 @@ export class InviteService {
   }
 
   /** 取有效邀请人（邀请码存在、邀请权在库、账号未停用、名额未用尽、未过期），否则 400。 */
-  private async findValidInviter(code: string) {
-    const inviter = await this.prisma.user.findUnique({
+  private async findValidInviter(code: string, tx: Prisma.TransactionClient = this.prisma) {
+    const inviter = await tx.user.findUnique({
       where: { inviteCode: code },
       select: {
         id: true,
@@ -1140,6 +1151,8 @@ export class InviteService {
         isActive: true,
         inviteQuota: true,
         inviteCodeExpiresAt: true,
+        discount: true,
+        subInviteAllowed: true,
       },
     })
     if (
@@ -1151,12 +1164,10 @@ export class InviteService {
     ) {
       throw new BadRequestException("无效链接（邀请码不存在或已过期）")
     }
-    // 名额在入口即拦截（与 approve 锁内校验同口径：已批 APPROVED 数计占用）——
+    // 名额在入口即拦截（与 approve 锁内校验同口径：实际建号人数计占用）——
     // 不拦会产出永远无法审批的死单（用户走完验证码+注册全流程才被拒）
     if (inviter.inviteQuota != null) {
-      const used = await this.prisma.inviteApplication.count({
-        where: { inviterId: inviter.id, status: InviteAppStatus.APPROVED },
-      })
+      const used = await tx.user.count({ where: { invitedById: inviter.id } })
       if (used >= inviter.inviteQuota) {
         throw new BadRequestException("该邀请链接名额已用完，请联系邀请人")
       }

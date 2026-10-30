@@ -1,7 +1,7 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
 import { Test } from "@nestjs/testing"
-import { CreditBucket, CreditTxnType, InviteAppStatus } from "@prisma/client"
+import { CreditBucket, CreditTxnType } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library"
 import { MailProvider } from "../common/providers/mail.provider"
 import { DefaultMemberRoleService } from "../common/services/default-member-role.service"
@@ -23,7 +23,6 @@ describe("AdminDistService", () => {
     rebateRule: { findFirst: jest.Mock; upsert: jest.Mock }
     user: { findUnique: jest.Mock; findMany: jest.Mock; count: jest.Mock; groupBy: jest.Mock }
     team: { findMany: jest.Mock }
-    inviteApplication: { count: jest.Mock }
     creditTransaction: { groupBy: jest.Mock; aggregate: jest.Mock; findMany: jest.Mock }
     creditLot: { aggregate: jest.Mock; groupBy: jest.Mock }
   }
@@ -51,7 +50,7 @@ describe("AdminDistService", () => {
       perInviterCap: null,
       perConsumeCapPct: null,
     })
-    prisma.inviteApplication.count.mockResolvedValue(3)
+    prisma.user.count.mockResolvedValue(3)
   }
 
   beforeEach(async () => {
@@ -64,7 +63,6 @@ describe("AdminDistService", () => {
         groupBy: jest.fn().mockResolvedValue([]),
       },
       team: { findMany: jest.fn().mockResolvedValue([]) },
-      inviteApplication: { count: jest.fn().mockResolvedValue(0) },
       creditTransaction: {
         groupBy: jest.fn().mockResolvedValue([]),
         aggregate: jest.fn().mockResolvedValue({ _sum: { amount: new Decimal(0) } }),
@@ -538,7 +536,7 @@ describe("AdminDistService", () => {
     const mockScopeTree = (root: object) => {
       prisma.user.findUnique.mockResolvedValue(root)
       prisma.rebateRule.findFirst.mockResolvedValue(null)
-      prisma.inviteApplication.count.mockResolvedValue(0)
+      prisma.user.count.mockResolvedValue(0)
       prisma.user.findMany.mockResolvedValueOnce(level1Rows).mockResolvedValueOnce(level2Rows)
     }
 
@@ -573,7 +571,7 @@ describe("AdminDistService", () => {
         subInviteAllowed: true,
       })
       prisma.rebateRule.findFirst.mockResolvedValue(null)
-      prisma.inviteApplication.count.mockResolvedValue(0)
+      prisma.user.count.mockResolvedValue(0)
       prisma.user.findMany.mockResolvedValueOnce(opened).mockResolvedValueOnce(level2Rows)
       const res = await service.getTree({ userId: 1, page: 1, pageSize: 10, scope: "inviter" })
       expect(res.level1.map(l => l.id)).toEqual([2, 3])
@@ -850,7 +848,7 @@ describe("AdminDistService", () => {
     it("BOM + 逗号/引号转义 + 本体/一级/二级行结构（规则缺省 corpCounts=true）", async () => {
       prisma.user.findUnique.mockResolvedValue({ ...rootUser, username: 'ro"ot' })
       prisma.rebateRule.findFirst.mockResolvedValue(null)
-      prisma.inviteApplication.count.mockResolvedValue(0)
+      prisma.user.count.mockResolvedValue(0)
       prisma.user.findMany
         .mockResolvedValueOnce([
           {
@@ -896,8 +894,7 @@ describe("AdminDistService", () => {
 
   describe("getDashboard", () => {
     it("汇总卡 4 项 + 明细行（返利倒序、手机号脱敏、内存分页）", async () => {
-      prisma.user.count.mockResolvedValue(2) // inviterCount
-      prisma.inviteApplication.count.mockResolvedValue(86) // invitedTotal
+      prisma.user.count.mockResolvedValueOnce(2).mockResolvedValueOnce(86) // inviterCount / invitedTotal
       prisma.creditTransaction.aggregate
         .mockResolvedValueOnce({ _sum: { amount: new Decimal("125600") } }) // inviteeConsumed
         .mockResolvedValueOnce({ _sum: { amount: new Decimal("37680") } }) // rebateTotal
@@ -968,7 +965,6 @@ describe("AdminDistService", () => {
 
     it("无分销代理 → 明细空、不查下级与聚合", async () => {
       prisma.user.count.mockResolvedValue(0)
-      prisma.inviteApplication.count.mockResolvedValue(0)
       prisma.user.findMany.mockResolvedValue([]) // inviters 空
 
       const res = await service.getDashboard({ page: 1, pageSize: 10 })
@@ -1055,7 +1051,7 @@ describe("InviteService.getMyInvite（分销扩展字段）", () => {
   let inviteService: InviteService
   let prisma: {
     user: { findUnique: jest.Mock; count: jest.Mock; findMany: jest.Mock }
-    inviteApplication: { findMany: jest.Mock; count: jest.Mock }
+    inviteApplication: { findMany: jest.Mock }
     creditTransaction: { aggregate: jest.Mock }
     creditLot: { aggregate: jest.Mock; groupBy: jest.Mock }
     rebateRule: { findFirst: jest.Mock }
@@ -1069,7 +1065,7 @@ describe("InviteService.getMyInvite（分销扩展字段）", () => {
         findMany: jest.fn().mockResolvedValue([]),
         groupBy: jest.fn().mockResolvedValue([]),
       },
-      inviteApplication: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn() },
+      inviteApplication: { findMany: jest.fn().mockResolvedValue([]) },
       creditTransaction: {
         aggregate: jest.fn().mockResolvedValue({ _sum: { amount: new Decimal(0) } }),
       },
@@ -1106,7 +1102,7 @@ describe("InviteService.getMyInvite（分销扩展字段）", () => {
       rebateRate: new Decimal("0.3"),
       level2RebateRate: null, // → 默认 0.10
     })
-    prisma.inviteApplication.count.mockResolvedValue(4)
+    prisma.user.count.mockResolvedValue(4)
     prisma.user.findMany
       .mockResolvedValueOnce([
         { id: 11, corpPassUp: null, teamMemberships: [] },
@@ -1148,9 +1144,9 @@ describe("InviteService.getMyInvite（分销扩展字段）", () => {
       estimatedRebate: "90",
       corpPoolRemainingExcluded: "0",
     })
-    // 名额口径 = 已批 APPROVED 申请数
-    expect(prisma.inviteApplication.count).toHaveBeenCalledWith({
-      where: { inviterId: 1, status: InviteAppStatus.APPROVED },
+    // 名额口径 = 实际已建号人数，包含无需审核的手机号注册
+    expect(prisma.user.count).toHaveBeenCalledWith({
+      where: { invitedById: 1 },
     })
   })
 
@@ -1165,7 +1161,7 @@ describe("InviteService.getMyInvite（分销扩展字段）", () => {
       rebateRate: new Decimal("0.3"),
       level2RebateRate: null,
     })
-    prisma.inviteApplication.count.mockResolvedValue(0)
+    prisma.user.count.mockResolvedValue(0)
     // user.findMany 默认 []（一级/二级都空）
 
     const res = await inviteService.getMyInvite(1)
@@ -1195,7 +1191,7 @@ describe("InviteService.getMyInvite（分销扩展字段）", () => {
       rebateRate: new Decimal("0.3"),
       level2RebateRate: null, // → 默认 0.10
     })
-    prisma.inviteApplication.count.mockResolvedValue(0)
+    prisma.user.count.mockResolvedValue(0)
     prisma.user.findMany
       .mockResolvedValueOnce([
         // 一级：11=企业41管理员（corpPassUp 未设 → 随全局 true，池计返利）；12=企业42管理员（逐人关，池不计返利）

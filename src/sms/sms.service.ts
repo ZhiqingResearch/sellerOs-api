@@ -1,6 +1,7 @@
 import Core from "@alicloud/pop-core"
 import { BadRequestException, Injectable, Logger } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"
+import { Prisma } from "@prisma/client"
 import { randomInt } from "node:crypto"
 import { PrismaService } from "../prisma/prisma.service"
 
@@ -104,8 +105,12 @@ export class SmsService {
     }
   }
 
-  async verifyCode(phone: string, code: string): Promise<boolean> {
-    const record = await this.prisma.smsCode.findFirst({
+  async verifyCode(
+    phone: string,
+    code: string,
+    tx: Prisma.TransactionClient = this.prisma
+  ): Promise<boolean> {
+    const record = await tx.smsCode.findFirst({
       where: {
         phone,
       },
@@ -117,14 +122,14 @@ export class SmsService {
     }
 
     if (record.code !== code) {
-      await this.prisma.smsCode.updateMany({
+      await tx.smsCode.updateMany({
         where: { id: record.id, used: false, attempts: { lt: 5 } },
         data: { attempts: { increment: 1 } },
       })
       return false
     }
 
-    const result = await this.prisma.smsCode.updateMany({
+    const result = await tx.smsCode.updateMany({
       where: { id: record.id, used: false, attempts: { lt: 5 }, expiredAt: { gt: new Date() } },
       data: { used: true },
     })
