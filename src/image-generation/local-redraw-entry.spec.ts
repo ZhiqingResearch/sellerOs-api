@@ -90,11 +90,11 @@ describe("统一重绘入口", () => {
         projectId: "41",
         mode: "image-creation",
         editMode: "local-redraw",
-        provider: "ZQ-Image-2",
         count: 1,
         prompt,
         mainImageUrls: urls,
       })
+      expect(form).not.toHaveProperty("provider")
       expect(i2i.create).not.toHaveBeenCalled()
     }
   )
@@ -180,9 +180,9 @@ describe("统一重绘入口", () => {
     expect(JSON.parse(input.form as string)).toMatchObject({
       mode: "normal",
       editMode: "local-redraw",
-      provider: "ZQ-Image-2",
       count: 1,
     })
+    expect(JSON.parse(input.form as string)).not.toHaveProperty("provider")
     expect(input.files).toEqual({ main: [original], refs: [annotated] })
     expect([uid, source]).toEqual([7, "platform"])
     expect(generate.create).not.toHaveBeenCalled()

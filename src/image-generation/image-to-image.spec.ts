@@ -29,7 +29,7 @@ import {
 import { IMAGE_PROVIDER_FACTORY } from "./providers/provider-factory.token";
 
 const mockPrisma = () => ({
-  aiGatewayModel: { findUnique: jest.fn().mockResolvedValue({
+  aiGatewayModel: { findFirst: jest.fn().mockResolvedValue({
     publicId: "ZQ-Image-2", modality: "IMAGE", enabled: true, gatewayActive: true,
     gatewayConfig: { detail: { facts: { modes: ["edit"], max_reference_images: 10,
       size_capability: { min_pixels: 1048576, max_pixels: 1572864, ratio_min: 0.6667, ratio_max: 1.5 } } } },

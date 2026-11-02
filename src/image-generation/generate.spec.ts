@@ -45,7 +45,7 @@ import { IMAGE_PROVIDER_FACTORY } from "./providers/provider-factory.token";
 // ─── mocks ──────────────────────────────────────────────────────────────────
 
 interface MockPrisma {
-  aiGatewayModel: { findUnique: jest.Mock };
+  aiGatewayModel: { findFirst: jest.Mock };
   imageProject: { findUnique: jest.Mock }
   generationTask: {
     findUnique: jest.Mock;
@@ -65,7 +65,7 @@ interface MockPrisma {
 
 function mockPrisma(): MockPrisma {
   const prisma: MockPrisma = {
-    aiGatewayModel: { findUnique: jest.fn().mockResolvedValue({
+    aiGatewayModel: { findFirst: jest.fn().mockResolvedValue({
       publicId: "ZQ-Image-2", enabled: true, gatewayActive: true, modality: "IMAGE",
       gatewayConfig: { detail: { facts: { modes: ["edit"], max_reference_images: 10,
         size_capability: { min_pixels: 1048576, max_pixels: 1572864, ratio_min: 0.6667, ratio_max: 1.5 } } } },
@@ -715,7 +715,7 @@ describe("generate create (prompt compilation + task payload)", () => {
 
   it("未初始化重绘模型时明确报错，不创建任务或回退前端模型", async () => {
     const prisma = mockPrisma()
-    prisma.aiGatewayModel.findUnique.mockResolvedValue(null)
+    prisma.aiGatewayModel.findFirst.mockResolvedValue(null)
     const imageProject = { createTask: jest.fn() }
     const { generate } = await makeServices({ prisma, imageProject })
     const result = await generate.create({ form: makeCreationForm({ editMode: "local-redraw", provider: undefined, aspectRatio: undefined,

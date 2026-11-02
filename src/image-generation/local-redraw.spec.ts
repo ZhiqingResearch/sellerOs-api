@@ -55,7 +55,7 @@ const plan: LocalRedrawPlan = {
 }
 
 describe("共享局部重绘规则", () => {
-  const db = () => ({ aiGatewayModel: { findUnique: jest.fn().mockResolvedValue(model()) } })
+  const db = () => ({ aiGatewayModel: { findFirst: jest.fn().mockResolvedValue(model()) } })
   const gateway = () => ({ fetchModelSnapshot: jest.fn().mockResolvedValue({
     detail: { modality: "image", facts: {} },
     requestSchema: { request_schema: { type: "object" } },
@@ -96,10 +96,23 @@ describe("共享局部重绘规则", () => {
   it("没有旧数值尺寸配置时仍可按网关原生能力生成", async () => {
     const prisma = db(), configured = model()
     delete (configured.gatewayConfig.detail.facts as { size_capability?: unknown }).size_capability
-    prisma.aiGatewayModel.findUnique.mockResolvedValue(configured)
+    prisma.aiGatewayModel.findFirst.mockResolvedValue(configured)
     const original = await image(1920, 1080)
     expect(await prepareLocalRedraw(prisma as never, [original, original], nativeGateway() as never, "移动文字"))
       .toMatchObject({ providerApplied: { aspect_ratio: "1920:1080", resolution: "2k" } })
+  })
+
+  it("按分类读取启用模型，不固定模型名称", async () => {
+    const prisma = db(), selected = { ...model(), publicId: "configured-redraw-model" }
+    prisma.aiGatewayModel.findFirst.mockResolvedValue(selected)
+    const original = await image(1920, 1080), gw = nativeGateway()
+    const result = await prepareLocalRedraw(prisma as never, [original, original], gw as never, "改色")
+    expect(result.provider).toBe(selected.publicId)
+    expect(prisma.aiGatewayModel.findFirst).toHaveBeenCalledWith({
+      where: { category: "LOCAL_REDRAW", modality: "IMAGE", enabled: true, gatewayActive: true },
+      orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
+    })
+    expect(gw.fetchModelSnapshot).toHaveBeenCalledWith(selected.publicId, "images.generations")
   })
 
   it("实时能力读取失败时不按旧配置猜测原生支持", async () => {
@@ -131,7 +144,7 @@ describe("共享局部重绘规则", () => {
 
   it("模型缺失或停用时不回退到前端模型", async () => {
     const prisma = db()
-    prisma.aiGatewayModel.findUnique.mockResolvedValue(null)
+    prisma.aiGatewayModel.findFirst.mockResolvedValue(null)
     await expect(prepare(prisma, [Buffer.from("bad"), Buffer.from("bad")])).rejects.toBeInstanceOf(
       ServiceUnavailableException
     )
@@ -149,9 +162,9 @@ describe("共享局部重绘规则", () => {
     expect(await sharp(bytes).metadata()).toMatchObject({ width: 90, height: 30 })
   })
 
-  it("初始化复制 ZQ-Image-2 配置和定价，重复初始化不覆盖已有值", async () => {
+  it("初始化复制目录模型配置和定价，重复初始化不覆盖已有值", async () => {
     const registry = {
-      findUnique: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(model()),
+      findFirst: jest.fn().mockResolvedValueOnce(null).mockResolvedValueOnce(model()),
       upsert: jest.fn(),
     }
     await expect(seedLocalRedrawModel({ aiGatewayModel: registry } as never)).resolves.toEqual({
@@ -161,14 +174,14 @@ describe("共享局部重绘规则", () => {
       expect.objectContaining({
         update: {},
         create: expect.objectContaining({
-          publicId: "ZQ-Image-2",
+          publicId: model().publicId,
           category: "LOCAL_REDRAW",
           fixedCredits: "10",
           priceMultiplier: "3",
         }),
       })
     )
-    registry.findUnique.mockResolvedValue(model())
+    registry.findFirst.mockResolvedValue(model())
     await expect(seedLocalRedrawModel({ aiGatewayModel: registry } as never)).resolves.toEqual({
       created: false,
     })
@@ -240,7 +253,17 @@ describe("局部重绘网关请求和交付", () => {
     expect(upload).not.toHaveBeenCalled()
   })
 
-  it("固定模型不一致时提交前拒绝", async () => {
+  it("使用任务冻结的目录模型提交，不限制模型名称", async () => {
+    const gw = gateway(), selected = "configured-redraw-model", bytes = await image(1536, 1024)
+    global.fetch = jest.fn().mockResolvedValue({ ok: true, arrayBuffer: async () => Uint8Array.from(bytes).buffer })
+    jest.spyOn(storage, "uploadBytesToSpaces").mockResolvedValue("https://cdn.example/final.png")
+    await expect(createGatewayImageProvider(gw as unknown as AiGatewayProvider, selected).generate({
+      ...input(), localRedraw: { ...plan, provider: selected },
+    })).resolves.toMatchObject({ url: "https://cdn.example/final.png" })
+    expect(gw.createImageTask).toHaveBeenCalledWith(expect.objectContaining({ model: selected }), expect.any(String))
+  })
+
+  it("快照模型不一致时提交前拒绝", async () => {
     const gw = gateway()
     await expect(
       createGatewayImageProvider(gw as unknown as AiGatewayProvider, "ZQ-Image-3").generate(input())
@@ -257,7 +280,7 @@ describe("局部重绘使用统一意图和比例交付", () => {
         aspect_ratio: { enum: ["1:1"] }, resolution: { enum: ["1k"] },
       } } },
     }) }
-    const result = await prepareLocalRedraw({ aiGatewayModel: { findUnique: jest.fn().mockResolvedValue(model()) } } as never,
+    const result = await prepareLocalRedraw({ aiGatewayModel: { findFirst: jest.fn().mockResolvedValue(model()) } } as never,
       [bytes, bytes], gateway as never, "改色", "4K")
     expect(result).toMatchObject({ resolutionTier: "4K", providerApplied: { aspect_ratio: "800:600", resolution: "4k" } })
   })

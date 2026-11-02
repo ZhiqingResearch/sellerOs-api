@@ -7,7 +7,6 @@ import { PrismaService } from "../prisma/prisma.service"
 import { imageMetadata } from "../common/utils/generation-metadata"
 import {
   LOCAL_REDRAW_CATEGORY,
-  LOCAL_REDRAW_MODEL,
   LocalRedrawPlan,
 } from "./local-redraw.constants"
 
@@ -46,8 +45,9 @@ export async function prepareLocalRedraw(
   sourceTier?: LocalRedrawPlan["resolutionTier"]
 ): Promise<LocalRedrawPlan> {
   if (references.length < 2) throw new BadRequestException("局部重绘必须提供原图和标注图")
-  const model = await prisma.aiGatewayModel.findUnique({
-    where: { publicId_category: { publicId: LOCAL_REDRAW_MODEL, category: LOCAL_REDRAW_CATEGORY } },
+  const model = await prisma.aiGatewayModel.findFirst({
+    where: { category: LOCAL_REDRAW_CATEGORY, modality: "IMAGE", enabled: true, gatewayActive: true },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   })
   if (!model?.enabled || !model.gatewayActive || model.modality !== "IMAGE") {
     throw new ServiceUnavailableException("局部重绘模型未就绪，请初始化 LOCAL_REDRAW 模型配置")

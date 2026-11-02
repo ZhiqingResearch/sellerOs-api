@@ -29,7 +29,6 @@ import {
 } from "../core/retry-utils";
 import { uploadBytesToSpaces, uploadRemoteUrlToSpaces } from "../core/storage"
 import { finalizeLocalRedraw } from "../local-redraw"
-import { LOCAL_REDRAW_MODEL } from "../local-redraw.constants"
 import type { ImageProvider, ProviderGenerateInput, ProviderGenerateResult } from "../core/types";
 import {
   normalizeGatewayArtifact,
@@ -256,8 +255,8 @@ export function createGatewayImageProvider(
   return {
     id: modelId,
     async generate(input: ProviderGenerateInput): Promise<ProviderGenerateResult> {
-      if (input.localRedraw && (modelId !== LOCAL_REDRAW_MODEL || modelId !== input.localRedraw.provider)) {
-        throw new RelayError("permanent_validation", "局部重绘模型配置不一致", "局部重绘必须使用冻结的 ZQ-Image-2 模型")
+      if (input.localRedraw && modelId !== input.localRedraw.provider) {
+        throw new RelayError("permanent_validation", "局部重绘模型配置不一致", "局部重绘必须使用任务快照中冻结的模型")
       }
       const sizing = input.localRedraw
         ? {
