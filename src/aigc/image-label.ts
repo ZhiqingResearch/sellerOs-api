@@ -88,16 +88,7 @@ export async function labelImage(buffer: Buffer, id = contentId(buffer)) {
   const metadata = aigcMetadata(id, original)
   const json = JSON.stringify(metadata)
   const xmp = `<x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:aigc="urn:selleros:aigc:1.0/"><aigc:AIGC>${xmlEscape(json)}</aigc:AIGC></rdf:Description></rdf:RDF></x:xmpmeta>`
-  const badge = await watermarkBadge(width, height)
-  let image = sharp(buffer, { limitInputPixels: false })
-    .rotate()
-    .composite([
-      {
-        input: badge.buffer,
-        left: width - badge.width - badge.margin,
-        top: height - badge.height - badge.margin,
-      },
-    ])
+  let image = sharp(buffer, { limitInputPixels: false }).rotate()
   if (meta.format !== "png") image = image.withXmp(xmp)
   if (meta.format === "jpeg") image = image.jpeg({ quality: 95, chromaSubsampling: "4:4:4" })
   else if (meta.format === "webp") image = image.webp({ quality: 95 })
