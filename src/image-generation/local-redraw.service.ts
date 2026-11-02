@@ -4,7 +4,6 @@ import type { CreationSource } from "../common/types/creation-source"
 import { PrismaService } from "../prisma/prisma.service"
 import { GenerateService, type GenerateUploadFile } from "./generate.service"
 import { ImageToImageService } from "./image-to-image.service"
-import { LOCAL_REDRAW_MODEL } from "./local-redraw.constants"
 import { LocalRedrawForm } from "./local-redraw.dto"
 import { sourceImageResolutionTier } from "./local-redraw"
 import type { LocalRedrawPlan } from "./local-redraw.constants"
@@ -56,7 +55,7 @@ export class LocalRedrawService {
         portrait = {
           promptConfig: {
             ...config,
-            localRedraw: { sourceImageId: image.id, provider: LOCAL_REDRAW_MODEL },
+            localRedraw: { sourceImageId: image.id },
           } as Prisma.InputJsonObject,
           ...(image.task.viewConfig !== null
             ? { viewConfig: image.task.viewConfig as Prisma.InputJsonValue }
@@ -104,7 +103,6 @@ export class LocalRedrawService {
           form: JSON.stringify({
             mode: "image-creation",
             editMode: "local-redraw",
-            provider: LOCAL_REDRAW_MODEL,
             projectId: String(projectId),
             prompt: form.prompt,
             count: form.count ?? 1,
@@ -136,7 +134,6 @@ export class LocalRedrawService {
         form: JSON.stringify({
           mode: "normal",
           editMode: "local-redraw",
-          provider: LOCAL_REDRAW_MODEL,
           prompt: form.prompt,
           count: form.count ?? 1,
         }),

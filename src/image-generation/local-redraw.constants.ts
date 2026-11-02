@@ -1,5 +1,4 @@
 export const LOCAL_REDRAW_CATEGORY = "LOCAL_REDRAW"
-export const LOCAL_REDRAW_MODEL = "ZQ-Image-2"
 
 export type LocalRedrawPlan = {
   provider: string

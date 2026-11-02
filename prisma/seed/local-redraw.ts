@@ -1,20 +1,18 @@
 import { PrismaClient } from "@prisma/client"
-import {
-  LOCAL_REDRAW_CATEGORY,
-  LOCAL_REDRAW_MODEL,
-} from "../../src/image-generation/local-redraw.constants"
+import { LOCAL_REDRAW_CATEGORY } from "../../src/image-generation/local-redraw.constants"
 
 /** 仅初始化局部重绘分类；不修改通用生图配置或覆盖已有局部重绘定价。 */
 export async function seedLocalRedrawModel(prisma: PrismaClient) {
-  const key = { publicId: LOCAL_REDRAW_MODEL, category: LOCAL_REDRAW_CATEGORY }
-  const existing = await prisma.aiGatewayModel.findUnique({ where: { publicId_category: key } })
+  const existing = await prisma.aiGatewayModel.findFirst({ where: { category: LOCAL_REDRAW_CATEGORY } })
   if (existing) return { created: false }
-  const source = await prisma.aiGatewayModel.findUnique({
-    where: { publicId_category: { publicId: LOCAL_REDRAW_MODEL, category: "IMAGE_GENERATION" } },
+  const source = await prisma.aiGatewayModel.findFirst({
+    where: { category: "IMAGE_GENERATION", modality: "IMAGE", enabled: true, gatewayActive: true },
+    orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
   })
   if (!source?.enabled || !source.gatewayActive || source.modality !== "IMAGE") {
-    throw new Error("请先上架 IMAGE_GENERATION 分类的 ZQ-Image-2 并同步网关能力")
+    throw new Error("请先上架 IMAGE_GENERATION 分类的可用图片模型并同步网关能力")
   }
+  const key = { publicId: source.publicId, category: LOCAL_REDRAW_CATEGORY }
   await prisma.aiGatewayModel.upsert({
     where: { publicId_category: key },
     update: {},
