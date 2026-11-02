@@ -12,9 +12,8 @@ const contextOf = (body: unknown) =>
 
 describe("指定业务的国产模型校验", () => {
   const findFirst = jest.fn()
-  const findMany = jest.fn()
   const models = new DomesticBusinessModels({
-    aiGatewayModel: { findFirst, findMany },
+    aiGatewayModel: { findFirst },
   } as unknown as PrismaService)
   const guard = new DomesticBusinessModelGuard(models)
   beforeEach(() => {
@@ -22,19 +21,22 @@ describe("指定业务的国产模型校验", () => {
     findFirst.mockResolvedValue({ publicId: "qwen3.8-max" })
   })
 
-  it.each(["qwen3.8-max", "MiniMax-M3"])("按 TEXT 分类和双启用标志校验 %s", async model => {
-    await models.assertEnabled(model)
-    expect(findFirst).toHaveBeenCalledWith({
-      where: {
-        publicId: model,
-        category: "TEXT",
-        modality: "TEXT",
-        enabled: true,
-        gatewayActive: true,
-      },
-      select: { publicId: true },
-    })
-  })
+  it.each(["qwen3.8-max", "MiniMax-M3"])(
+    "按 SELLER_BUSINESS 分类和双启用标志校验 %s",
+    async model => {
+      await models.assertEnabled(model)
+      expect(findFirst).toHaveBeenCalledWith({
+        where: {
+          publicId: model,
+          category: "SELLER_BUSINESS",
+          modality: "TEXT",
+          enabled: true,
+          gatewayActive: true,
+        },
+        select: { publicId: true },
+      })
+    }
+  )
   it.each([undefined, null, "", "ZQ-Think-Flash", "gpt-6.1-sol", "qwen3.8-max "])(
     "拒绝遗漏及白名单外模型 %s",
     async model => {
@@ -45,23 +47,6 @@ describe("指定业务的国产模型校验", () => {
   it("已停用、网关不可用或只在其他分类上架均拒绝", async () => {
     findFirst.mockResolvedValue(null)
     await expect(models.assertEnabled("MiniMax-M3")).rejects.toThrow("未启用或当前不可用")
-  })
-  it("目录查询也限制为同一白名单和 TEXT 分类", async () => {
-    findMany.mockResolvedValue([{ publicId: "MiniMax-M3", displayName: "MiniMax-M3" }])
-    expect(await models.findAll()).toEqual({
-      items: [{ publicId: "MiniMax-M3", displayName: "MiniMax-M3" }],
-    })
-    expect(findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: {
-          publicId: { in: ["qwen3.8-max", "MiniMax-M3"] },
-          category: "TEXT",
-          modality: "TEXT",
-          enabled: true,
-          gatewayActive: true,
-        },
-      })
-    )
   })
   it.each(["model", "main", "longTitle", "autoScore"])("拒绝 %s 中的不可用模型", async key => {
     const body =

@@ -1,6 +1,9 @@
 import { ValidationPipe, type ExecutionContext, type INestApplication } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import request from "supertest"
+import { AiGatewayModelController } from "../../ai-gateway/ai-gateway-model.controller"
+import { AiGatewayModelService } from "../../ai-gateway/ai-gateway-model.service"
+import { AiGatewayProvider } from "../../ai-gateway/ai-gateway.provider"
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard"
 import { PermissionsGuard } from "../../auth/guards/permissions.guard"
 import { CompetitorAnalysisController } from "../../competitor-analysis/competitor-analysis.controller"
@@ -16,8 +19,8 @@ import { ListingController } from "../../listing/listing.controller"
 import { PrismaService } from "../../prisma/prisma.service"
 import { PromotionPlanAiController } from "../../promotion-plan/promotion-plan-ai.controller"
 import { SmartPricingAiController } from "../../smart-pricing/smart-pricing-ai.controller"
+import { UsageService } from "../../usage/usage.service"
 import { BusinessAiService } from "./business-ai.service"
-import { DomesticBusinessModelController } from "./domestic-business-model.controller"
 import { DomesticBusinessModels } from "./domestic-business-models"
 
 const runId = "832c13ca-7715-4515-b17a-236fab52a9ba"
@@ -58,10 +61,13 @@ describe("国产模型实际 HTTP 入口校验", () => {
         CompetitorAnalysisController,
         PromotionPlanAiController,
         SmartPricingAiController,
-        DomesticBusinessModelController,
+        AiGatewayModelController,
       ],
       providers: [
         DomesticBusinessModels,
+        AiGatewayModelService,
+        { provide: AiGatewayProvider, useValue: {} },
+        { provide: UsageService, useValue: {} },
         { provide: PrismaService, useValue: { aiGatewayModel: { findFirst, findMany } } },
         { provide: ListingAiService, useValue: { complete: invoke, stream } },
         { provide: ListingScoreService, useValue: { complete: invoke, stream } },
@@ -150,7 +156,19 @@ describe("国产模型实际 HTTP 入口校验", () => {
       { publicId: "MiniMax-M3", displayName: "MiniMax" },
     ]
     findMany.mockResolvedValue(items)
-    const response = await request(app.getHttpServer()).get("/api/business-ai/models").expect(200)
-    expect(response.body).toEqual({ items })
+    const response = await request(app.getHttpServer())
+      .get("/api/ai-models?modality=TEXT&category=SELLER_BUSINESS")
+      .expect(200)
+    expect(response.body.items).toMatchObject(items)
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          modality: "TEXT",
+          category: "SELLER_BUSINESS",
+          enabled: true,
+          gatewayActive: true,
+        },
+      })
+    )
   })
 })

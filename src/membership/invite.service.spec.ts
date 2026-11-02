@@ -203,8 +203,80 @@ describe("InviteService", () => {
         inviteQuota: 2,
         inviteCodeExpiresAt: future(),
       })
-      prisma.inviteApplication.count.mockResolvedValue(2) // 已批 2/2
+      prisma.user.count.mockResolvedValue(2) // 已建号 2/2，含自助注册
       await expect(service.verifyInviteCode("OS1234")).rejects.toThrow("名额已用完")
+    })
+  })
+
+  describe("registrationInviteData", () => {
+    const inviter = () => ({
+      id: 7,
+      username: "邀请人",
+      canInvite: true,
+      isActive: true,
+      inviteCodeExpiresAt: future(),
+      inviteQuota: 2,
+      discount: new Decimal("0.8"),
+      subInviteAllowed: false,
+    })
+
+    it("先锁邀请人，再校验实际已建号人数，只返回邀请关系和折扣", async () => {
+      prisma.user.findUnique.mockResolvedValue(inviter())
+      prisma.user.count.mockResolvedValue(1)
+      const data = await service.registrationInviteData(
+        prisma as unknown as Prisma.TransactionClient,
+        "OS1234"
+      )
+      expect(data).toEqual({ invitedById: 7, discount: new Decimal("0.8") })
+      const [query, code] = callArgs<[TemplateStringsArray, string]>(prisma.$queryRaw, 0)
+      expect(query.join("?")).toBe("SELECT id FROM `User` WHERE inviteCode = ? FOR UPDATE")
+      expect(code).toBe("OS1234")
+      expect(prisma.$queryRaw.mock.invocationCallOrder[0]).toBeLessThan(
+        prisma.user.findUnique.mock.invocationCallOrder[0]
+      )
+      expect(prisma.user.count).toHaveBeenCalledWith({ where: { invitedById: 7 } })
+      expect(prisma.inviteApplication.count).not.toHaveBeenCalled()
+      expect(prisma.userOrganization.createMany).not.toHaveBeenCalled()
+    })
+
+    it("下级可继续邀请开启时，赋予邀请权及7天邀请码", async () => {
+      prisma.user.findUnique
+        .mockResolvedValueOnce({ ...inviter(), subInviteAllowed: true })
+        .mockResolvedValueOnce(null)
+      const data = await service.registrationInviteData(
+        prisma as unknown as Prisma.TransactionClient,
+        "OS1234"
+      )
+      expect(data).toMatchObject({
+        invitedById: 7,
+        canInvite: true,
+        inviteCode: expect.stringMatching(/^OS[A-Z2-9]{4}$/) as string,
+        inviteCodeExpiresAt: expect.any(Date) as Date,
+      })
+      expect(data.inviteCodeExpiresAt!.getTime() - Date.now()).toBeGreaterThan(7 * 86400000 - 5000)
+    })
+
+    it.each([
+      null,
+      { canInvite: false },
+      { isActive: false },
+      { inviteCodeExpiresAt: new Date(0) },
+    ])("无效邀请人 %j 不允许绑定", async invalid => {
+      prisma.user.findUnique.mockResolvedValue(
+        invalid === null ? null : { ...inviter(), ...invalid }
+      )
+      await expect(
+        service.registrationInviteData(prisma as unknown as Prisma.TransactionClient, "OS1234")
+      ).rejects.toThrow("无效链接")
+    })
+
+    it("实际建号已满时拦截，即使没有审核通过的申请记录", async () => {
+      prisma.user.findUnique.mockResolvedValue(inviter())
+      prisma.user.count.mockResolvedValue(2)
+      await expect(
+        service.registrationInviteData(prisma as unknown as Prisma.TransactionClient, "OS1234")
+      ).rejects.toThrow("名额已用完")
+      expect(prisma.inviteApplication.count).not.toHaveBeenCalled()
     })
   })
 
@@ -478,10 +550,25 @@ describe("InviteService", () => {
           roles: [],
           orgs: [],
         })
-      prisma.inviteApplication.count.mockResolvedValue(6) // 已批 5/5 + 本次原子认领 = 6 > 5
+      prisma.user.count.mockResolvedValue(5) // 已建号 5/5，不含尚未建号的本次申请
 
       await expect(service.approve(99, 1)).rejects.toThrow("名额已用完")
       expect(prisma.user.create).not.toHaveBeenCalled()
+    })
+
+    it("旧审批在实际已用人数小于上限时允许占最后一个名额", async () => {
+      prisma.inviteApplication.findFirst.mockResolvedValue(pendingApp)
+      prisma.user.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({
+        canInvite: true,
+        discount: new Decimal("0.8"),
+        inviteQuota: 5,
+        orgs: [],
+      })
+      prisma.user.count.mockResolvedValue(4)
+      prisma.user.create.mockResolvedValue({ id: 50 })
+      await expect(service.approve(99, 1)).resolves.toMatchObject({ userId: 50 })
+      expect(prisma.user.count).toHaveBeenCalledWith({ where: { invitedById: 1 } })
+      expect(prisma.inviteApplication.count).not.toHaveBeenCalled()
     })
 
     it("邀请人已被关闭邀请权限 → 403，不建账号", async () => {
@@ -999,7 +1086,7 @@ describe("InviteService", () => {
     })
 
     it("名额边界（2026-09-02 bug29）：上限=已用允许保存（不再误报「名额已用尽」）；上限<已用才 400", async () => {
-      // ① 上限 3 < 已批 4 → 400，且不写库
+      // ① 上限 3 < 已建号 4 → 400，且不写库
       prisma.user.findUnique.mockResolvedValue({
         id: 1,
         canInvite: true,
@@ -1007,13 +1094,13 @@ describe("InviteService", () => {
         subscriptionTier: null,
         inviteQuota: null,
       })
-      prisma.inviteApplication.count.mockResolvedValue(4)
+      prisma.user.count.mockResolvedValue(4)
       await expect(service.setInviteConfig(1, { inviteQuota: 3 })).rejects.toThrow(
         "邀请名额上限不能小于当前已用人数"
       )
       expect(prisma.user.update).not.toHaveBeenCalled()
 
-      // ② 上限 3 = 已批 3 → 保存成功（已开邀请状态下仅改配置；新增邀请由 verify/register 入口拦截）
+      // ② 上限 3 = 已建号 3 → 保存成功（已开邀请状态下仅改配置；新增邀请由 verify/register 入口拦截）
       prisma.user.findUnique
         .mockResolvedValueOnce({
           id: 1,
@@ -1023,7 +1110,7 @@ describe("InviteService", () => {
           inviteQuota: 3,
         })
         .mockResolvedValueOnce({ canInvite: true, membershipLevel: MembershipLevel.NONE }) // getInviteOverview
-      prisma.inviteApplication.count.mockResolvedValue(3)
+      prisma.user.count.mockResolvedValue(3)
       await service.setInviteConfig(1, { inviteQuota: 3 })
       const updateArg = (
         prisma.user.update.mock.calls as unknown as Array<
