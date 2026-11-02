@@ -37,7 +37,7 @@ const nativeTools =
     await rm(directory, { recursive: true, force: true })
   })
 
-  it("首尾画面都有像素水印，MP4元数据可回读，音频、尺寸和时长保留", async () => {
+  it("不添加像素水印，MP4元数据可回读，音频、尺寸和时长保留", async () => {
     const result = await labelVideo(source, directory, "video-test")
     const probe = await probeVideo(result.path)
     expect(probe.streams.find(item => item.codec_type === "video")).toMatchObject({
@@ -51,28 +51,33 @@ const nativeTools =
       Label: "1",
       PropagateID: "video-test",
     })
-    for (const time of [0, 2.5]) {
-      const png = execFileSync("ffmpeg", [
-        "-v",
-        "error",
-        "-ss",
-        String(time),
-        "-i",
-        result.path,
-        "-frames:v",
-        "1",
-        "-f",
-        "image2pipe",
-        "-vcodec",
-        "png",
-        "pipe:1",
-      ])
-      const corner = await sharp(png)
-        .extract({ left: 305, top: 222, width: 1, height: 1 })
+    const frame = async (path: string, time: number) =>
+      sharp(
+        execFileSync("ffmpeg", [
+          "-v",
+          "error",
+          "-ss",
+          String(time),
+          "-i",
+          path,
+          "-frames:v",
+          "1",
+          "-f",
+          "image2pipe",
+          "-vcodec",
+          "png",
+          "pipe:1",
+        ])
+      )
         .removeAlpha()
         .raw()
         .toBuffer()
-      expect(corner[2]).toBeLessThan(230)
+    for (const time of [0, 1.5, 2.5]) {
+      const before = await frame(source, time)
+      const after = await frame(result.path, time)
+      expect(after.length).toBe(before.length)
+      // 视频重新编码允许轻微色差，但整幅画面都不应出现水印像素。
+      expect(after.every((value, index) => Math.abs(value - before[index]) <= 2)).toBe(true)
     }
   })
 
