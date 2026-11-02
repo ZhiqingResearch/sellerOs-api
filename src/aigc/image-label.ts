@@ -1,6 +1,5 @@
 import sharp from "sharp"
 import {
-  AIGC_TEXT,
   aigcMetadata,
   contentId,
   parseAigc,
@@ -32,44 +31,6 @@ function pngAigc(buffer: Buffer, json: string): Buffer {
   chunk.writeUInt32BE((crc ^ 0xffffffff) >>> 0, chunk.length - 4)
   // 放在IHDR之后，仅读取头部的元数据工具也能核验，无需解码整幅像素。
   return Buffer.concat([buffer.subarray(0, 33), chunk, buffer.subarray(33)])
-}
-
-/** 以实际字形高度确定6%尺寸，避免字体em高度达标但可见字形不足5%。 */
-export async function watermarkBadge(width: number, height: number) {
-  const shortest = Math.min(width, height)
-  const textHeight = Math.max(1, Math.ceil(shortest * 0.06))
-  const padding = Math.max(1, Math.ceil(shortest * 0.012))
-  const margin = Math.max(1, Math.ceil(shortest * 0.015))
-  const rendered = await sharp({
-    text: {
-      text: `<span foreground="white">${AIGC_TEXT}</span>`,
-      font: "sans 64",
-      rgba: true,
-    },
-  })
-    .png()
-    .toBuffer()
-  const text = await sharp(rendered)
-    .trim()
-    .resize({ height: textHeight })
-    .png()
-    .toBuffer({ resolveWithObject: true })
-  const badgeWidth = text.info.width + padding * 2
-  const badgeHeight = text.info.height + padding * 2
-  if (badgeWidth + margin > width || badgeHeight + margin > height)
-    throw new Error("图片尺寸不足以显示清晰标识")
-  const badge = await sharp({
-    create: {
-      width: badgeWidth,
-      height: badgeHeight,
-      channels: 4,
-      background: { r: 30, g: 30, b: 30, alpha: 0.85 },
-    },
-  })
-    .composite([{ input: text.data, left: padding, top: padding }])
-    .png()
-    .toBuffer()
-  return { buffer: badge, width: badgeWidth, height: badgeHeight, margin, textHeight }
 }
 
 export async function labelImage(buffer: Buffer, id = contentId(buffer)) {
