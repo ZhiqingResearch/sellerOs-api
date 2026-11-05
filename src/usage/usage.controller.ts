@@ -1,3 +1,5 @@
+import { GenerationRecordDetailService } from "./generation-record-detail.service"
+import { GenerationRecordDetailDto, QueryGenerationRecordDetailDto } from "./dto/generation-record-detail.dto"
 import { FixedModulePrecheckDto } from "./dto/fixed-module-precheck.dto"
 import {
   Body,
@@ -35,7 +37,8 @@ import { UsageService } from "./usage.service"
 export class UsageController {
   constructor(
     private readonly usageService: UsageService,
-    private readonly generationRecordService: GenerationRecordService
+    private readonly generationRecordService: GenerationRecordService,
+    private readonly generationRecordDetails: GenerationRecordDetailService
   ) {}
 
   @Post("fixed-module/precheck")
@@ -66,6 +69,21 @@ export class UsageController {
     return this.usageService.listLogs(req.user.id, query)
   }
 
+  @Get("generation-records/function-options")
+  @RequirePermissions("company.admin")
+  @ApiOperation({ summary: "用户生成记录功能选项（管理员）" })
+  getGenerationRecordFunctionOptions() {
+    return this.generationRecordService.getFunctionOptions()
+  }
+
+  @Get("generation-records/detail")
+  @RequirePermissions("company.admin")
+  @ApiOperation({ summary: "用户生成记录正文（管理员）" })
+  @ApiOkResponse({ type: GenerationRecordDetailDto })
+  getGenerationRecordDetail(@Query() query: QueryGenerationRecordDetailDto) {
+    return this.generationRecordDetails.detail(query.key)
+  }
+
   @Get("generation-records/model-options")
   @RequirePermissions("company.admin")
   @ApiOperation({
@@ -83,7 +101,7 @@ export class UsageController {
   @ApiOperation({
     summary: "用户生成记录（管理员）",
     description:
-      "跨用户列出图片 / 视频创作 / 影刀 RPA / 灵感雷达记录（合并 GenerationTask + ImageGenJob + VideoTask + RpaCreationTask + InspirationSubscription 最近刷新），含用户、组织、角色、提示词、模型、扣除积分、时间、结果。RPA 图片归入 IMAGE、RPA 视频归入 VIDEO；AI 拆图按任务组（groupId）聚合为一行并入 IMAGE，积分含工作流阶段 + 终态生图全部流水；通用生图 t2i/i2i（ImageGenJob）按 jobId 一行并入 IMAGE，积分按 UsageLog.meta.jobId 反查。支持 keyword(姓名/手机号/提示词/订阅名) / orgId / roleId / function(IMAGE|VIDEO|INSPIRATION_RADAR) / model / dateFrom / dateTo 筛选 + 分页，并返回筛选集累计实扣积分。",
+      "查询近 14 天各功能的成功生成快照，包含图片、视频、灵感雷达、ASIN、Listing、竞品分析、类目分析、选品分析、智能定价、新品推广、视频分析和车泰斗文本。按每次成功操作去重，返回用户、组织、角色、提示词、实际模型、积分和结果；支持关键词、组织、角色、功能、模型及时间筛选，返回筛选集总数与积分合计。",
   })
   listGenerationRecords(@Query() query: QueryGenerationRecordsDto) {
     return this.generationRecordService.list(query)

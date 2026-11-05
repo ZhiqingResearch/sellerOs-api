@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import {
   BadRequestException,
   Injectable,
@@ -785,6 +786,7 @@ export class AiGatewayWebhookService implements OnModuleInit {
     )
 
     if (applied) {
+      await recordGenerationSuccess(this.prisma, "videoTask", localTask.id, { credits: !fixedCharge && taskUsage && !this.isChargeableAmount(taskUsage.amount) ? 0 : undefined })
       this.logger.log(
         `[AI Gateway 回调] task=${task.id} status=${status} usage=${taskUsage?.amount ?? "0"} CNY`
       )
@@ -935,10 +937,11 @@ export class AiGatewayWebhookService implements OnModuleInit {
           }
         )
       }
-      return true
+        return true
     })
 
     if (applied) {
+      await recordGenerationSuccess(this.prisma, "storyboardVideo", localTask.id, { credits: !fixedCharge && taskUsage && !this.isChargeableAmount(taskUsage.amount) ? 0 : undefined })
       this.logger.log(
         `[AI Gateway 分镜回调] task=${task.id} video=${localTask.id} status=${status} usage=${taskUsage?.amount ?? "0"} CNY`
       )
@@ -1101,6 +1104,7 @@ export class AiGatewayWebhookService implements OnModuleInit {
     )
 
     if (applied) {
+      await recordGenerationSuccess(this.prisma, "beautyTask", localTask.id, { credits: !fixedCharge && taskUsage && !this.isChargeableAmount(taskUsage.amount) ? 0 : undefined })
       this.logger.log(
         `[AI Gateway 美妆回调] task=${task.id} beautyTask=${localTask.id} status=${status} usage=${taskUsage?.amount ?? "0"} CNY`
       )
@@ -1663,6 +1667,7 @@ export class AiGatewayWebhookService implements OnModuleInit {
     )
 
     if (applied) {
+      await recordGenerationSuccess(this.prisma, "generationTask", localTask.id, { credits: !fixedCredits && taskUsage && !this.isChargeableAmount(taskUsage.amount) ? 0 : undefined })
       this.logger.log(
         `[AI Gateway 图片回调] task=${task.id} status=${status} outputs=${storedImages.length} usage=${taskUsage?.amount ?? "0"} CNY`
       )

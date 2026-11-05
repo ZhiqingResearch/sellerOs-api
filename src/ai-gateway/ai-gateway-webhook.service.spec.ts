@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { deliverVideo } from "../aigc/media-delivery"
 import { BadRequestException, UnauthorizedException } from "@nestjs/common"
 import { ConfigService } from "@nestjs/config"

@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { PERMISSIONS_METADATA_KEY } from "../auth/decorators/require-permissions.decorator"
 import { hasPermission } from "../auth/guards/permissions.guard"
 import { ChetaidouAdminService } from "./chetaidou-admin.service"

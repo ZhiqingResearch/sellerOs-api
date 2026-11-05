@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import {
   BadRequestException,
   ConflictException,
@@ -7,7 +8,8 @@ import {
 } from "@nestjs/common"
 import { Prisma } from "@prisma/client"
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library"
-import { hashJson } from "../common/utils/canonical-json"
+import { hashJson, isJsonObject } from "../common/utils/canonical-json"
+import { linkAsinGeneratedUsage } from "../common/utils/link-asin-generated-usage"
 import { PrismaService } from "../prisma/prisma.service"
 import { validateAsinEvidencePayload } from "./asin-evidence-record.validator"
 import { CreateAsinEvidenceRecordDto } from "./dto/create-asin-evidence-record.dto"
@@ -40,18 +42,34 @@ export class AsinEvidenceRecordService {
     if (existing) return this.handleExistingCreate(existing, createFingerprint)
 
     try {
-      const record = await this.prisma.asinEvidenceRecord.create({
-        data: {
+      const record = await this.prisma.$transaction(async tx => {
+        const created = await tx.asinEvidenceRecord.create({
+          data: {
+            userId,
+            clientRequestId: dto.clientRequestId,
+            createFingerprint,
+            asin,
+            country,
+            productTitle: validation.productTitle,
+            evidence,
+            model,
+          },
+        })
+        const requestId = isJsonObject(dto.evidence.meta)
+          ? dto.evidence.meta.generationRequestId
+          : undefined
+        await linkAsinGeneratedUsage(
+          tx,
           userId,
-          clientRequestId: dto.clientRequestId,
-          createFingerprint,
-          asin,
-          country,
-          productTitle: validation.productTitle,
+          created.id,
+          "evidence",
           evidence,
-          model,
-        },
+          typeof requestId === "string" ? requestId : undefined
+        )
+        return created
       })
+
+      await recordGenerationSuccess(this.prisma, "asinEvidenceRecord", record.id)
 
       this.logger.log(
         `ASIN evidence record created: id=${record.id}, user=${userId}, asin=${asin}, country=${country}, evidenceBytes=${validation.evidenceBytes}`

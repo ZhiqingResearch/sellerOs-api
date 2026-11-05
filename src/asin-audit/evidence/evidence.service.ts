@@ -1,3 +1,4 @@
+import { hashJson } from "../../common/utils/canonical-json"
 import { BadRequestException, Injectable, Logger } from "@nestjs/common"
 import { auditDataSource } from "../../audit/audit-data"
 import { parseAmazonAuditTarget, type Country } from "../../audit/audit.marketplace"
@@ -183,6 +184,7 @@ export class EvidenceService {
       D: de.D,
       E: de.E,
       meta: {
+        ...(dto.scene === "evidence-module" ? { generationRequestId: dto.clientRequestId } : {}),
         sources: {
           ...(abpc.A.filled ? { A: [evidenceSource] } : {}),
           ...(abpc.P.filled ? { P: [evidenceSource] } : {}),
@@ -236,6 +238,7 @@ export class EvidenceService {
         "evidence",
         {
           scene: dto.scene,
+          resultHash: hashJson(JSON.parse(JSON.stringify(result)) as unknown),
           ...(dto.clientRequestId ? { clientRequestId: dto.clientRequestId } : {}),
         },
         ASIN_EVIDENCE_SOURCE

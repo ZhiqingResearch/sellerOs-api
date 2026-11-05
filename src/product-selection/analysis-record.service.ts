@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import { createHash } from "crypto"
 import { UsageService } from "../usage/usage.service"
 import {
@@ -140,6 +141,8 @@ export class AnalysisRecordService {
         }, tx)
         return saved
       }, { timeout: 30000 })
+
+      if (isProduct) await recordGenerationSuccess(this.prisma, "selectionAnalysisRecord", record.id)
 
       this.logger.log(
         `Selection analysis created: id=${record.id}, user=${userId}, payloadBytes=${payloadBytes}`

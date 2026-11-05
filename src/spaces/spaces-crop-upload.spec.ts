@@ -21,6 +21,8 @@ describe("裁剪公开直传 SDK 契约", () => {
   function service() {
     return new SpacesService(
       new ConfigService({
+        STORAGE_PROVIDER: "spaces",
+        SPACES_ENDPOINT: "https://nyc3.digitaloceanspaces.com",
         SPACES_BUCKET: "bucket",
         SPACES_BASE_URL: "https://assets.example",
         SPACES_KEY: "test",
@@ -29,7 +31,9 @@ describe("裁剪公开直传 SDK 契约", () => {
     )
   }
   it("不签发可覆盖审核快照的客户端上传地址", async () => {
-    await expect(service().generateUploadUrl({ key: "content-moderation/snapshots/existing.png" })).rejects.toThrow("审核文件不允许客户端覆盖")
+    await expect(
+      service().generateUploadUrl({ key: "content-moderation/snapshots/existing.png" })
+    ).rejects.toThrow("审核文件不允许客户端覆盖")
     expect(getSignedUrl).not.toHaveBeenCalled()
   })
   it("用户元数据写入 PUT 并加入签名，前端按 headers 直传", async () => {

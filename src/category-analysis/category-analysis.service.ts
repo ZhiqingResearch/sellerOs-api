@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import {
   BadGatewayException,
   BadRequestException,
@@ -526,6 +527,7 @@ export class CategoryAnalysisService {
       },
       { timeout: 30000 }
     )
+    if (status === "COMPLETED") await recordGenerationSuccess(this.prisma, "categoryAnalysisRecord", id)
   }
   private _summary(record: {
     id: number

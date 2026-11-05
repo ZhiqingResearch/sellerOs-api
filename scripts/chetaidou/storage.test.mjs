@@ -22,7 +22,7 @@ test("跨域预览不写入，正式执行保留已有规则且重跑无重复",
   assert.equal((await configureCors(s3, "bucket", origins, true)).applied, true)
   assert.equal(writes, 1)
   assert.deepEqual(rules[0], old)
-  assert.deepEqual(rules[1].AllowedMethods, ["GET", "HEAD"])
+  assert.deepEqual(rules[1].AllowedMethods, ["GET", "HEAD", "PUT", "POST"])
   assert.equal((await configureCors(s3, "bucket", origins, true)).changed, false)
   assert.equal(writes, 1)
   await assert.rejects(configureCors(s3, "bucket", ["https://new.example.com/path"], true), /不带路径/)

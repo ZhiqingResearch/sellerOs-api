@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { ExecutionContext, INestApplication, ValidationPipe } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import request from "supertest"

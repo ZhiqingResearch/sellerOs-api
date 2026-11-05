@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { AiGatewayProvider } from "../common/providers/ai-gateway.provider"
-import { isJsonObject } from "../common/utils/canonical-json"
+import { hashJson, isJsonObject } from "../common/utils/canonical-json"
 import { AsinAuditBilling } from "./asin-audit.billing"
 import type { AsinAuditSseEvent } from "./asin-audit.types"
 import { asinAuditActionLabel } from "./asin-audit.types"
@@ -392,9 +392,11 @@ export class AuditScoreService {
         if (!jsonStr) throw new Error("No JSON found in audit score response")
         const payload = parseLlmJson<AuditScoreLlmPayload>(jsonStr)
         const result = finalizeScoreResult(payload, evidence)
+        const resultHash = hashJson(JSON.parse(JSON.stringify(result)) as unknown)
         // 固定价模型走一口价 20（打分含审计链取证成本），非固定模型回落按量
         const billed =
           (await this.billing.chargeFixedStage(userId, dto.model, "score", {
+            resultHash,
             ...(dto.clientRequestId ? { clientRequestId: dto.clientRequestId } : {}),
           })) ||
           (await this.billing.charge(
@@ -402,7 +404,8 @@ export class AuditScoreService {
             dto.model,
             "score",
             event.billing,
-            dto.clientRequestId
+            dto.clientRequestId,
+            { meta: { resultHash } }
           ))
         this.logger.log(
           `[asin-audit] score finalized userId=${userId} asin=${evidence.asin} category=${category ?? "generic"} total=${result.total} coverage=${result.scoring.coverageRate}`

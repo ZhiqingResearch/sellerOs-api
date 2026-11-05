@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { DomesticBusinessModels } from "../common/business-ai/domestic-business-models"
 import { INestApplication, Logger, ValidationPipe } from "@nestjs/common"
 import { Test } from "@nestjs/testing"

@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import {
   BadRequestException,
   ConflictException,
@@ -28,7 +29,7 @@ export class CompetitorAnalysisRecordService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(userId: number, dto: CreateCompetitorAnalysisRecordDto) {
+  async create(userId: number, dto: CreateCompetitorAnalysisRecordDto, options?: { deferGenerationRecord?: boolean }) {
     const snapshot = validateAndNormalizeCompetitorAnalysisRecord(dto)
     const createFingerprint = hashJson(fingerprintPayload(snapshot))
 
@@ -38,8 +39,8 @@ export class CompetitorAnalysisRecordService {
     if (existing) return this.handleExistingCreate(existing, createFingerprint)
 
     try {
-      const record = await this.prisma.$transaction(transaction =>
-        transaction.competitorAnalysisRecord.create({
+      const record = await this.prisma.$transaction(async transaction => {
+        const created = await transaction.competitorAnalysisRecord.create({
           data: {
             userId,
             clientRequestId: dto.clientRequestId,
@@ -76,7 +77,10 @@ export class CompetitorAnalysisRecordService {
             },
           },
         })
-      )
+        return created
+      })
+
+      if (!options?.deferGenerationRecord) await recordGenerationSuccess(this.prisma, "competitorAnalysisRecord", record.id)
 
       this.logger.log(
         `Competitor analysis record created: id=${record.id}, user=${userId}, ` +

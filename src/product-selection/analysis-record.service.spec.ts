@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { UsageService } from "../usage/usage.service"
 import { BadRequestException, ConflictException } from "@nestjs/common"
 import {

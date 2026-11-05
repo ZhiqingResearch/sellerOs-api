@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { BadRequestException, NotFoundException } from "@nestjs/common"
 import type { CreationSource } from "../common/types/creation-source"
 import { ImageToImageService } from "../image-generation/image-to-image.service"

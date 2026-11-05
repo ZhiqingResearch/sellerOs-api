@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { Prisma } from "@prisma/client"
 import { PrismaService } from "../prisma/prisma.service"
 import { HistoryService } from "./history.service"

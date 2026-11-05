@@ -16,7 +16,7 @@ export class SpacesController {
   @ApiOperation({
     summary: "生成 Presigned PUT URL",
     description:
-      "前端 `fetch(uploadUrl, { method: 'PUT', body: file, headers })` 直传到 DigitalOcean Spaces。" +
+      "前端 `fetch(uploadUrl, { method: 'PUT', body: file, headers })` 直传到当前配置的对象存储（默认 OSS）。" +
       " 上传成功（HTTP 200）后用 `publicUrl` 访问文件。",
   })
   @Post("upload-url")

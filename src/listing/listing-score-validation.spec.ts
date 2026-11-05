@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { ListingAiService } from "./listing-ai.service"
 import { AiGatewayProvider } from "../common/providers/ai-gateway.provider"
 import { UsageService } from "../usage/usage.service"

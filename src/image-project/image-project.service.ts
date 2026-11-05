@@ -1,3 +1,5 @@
+import { publicGenerationMetadata } from "../common/utils/generation-metadata"
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import { gatewayImageDimensions, gatewayOriginalUrl, imageMetadata, modelDisplayNames, jsonObject } from "../common/utils/generation-metadata"
 import {
   BadRequestException,
@@ -533,6 +535,7 @@ export class ImageProjectService {
       await linkSourceJob(tx, task.id)
       return task
     })
+    if (task.status === "SUCCESS") await recordGenerationSuccess(this.prisma, "generationTask", task.id)
     return (await this.publicTasks([task]))[0]
   }
 
@@ -582,7 +585,7 @@ export class ImageProjectService {
       const generatedImages = task.generatedImages?.map(image => {
         const dimensions = gatewayImageDimensions(jsonObject(image.deliveryMeta).gatewayImage)
         return {
-          ...image,
+          ...publicGenerationMetadata(image),
           originalUrl: image.originalUrl ?? gatewayOriginalUrl(jsonObject(image.deliveryMeta).gatewayImage),
           width: image.width ?? dimensions.width ?? null,
           height: image.height ?? dimensions.height ?? null,
@@ -727,7 +730,7 @@ export class ImageProjectService {
 
   async updateTask(taskId: number, dto: UpdateTaskDto, userId: number) {
     await this.assertTaskOwned(taskId, userId)
-    return this.prisma.generationTask.update({
+    const result = await this.prisma.generationTask.update({
       where: { id: taskId, source: "platform", project: { source: "platform" } },
       data: { status: dto.status, errorMessage: dto.errorMessage },
       include: {
@@ -737,6 +740,8 @@ export class ImageProjectService {
         },
       },
     })
+    if (dto.status === "SUCCESS") await recordGenerationSuccess(this.prisma, "generationTask", taskId)
+    return publicGenerationMetadata(result)
   }
 
   async deleteTask(taskId: number, userId: number) {
@@ -919,7 +924,7 @@ export class ImageProjectService {
         adopted: dto.adopted,
         order: dto.order,
       },
-    })
+    }).then(publicGenerationMetadata)
   }
 
   async deleteGeneratedImage(imageId: number, userId: number) {

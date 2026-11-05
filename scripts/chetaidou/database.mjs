@@ -84,8 +84,8 @@ export async function importImage(db, storage, context, item, actorId) {
   const existing = await lookup(db)
   checkExistingImage(existing, item, sku.id)
   if (existing) return readExistingImage(db, existing, item)
-  const fileKey = item.uploadedKey ?? `chetaidou/${sku.id}/preset/seed/${item.entry.id}/${item.checksum}.${item.mime.split("/")[1]}`
-  if (!item.uploadedKey) await storage.ensureFile(fileKey, item.file, item.mime, item.checksum, item.bytes)
+  const fileKey = `chetaidou/${sku.id}/preset/seed/${item.entry.id}/${item.checksum}.${item.mime.split("/")[1]}`
+  await storage.ensureFile(fileKey, item.file, item.mime, item.checksum, item.bytes)
   const thumbnailKey = await storage.ensureThumbnail(fileKey, item.file, item.bytes)
   return db.$transaction(async tx => {
     await tx.$queryRaw`SELECT id FROM ChetaidouSku WHERE id = ${sku.id} FOR UPDATE`
