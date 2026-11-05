@@ -887,8 +887,7 @@ export class CustomerService implements OnModuleInit {
 
   /** 判断 URL 是否已是我们 OSS 上的地址（用于幂等防重复上传） */
   private isOssUrl(url: string): boolean {
-    const base = this.config.get<string>("OSS_BASE_URL") ?? ""
-    return !!base && url.startsWith(base.replace(/\/$/, ""))
+    return this.spaces.isManagedUrl(url)
   }
 
   /**
@@ -917,14 +916,14 @@ export class CustomerService implements OnModuleInit {
     }
     this.videoPersistCronRunning = true
     try {
-      const ossBase = (this.config.get<string>("OSS_BASE_URL") ?? "").replace(/\/$/, "")
+      const managedPrefixes = this.spaces.managedUrlPrefixes()
       const pending = await this.prisma.script.findMany({
         where: {
           videoStatus: "SUCCESS",
           deletedAt: null,
           AND: [
             { videoUrl: { not: null } },
-            ...(ossBase ? [{ NOT: { videoUrl: { startsWith: ossBase } } }] : []),
+            ...managedPrefixes.map(prefix => ({ NOT: { videoUrl: { startsWith: prefix } } })),
           ],
         },
         orderBy: { updatedAt: "asc" },

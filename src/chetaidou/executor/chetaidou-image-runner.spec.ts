@@ -1,3 +1,4 @@
+jest.mock("../../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import sharp from "sharp"
 import { planChetaidouImage } from "../chetaidou-image-options.service"
 import { ChetaidouStorageService, OriginalImageAsset } from "../chetaidou-storage.service"

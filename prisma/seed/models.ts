@@ -71,6 +71,7 @@ const AI_MODELS = [
     kind: "IMAGE",
     sortOrder: 4,
   },
+  { code: "wan2.7-image-pro", name: "Wan2.7-Image-Pro（官方直连）", kind: "IMAGE", sortOrder: 5 },
 
   // VIDEO
   {
@@ -179,6 +180,7 @@ const AI_MODELS = [
     kind: "VIDEO",
     sortOrder: 21,
   },
+  { code: "happyhorse-1.1", name: "Happyhorse-1.1（官方直连）", kind: "VIDEO", sortOrder: 22 },
 ] as const
 
 export async function seedModels(prisma: PrismaClient) {

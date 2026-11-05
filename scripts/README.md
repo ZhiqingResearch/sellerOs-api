@@ -50,7 +50,7 @@
 | `export-product-publish-store-classifications.ts` | 导出店铺→分类映射 JSON（仅 externalStoreId/classification 两字段，给 RPA 同事）；分类码残留下划线会直接失败。`npm run export:product-publish-store-classifications [-- --output 路径]` |
 | `sync-product-publish-stores.ts` | 店铺初始化同步：补初始分类后从飞书多维表格同步店铺及分类映射（MANUAL 触发），并做首同步验收（SUCCESS 且 total>0 且 skipped=0 否则非零退出）。`npm run sync:product-publish-stores` |
 | `sync-product-publish-templates.ts` | 一次性强制同步全部启用 Amazon 店铺的全部分类模板（上传 download_listing 参数文件、调起影刀 RPA、等回调写 templateUrl，逐条串行）。前置：店铺映射已初始化、正式后端回调在线、X-API-Key 一致；`--wait-seconds`（默认 4200s） |
-| `upload-product-publish-templates.mjs` | 把 `temp/20260722一键上架功能/templates/` 的 .xlsm 模板按「模版映射说明.txt」两两一组上传到 DigitalOcean Spaces（S3 SDK，key 前缀 product-publish/templates）。`--dry-run` 只校验，需 SPACES_* 环境变量。`npm run upload:product-publish-templates`（ESM） |
+| `upload-product-publish-templates.mjs` | 把 `temp/20260722一键上架功能/templates/` 的 .xlsm 模板按「模版映射说明.txt」两两一组上传到当前对象存储（默认 OSS，STORAGE_PROVIDER=spaces 可切换，key 前缀 product-publish/templates）。`--dry-run` 只校验；先 npm run build，凭证配置见 src/storage/README.md。`npm run upload:product-publish-templates`（ESM） |
 
 ## AI Gateway / 模型目录
 
@@ -74,6 +74,7 @@
 
 | 脚本 | 作用 |
 |------|------|
+| `export-bootstrap-data.mjs` | 新环境基础数据 SQL 导出：固定33张表，全量保留用户、角色、个人/系统模板、模型及定价等原始数据和ID，不含车泰斗表。`npm run export:bootstrap-sql -- --dry-run` 预检；`npm run export:bootstrap-sql` 导出到已忽略的 `seedbackups/`；`--output <文件.sql>` 指定路径。只读源数据，在单个 REPEATABLE READ 事务中按主键分页，保留Decimal/BigInt/JSON/时间精度；SQL只有数据INSERT，不建表、不清表、不覆盖，失败清理未完成文件，已有文件拒绝覆盖。文件权限0600，包含账号密码哈希和OpenApiApp明文密钥，不要提交到Git或公开分享。导入前用同版本Schema执行 `npm run db:push`，33张目标表保持空，不先跑seed；使用 `mysql --default-character-set=utf8mb4 -h <新库地址> -u <用户名> -p <新库名> < seedbackups/<文件.sql>`，不要加 `--force`。素材文件、域名和第三方账号不随SQL迁移，旧用户的积分批次/订单/团队等历史不在范围内，保留的账号状态需结合新环境业务安排核对。 |
 | `import-prompt-templates.ts` | 一次性导入产品提供的 Excel 提示词集合到 ImagePromptTemplate 表（A 维度/B 功能名/C 提示词，按 (dimension,name) upsert，admin 手关的 enabled 不恢复）。默认 DRY-RUN，`--apply` 写库，`npx ts-node ... <xlsx-path>` |
 | `import-sensitive-words.ts` | 敏感词初始数据导入（亚马逊/沃尔玛两份 Excel → platform 区分，风险等级映射，createMany+skipDuplicates）。幂等，`--dry-run`；数据源 Excel 放在 `scripts/data/` 下（需自备） |
 | `split-industry-tags.ts` | 一次性清理：Tag 表 INDUSTRY 类下含「、/，」的多值标签拆成单值行并删原行。默认 DRY-RUN，`--apply` 执行 |

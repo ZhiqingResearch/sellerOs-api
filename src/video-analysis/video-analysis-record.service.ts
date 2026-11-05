@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { Prisma, type VideoAnalysisRecord } from "@prisma/client"
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library"
@@ -67,6 +68,7 @@ export class VideoAnalysisRecordService {
         return existing
       })
     this.assertReplay(record, fingerprint)
+    await recordGenerationSuccess(this.prisma, "videoAnalysisRecord", record.id)
     this.logger.log(`视频分析结果已保存：recordId=${record.id}, userId=${userId}`)
     return detailResponse(record)
   }

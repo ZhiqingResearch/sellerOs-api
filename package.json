@@ -6,6 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
+    "backfill:generation-records": "node -r ts-node/register scripts/backfill-unified-generation-records.ts",
     "chetaidou:init": "node --env-file-if-exists=.env scripts/init-chetaidou-production.mjs",
     "chetaidou:init:test": "node --test scripts/chetaidou/*.test.mjs",
     "build": "nest build",
@@ -19,6 +20,7 @@
     "db:seed": "prisma db seed",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
+    "export:bootstrap-sql": "node --env-file-if-exists=.env scripts/export-bootstrap-data.mjs",
     "import:product-publish-classifications": "node --env-file-if-exists=.env -r ts-node/register scripts/import-product-publish-classifications.ts",
     "normalize:product-publish-classifications": "node --env-file-if-exists=.env -r ts-node/register scripts/normalize-product-publish-classifications.ts",
     "restore:product-publish-classifications": "node --env-file-if-exists=.env -r ts-node/register scripts/normalize-product-publish-classifications.ts --restore",

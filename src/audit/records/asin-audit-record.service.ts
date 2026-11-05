@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../../generation-record/generation-record-success"
 import {
   BadRequestException,
   ConflictException,
@@ -8,6 +9,7 @@ import {
 import { AsinAuditRecordStatus, Prisma } from "@prisma/client"
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library"
 import { hashJson } from "../../common/utils/canonical-json"
+import { linkAsinGeneratedUsage } from "../../common/utils/link-asin-generated-usage"
 import { PrismaService } from "../../prisma/prisma.service"
 import {
   validateCreateAsinAuditPayload,
@@ -76,8 +78,8 @@ export class AsinAuditRecordService {
 
     try {
       // 主记录和第一步快照必须原子创建，避免出现只有列表摘要、没有详情快照的半成品。
-      const record = await this.prisma.$transaction(tx =>
-        tx.asinAuditRecord.create({
+      const record = await this.prisma.$transaction(async tx => {
+        const created = await tx.asinAuditRecord.create({
           data: {
             userId,
             clientRequestId: dto.clientRequestId,
@@ -106,7 +108,11 @@ export class AsinAuditRecordService {
             },
           },
         })
-      )
+        await linkAsinGeneratedUsage(tx, userId, created.id, "score", scoreResult)
+        return created
+      })
+
+      await recordGenerationSuccess(this.prisma, "asinAuditRecord", record.id)
 
       this.logger.log(
         `ASIN audit created: id=${record.id}, user=${userId}, payloadBytes=${validation.snapshotPayloadBytes}`
@@ -145,7 +151,7 @@ export class AsinAuditRecordService {
           currentRevision > 0
             ? await tx.asinAuditOptimizationRevision.findUnique({
                 where: { recordId_revision: { recordId, revision: currentRevision } },
-                select: { payloadHash: true },
+                select: { id: true, payloadHash: true },
               })
             : null
 
@@ -158,6 +164,7 @@ export class AsinAuditRecordService {
 
         // 内容幂等判断先于乐观锁；网络重试即使携带旧 expectedVersion 也能安全成功。
         if (current?.payloadHash === payloadHash) {
+          await linkAsinGeneratedUsage(tx, userId, recordId, "optimize", optimizationResult, undefined, current.id)
           return optimizationResponse(record, currentRevision, false)
         }
 
@@ -171,7 +178,7 @@ export class AsinAuditRecordService {
 
         // 只有优化内容真正变化时才新增子表版本并推进主记录版本。
         const nextRevision = currentRevision + 1
-        await tx.asinAuditOptimizationRevision.create({
+        const savedRevision = await tx.asinAuditOptimizationRevision.create({
           data: {
             recordId,
             revision: nextRevision,
@@ -199,10 +206,13 @@ export class AsinAuditRecordService {
             updatedAt: true,
           },
         })
+        await linkAsinGeneratedUsage(tx, userId, recordId, "optimize", optimizationResult, undefined, savedRevision.id)
         return optimizationResponse(updated, nextRevision, true)
       },
       { timeout: 10_000 }
     )
+
+    await recordGenerationSuccess(this.prisma, "asinAuditRecord", recordId)
 
     if (response.changed) {
       this.logger.log(

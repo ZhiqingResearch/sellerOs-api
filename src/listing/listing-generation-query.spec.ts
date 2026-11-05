@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { Logger } from "@nestjs/common"
 import { type ListingGenerationTask } from "@prisma/client"
 import { AiGatewayProvider } from "../common/providers/ai-gateway.provider"

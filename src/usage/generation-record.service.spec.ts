@@ -1,5 +1,14 @@
+const previousReadMode = process.env.GENERATION_RECORD_READ_MODE
+beforeAll(() => { process.env.GENERATION_RECORD_READ_MODE = "legacy" })
+afterAll(() => { if (previousReadMode === undefined) delete process.env.GENERATION_RECORD_READ_MODE; else process.env.GENERATION_RECORD_READ_MODE = previousReadMode })
 import { Decimal } from "@prisma/client/runtime/library"
 import { GenerationRecordService } from "./generation-record.service"
+const now = new Date("2026-11-03T12:00:00.000Z")
+beforeEach(() => {
+  jest.useFakeTimers()
+  jest.setSystemTime(now.getTime())
+})
+afterEach(() => jest.useRealTimers())
 
 const user = {
   id: 7,
@@ -50,11 +59,46 @@ function createMocks() {
       findMany: jest.fn().mockResolvedValue([]),
     },
   }
-  const service = new GenerationRecordService(prisma as never, audit as never)
-  return { service, prisma, audit }
+  const textRecords = { list: jest.fn().mockResolvedValue([]) }
+  const service = new GenerationRecordService(prisma as never, audit as never, textRecords as never)
+  return { service, prisma, audit, textRecords }
 }
 
 describe("GenerationRecordService 模型目录展示名", () => {
+  it("默认列表取数、总数、灵感刷新时间和模型选项都下推相同的近 14 天边界", async () => {
+    const { service, audit, textRecords } = createMocks()
+    const range = { gte: new Date("2026-10-20T12:00:00.000Z"), lte: now }
+    await service.list({ page: 1, pageSize: 20 })
+    for (const table of [
+      audit.generationTask,
+      audit.videoTask,
+      audit.imageGenJob,
+      audit.rpaCreationTask,
+      audit.beautyTask,
+      audit.storyboardVideo,
+    ]) {
+      const countQuery = table.count.mock.calls[0] as unknown as [{ where: { createdAt: object } }]
+      const listQuery = table.findMany.mock.calls[0] as unknown as [
+        { where: { createdAt: object } },
+      ]
+      expect(countQuery[0].where.createdAt).toEqual(range)
+      expect(listQuery[0].where.createdAt).toEqual(range)
+    }
+    const radarQuery = audit.inspirationSubscription.count.mock.calls[0] as unknown as [
+      { where: { lastRefreshedAt: object } },
+    ]
+    expect(radarQuery[0].where.lastRefreshedAt).toEqual({ not: null, ...range })
+    await service.getModelOptions({})
+    const modelQuery = audit.videoTask.groupBy.mock.calls[0] as unknown as [
+      { where: { createdAt: object } },
+    ]
+    expect(modelQuery[0].where.createdAt).toEqual(range)
+    expect(textRecords.list).toHaveBeenLastCalledWith(
+      { dateFrom: range.gte.toISOString(), dateTo: now.toISOString() },
+      now
+    )
+  })
+
   it("模型选项统一使用目录名称，保留原始筛选值，同 publicId 取首个有效名称", async () => {
     const { service, prisma, audit } = createMocks()
     audit.generationTask.groupBy.mockResolvedValue([{ model: "image-model" }])
@@ -499,8 +543,8 @@ describe("GenerationRecordService RPA 生成记录", () => {
       keyword: "商品",
       orgId: 3,
       roleId: 5,
-      dateFrom: "2026-08-01",
-      dateTo: "2026-08-18",
+      dateFrom: "2026-10-22",
+      dateTo: "2026-11-02",
     })
 
     expect(audit.videoTask.count).not.toHaveBeenCalled()
@@ -510,7 +554,7 @@ describe("GenerationRecordService RPA 生成记录", () => {
         where: {
           mediaType: { in: string[] }
           model: string
-          createdAt: { gte: Date; lt: Date }
+          createdAt: { gte: Date; lte: Date }
           user: {
             orgs: { some: { orgId: number } }
             roles: { some: { roleId: number } }
@@ -523,8 +567,8 @@ describe("GenerationRecordService RPA 生成记录", () => {
       mediaType: { in: ["IMAGE"] },
       model: "NANO_BANANA_2",
       createdAt: {
-        gte: new Date("2026-08-01"),
-        lt: new Date("2026-08-19"),
+        gte: new Date("2026-10-22"),
+        lte: new Date("2026-11-02T23:59:59.999Z"),
       },
       user: {
         orgs: { some: { orgId: 3 } },
@@ -549,7 +593,10 @@ describe("GenerationRecordService RPA 生成记录", () => {
     ])
     expect(audit.rpaCreationTask.groupBy).toHaveBeenCalledWith({
       by: ["model", "mediaType"],
-      where: { mediaType: { in: ["IMAGE", "VIDEO"] } },
+      where: {
+        mediaType: { in: ["IMAGE", "VIDEO"] },
+        createdAt: { gte: new Date("2026-10-20T12:00:00.000Z"), lte: now },
+      },
     })
   })
 
@@ -841,16 +888,16 @@ describe("GenerationRecordService 通用生图 t2i/i2i 生成记录", () => {
       keyword: "沙发",
       orgId: 3,
       roleId: 5,
-      dateFrom: "2026-09-01",
-      dateTo: "2026-09-11",
+      dateFrom: "2026-10-22",
+      dateTo: "2026-11-02",
     })
 
     const countCall = audit.imageGenJob.count.mock.calls[0] as [{ where: Record<string, unknown> }]
     expect(countCall[0].where).toMatchObject({
       model: "atlas-gpt",
       createdAt: {
-        gte: new Date("2026-09-01"),
-        lt: new Date("2026-09-12"),
+        gte: new Date("2026-10-22"),
+        lte: new Date("2026-11-02T23:59:59.999Z"),
       },
       user: {
         orgs: { some: { orgId: 3 } },
@@ -879,7 +926,12 @@ describe("GenerationRecordService 通用生图 t2i/i2i 生成记录", () => {
     expect(options).toEqual([{ value: "atlas-gpt", label: "atlas-gpt", function: "IMAGE" }])
     expect(audit.imageGenJob.groupBy).toHaveBeenCalledWith({
       by: ["model"],
-      where: { source: "platform", kind: { not: "CROP" }, taskId: null }, // 裁剪、VidFlow 及已归档 job 隐藏
+      where: {
+        source: "platform",
+        kind: { not: "CROP" },
+        taskId: null,
+        createdAt: { gte: new Date("2026-10-20T12:00:00.000Z"), lte: now },
+      }, // 裁剪、VidFlow 及已归档 job 隐藏
     })
   })
 
@@ -1014,5 +1066,183 @@ describe("视频用户生成记录来源隔离", () => {
     expect(audit.videoTask.groupBy).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining(visible) })
     )
+  })
+})
+
+describe("GenerationRecordService 文本功能聚合", () => {
+  it.each(["SMART_PRICING", "PROMOTION_PLAN"] as const)(
+    "%s 的模型列按实际模型解析显示名，保留积分且未知时不显示计费占位",
+    async fn => {
+      const { service, textRecords, prisma } = createMocks()
+      textRecords.list.mockResolvedValue([
+        {
+          ...textRow,
+          function: fn,
+          model: "fixed-module",
+          modelLabel: "actual-model",
+          actualModel: "actual-model",
+          actualModels: ["actual-model"],
+          credits: "10",
+        },
+        {
+          ...textRow,
+          id: "legacy",
+          key: "legacy",
+          function: fn,
+          model: "fixed-module",
+          modelLabel: "—",
+          actualModel: null,
+          actualModels: [],
+          credits: null,
+        },
+      ])
+      prisma.aiGatewayModel.findMany.mockResolvedValue([
+        { publicId: "actual-model", displayName: "实际模型显示名" },
+        { publicId: "fixed-module", displayName: "按功能计费" },
+      ])
+      const result = await service.list({ function: fn, page: 1, pageSize: 20 })
+      expect(result.items.find(row => row.id === textRow.id)).toMatchObject({
+        model: "fixed-module",
+        modelLabel: "实际模型显示名",
+        credits: "10",
+      })
+      expect(result.items.find(row => row.id === "legacy")).toMatchObject({
+        modelLabel: "—",
+        credits: null,
+      })
+      expect(result.summary.totalCredits).toBe("10")
+    }
+  )
+
+  it("智能定价模型下拉包含实际模型和计费方式，重复实际模型仅返回一次", async () => {
+    const { service, textRecords, prisma } = createMocks()
+    textRecords.list.mockResolvedValue([
+      {
+        ...textRow,
+        function: "SMART_PRICING",
+        model: "fixed-module",
+        models: ["fixed-module"],
+        actualModel: "actual-model",
+        actualModels: ["actual-model", "actual-model"],
+      },
+    ])
+    prisma.aiGatewayModel.findMany.mockResolvedValue([
+      { publicId: "actual-model", displayName: "实际模型" },
+    ])
+    expect(await service.getModelOptions({ function: "SMART_PRICING" })).toEqual(
+      expect.arrayContaining([
+        { value: "actual-model", label: "实际模型", function: "SMART_PRICING" },
+        { value: "fixed-module", label: "按功能计费", function: "SMART_PRICING" },
+      ])
+    )
+    const options = await service.getModelOptions({ function: "SMART_PRICING" })
+    expect(options.filter(option => option.value === "actual-model")).toHaveLength(1)
+  })
+
+  const textRow = {
+    key: "TEXT:ASIN_AUDIT:audit-1",
+    function: "ASIN_AUDIT",
+    contentType: "TEXT",
+    id: "audit-1",
+    userId: user.id,
+    username: user.username,
+    phone: user.phone,
+    orgs: [],
+    roles: [],
+    prompt: "审计报告",
+    model: "text-model",
+    models: ["text-model", "second-model"],
+    modelLabel: "text-model",
+    credits: "35",
+    status: "OPTIMIZED",
+    resultUrl: null,
+    expired: false,
+    deleted: false,
+    createdAt: new Date("2026-11-02T02:00:00Z"),
+  }
+
+  it("功能下拉返回全部和 14 个具体功能，审计打分与优化仅一个选项", () => {
+    const { service } = createMocks()
+    const options = service.getFunctionOptions()
+    expect(options).toHaveLength(15)
+    expect(options[0]).toEqual({ value: "", label: "全部功能" })
+    expect(options.filter(option => option.label.includes("ASIN 审计"))).toEqual([
+      { value: "ASIN_AUDIT", label: "ASIN 审计" },
+    ])
+  })
+
+  it("文本参与跨类型倒序分页，总数和积分按完整筛选集汇总", async () => {
+    const { service, audit, textRecords } = createMocks()
+    textRecords.list.mockResolvedValue([
+      textRow,
+      {
+        ...textRow,
+        id: "audit-2",
+        key: "TEXT:ASIN_AUDIT:audit-2",
+        credits: "15",
+        createdAt: new Date("2026-11-02T00:00:00Z"),
+      },
+    ])
+    audit.videoTask.count.mockResolvedValue(1)
+    audit.videoTask.findMany.mockResolvedValue([
+      {
+        id: 42,
+        prompt: "视频",
+        model: "video-model",
+        modelName: "视频模型",
+        status: "SUCCESS",
+        createdAt: new Date("2026-11-02T01:00:00Z"),
+        deletedAt: null,
+        userId: user.id,
+        user,
+        resultUrl: null,
+      },
+    ])
+    const result = await service.list({ page: 2, pageSize: 1 })
+    expect(result.items.map(item => item.key)).toEqual(["VIDEO:42"])
+    expect(result).toMatchObject({ total: 3, totalPages: 3, summary: { totalCredits: "50" } })
+  })
+
+  it("具体文本筛选隔离所有媒体表，列表与模型选项使用相同功能和完整文本模型集", async () => {
+    const { service, prisma, audit, textRecords } = createMocks()
+    textRecords.list.mockResolvedValue([textRow])
+    prisma.aiGatewayModel.findMany.mockResolvedValue([
+      { publicId: "text-model", displayName: "文本模型" },
+    ])
+    const query = { function: "ASIN_AUDIT" as const, keyword: "审计", orgId: 2, roleId: 3 }
+    const result = await service.list({ ...query, page: 1, pageSize: 10 })
+    expect(result).toMatchObject({ total: 1, summary: { totalCredits: "35" } })
+    expect(result.items[0]).toMatchObject({
+      function: "ASIN_AUDIT",
+      functionLabel: "ASIN 审计",
+      modelLabel: "文本模型",
+    })
+    const options = await service.getModelOptions(query)
+    expect(options).toEqual(
+      expect.arrayContaining([
+        { value: "text-model", label: "文本模型", function: "ASIN_AUDIT" },
+        { value: "second-model", label: "second-model", function: "ASIN_AUDIT" },
+      ])
+    )
+    expect(textRecords.list).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ...query,
+        dateFrom: "2026-10-20T12:00:00.000Z",
+        dateTo: now.toISOString(),
+      }),
+      now
+    )
+    for (const table of [
+      audit.generationTask,
+      audit.imageGenJob,
+      audit.videoTask,
+      audit.storyboardVideo,
+      audit.beautyTask,
+      audit.rpaCreationTask,
+      audit.inspirationSubscription,
+    ]) {
+      expect(table.findMany).not.toHaveBeenCalled()
+      expect(table.count).not.toHaveBeenCalled()
+    }
   })
 })

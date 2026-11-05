@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { withDeliveryCheckpoint } from "../aigc/test-prisma"
 // src/image-generation/generate.spec.ts
 //

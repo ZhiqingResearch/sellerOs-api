@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { withDeliveryCheckpoint } from "../aigc/test-prisma"
 // src/image-generation/image-generation-t2i.spec.ts
 //
@@ -7,6 +8,7 @@ import { withDeliveryCheckpoint } from "../aigc/test-prisma"
 //   - 执行器:CAS 认领、成功结算、失败文案、Job 聚合、晚到结果不覆盖
 
 import { Test } from "@nestjs/testing";
+import { Logger } from "@nestjs/common";
 import { Decimal } from "@prisma/client/runtime/library";
 import sharp from "sharp";
 import { PrismaService } from "../prisma/prisma.service";
@@ -270,6 +272,38 @@ describe("image-gen item runner", () => {
     const { runner } = await makeServices({ prisma });
     await runner.executeItem(1);
     expect(prisma.imageGenItem.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("记录结算证据失败不改变成功图片，不重试生成或扣费", async () => {
+    const prisma = mockPrisma();
+    prisma.imageGenItem.updateMany
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 })
+      .mockRejectedValueOnce(new Error("metadata write failed"));
+    prisma.imageGenItem.findUnique.mockResolvedValue({ id: 1, job: job() });
+    prisma.imageGenItem.findMany.mockResolvedValueOnce([{ status: "SUCCEEDED" }]);
+    prisma.imageGenJob.updateMany.mockResolvedValue({ count: 1 });
+    const generate = jest.fn().mockResolvedValue({
+      url: "data:image/png;base64,AA==",
+      tokenUsage: { promptTokens: 3, completionTokens: 4 },
+      gatewayTaskId: "gw-proof-failure",
+      gatewayImage: { width: 819, height: 1024 },
+    });
+    const { runner, usage } = await makeServices({
+      prisma, provider: { generate } as Partial<ImageProvider>,
+    });
+    const log = jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined);
+    try {
+      await expect(runner.executeItem(1)).resolves.toBeUndefined();
+      expect(generate).toHaveBeenCalledTimes(1);
+      expect(usage.chargeTokens).toHaveBeenCalledTimes(1);
+      expect(prisma.imageGenItem.updateMany).toHaveBeenCalledTimes(3);
+      expect(prisma.imageGenItem.updateMany.mock.calls[1][0].data.status).toBe("SUCCEEDED");
+      expect(prisma.imageGenJob.updateMany.mock.calls[0][0].data.status).toBe("COMPLETED");
+      expect(log).toHaveBeenCalledWith("生成记录结算证据保存失败 itemId=1", expect.any(String));
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it("claims, hosts output, settles with CAS and aggregates job", async () => {

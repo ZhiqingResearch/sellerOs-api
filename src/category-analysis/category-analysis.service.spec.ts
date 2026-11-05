@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { ConfigService } from "@nestjs/config"
 import { Prisma } from "@prisma/client"
 import { createHash } from "crypto"

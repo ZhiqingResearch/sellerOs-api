@@ -2,7 +2,6 @@ import { createHash } from "node:crypto"
 
 export const AIGC_PROVIDER = "ZQYK-SELLEROS"
 export const AIGC_VERSION = "1"
-export const AIGC_TEXT = "AI生成"
 
 export interface AigcMetadata {
   AIGC: {

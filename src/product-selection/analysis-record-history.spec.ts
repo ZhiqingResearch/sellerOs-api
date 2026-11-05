@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { ForbiddenException } from "@nestjs/common"
 import { SelectionAnalysisEntry } from "@prisma/client"
 import { PermissionCacheService } from "../auth/services/permission-cache.service"

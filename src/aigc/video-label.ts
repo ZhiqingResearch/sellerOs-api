@@ -1,9 +1,7 @@
 import { execFile } from "node:child_process"
-import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { promisify } from "node:util"
 import { aigcMetadata, parseAigc } from "./aigc-metadata"
-import { watermarkBadge } from "./image-label"
 
 const execute = promisify(execFile)
 
@@ -51,10 +49,7 @@ export async function labelVideo(source: string, directory: string, id: string) 
     ([key]) => key.toUpperCase() === "AIGC"
   )?.[1]
   const metadata = aigcMetadata(id, parseAigc(original))
-  const badge = await watermarkBadge(width, height)
-  const badgePath = join(directory, "watermark.png")
   const output = join(directory, "labeled.mp4")
-  await writeFile(badgePath, badge.buffer)
   await execute(
     "ffmpeg",
     [
@@ -65,18 +60,12 @@ export async function labelVideo(source: string, directory: string, id: string) 
       "-y",
       "-threads",
       "2",
-      "-filter_complex_threads",
-      "1",
       "-protocol_whitelist",
       "file,pipe",
       "-i",
       source,
-      "-i",
-      badgePath,
-      "-filter_complex",
-      `[0:v:0][1:v:0]overlay=x=W-w-${badge.margin}:y=H-h-${badge.margin}:format=auto[v]`,
       "-map",
-      "[v]",
+      "0:v:0",
       "-map",
       "0:a?",
       "-map_metadata",

@@ -118,3 +118,11 @@ export function imageMetadata(task: {
       ) ?? null,
   }
 }
+
+/** 生成记录的内部结算证据不属于业务产物响应。 */
+export function publicGenerationMetadata<T>(value: T): T {
+  if (Array.isArray(value)) return value.map(publicGenerationMetadata) as T
+  if (!value || typeof value !== "object" || Object.getPrototypeOf(value) !== Object.prototype) return value
+  return Object.fromEntries(Object.entries(value).filter(([key]) => key !== "generationRecordCredits")
+    .map(([key, child]) => [key, publicGenerationMetadata(child)])) as T
+}

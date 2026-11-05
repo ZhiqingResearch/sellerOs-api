@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { Logger } from "@nestjs/common"
 import { BusinessAiRun, Prisma } from "@prisma/client"
 import { readFileSync } from "node:fs"

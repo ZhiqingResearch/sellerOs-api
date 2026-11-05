@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../../generation-record/generation-record-success"
 import { chetaidouImageJobStatus } from "../chetaidou.constants"
 // 车泰斗素材工作台 — 生图执行器（方案 §7.5）
 // 扫描 businessType=CHETAIDOU 的 ImageGenJob/Item；每张独立 Call：
@@ -603,7 +604,7 @@ export class ChetaidouImageRunnerService implements OnModuleInit {
 
   /** 聚合 Job 状态（持 Job 行锁后读取全部当前 Item 状态再更新） */
   async aggregateJob(jobId: string): Promise<void> {
-    await this.prisma.$transaction(async tx => {
+    const status = await this.prisma.$transaction(async tx => {
       await tx.$queryRaw`SELECT id FROM ImageGenJob WHERE id = ${jobId} FOR UPDATE`
       const job = await tx.imageGenJob.findUnique({ where: { id: jobId } })
       if (!job || job.businessType !== CHETAIDOU_BUSINESS_TYPE) return
@@ -614,7 +615,9 @@ export class ChetaidouImageRunnerService implements OnModuleInit {
         data: { status },
         ...(status !== "RUNNING" ? {} : {}),
       })
+      return status
     })
+    if (status === "COMPLETED" || status === "PARTIAL") await recordGenerationSuccess(this.prisma, "imageGenJob", jobId)
   }
 
   private async openImageCall(

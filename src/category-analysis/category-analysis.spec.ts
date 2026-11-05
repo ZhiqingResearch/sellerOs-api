@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { plainToInstance } from "class-transformer"
 import { validate } from "class-validator"
 import {

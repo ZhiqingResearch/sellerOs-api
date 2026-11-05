@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { BadRequestException, ServiceUnavailableException } from "@nestjs/common"
 import type { Prisma, RpaCreationTask } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library"

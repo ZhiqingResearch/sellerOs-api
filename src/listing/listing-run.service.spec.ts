@@ -1,3 +1,6 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue({ written: 0 }) }))
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
+import { Logger } from "@nestjs/common"
 import { Prisma } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library"
 import { AiGatewayProvider } from "../common/providers/ai-gateway.provider"
@@ -111,7 +114,7 @@ describe("Listing 持久化与扣费", () => {
       historyRevision: { create: jest.fn() },
     }
     const prisma = { $transaction: jest.fn(fn => fn(tx)) }
-    return { current, task, tx, runs: new ListingRunService(prisma as unknown as PrismaService) }
+    return { current, task, tx, prisma, runs: new ListingRunService(prisma as unknown as PrismaService) }
   }
 
   it("迟到的旧任务不能覆盖新任务；不写记录、不重复扣费", async () => {
@@ -140,6 +143,51 @@ describe("Listing 持久化与扣费", () => {
     expect(tx.listingRun.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({ where: { runId: "run", history: { userId: 3 } } })
     )
+  })
+
+  it("只在成功结果及结算落存后捕获快照，失败或进度变化不写", async () => {
+    const { tx, prisma, runs } = createUpdateFixture()
+    const capture = jest.mocked(recordGenerationSuccess)
+    capture.mockClear()
+    await runs.update(3, "run", { status: "RUNNING", stage: "generation" })
+    await runs.update(3, "run", { status: "FAILED", stage: "generation" })
+    expect(capture).not.toHaveBeenCalled()
+    await runs.update(3, "run", { status: "COMPLETED", stage: "completed", data: { plans: [{ result: { title: "成功正文" } }] } })
+    expect(capture).toHaveBeenCalledWith(prisma, "history", 1)
+    expect(tx.historyRevision.create.mock.invocationCallOrder[0]).toBeLessThan(capture.mock.invocationCallOrder[0])
+  })
+
+  it("生成记录写入失败发生在业务提交后，仍返回成功且不重复扣费或回滚正文", async () => {
+    const { tx, prisma, runs } = createUpdateFixture()
+    const committed = jest.fn()
+    const settle = jest.fn().mockResolvedValue(undefined)
+    prisma.$transaction
+      .mockImplementationOnce(async work => {
+        const result = await work(tx)
+        committed()
+        return result
+      })
+      .mockImplementationOnce(() => {
+        expect(committed).toHaveBeenCalledTimes(1)
+        return Promise.reject(new Error("GenerationRecord 表不存在"))
+      })
+    const real = jest.requireActual<typeof import("../generation-record/generation-record-success")>(
+      "../generation-record/generation-record-success"
+    )
+    jest.mocked(recordGenerationSuccess).mockImplementationOnce(real.recordGenerationSuccess)
+    const log = jest.spyOn(Logger.prototype, "error").mockImplementation(() => undefined)
+    try {
+      await expect(runs.update(3, "run", {
+        status: "COMPLETED", stage: "completed", data: { plans: [{ result: { title: "成功正文" } }] },
+      }, settle)).resolves.toEqual({ id: 1, runId: "run" })
+      expect(tx.history.update).toHaveBeenCalledTimes(1)
+      expect(tx.historyRevision.create).toHaveBeenCalledTimes(1)
+      expect(settle).toHaveBeenCalledTimes(1)
+      expect(prisma.$transaction).toHaveBeenCalledTimes(2)
+      expect(log).toHaveBeenCalledWith("成功快照保存失败 source=history id=1", expect.any(String))
+    } finally {
+      log.mockRestore()
+    }
   })
 
   it.each([

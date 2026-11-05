@@ -1,3 +1,4 @@
+import { hashJson } from "../common/utils/canonical-json"
 import { Injectable, Logger } from "@nestjs/common"
 import { AiGatewayProvider } from "../common/providers/ai-gateway.provider"
 import { AsinAuditBilling } from "./asin-audit.billing"
@@ -395,9 +396,11 @@ export class AuditOptimizeService {
       if (event.type === "billing" && event.billing) {
         // 先解析后计费：解析失败不扣分（与 Web 前端「成功才上报 usage」口径一致）
         const result = finalizeOptimizeResult(textBuffer, evidence, score)
+        const resultHash = hashJson(JSON.parse(JSON.stringify(result)) as unknown)
         // 固定价模型走一口价 15，非固定模型回落按量
         const billed =
           (await this.billing.chargeFixedStage(userId, dto.model, "optimize", {
+            resultHash,
             ...(dto.clientRequestId ? { clientRequestId: dto.clientRequestId } : {}),
           })) ||
           (await this.billing.charge(
@@ -405,7 +408,8 @@ export class AuditOptimizeService {
             dto.model,
             "optimize",
             event.billing,
-            dto.clientRequestId
+            dto.clientRequestId,
+            { meta: { resultHash } }
           ))
         this.logger.log(
           `[asin-audit] optimize finalized userId=${userId} asin=${evidence.asin} title=${result.listing.title.slice(0, 40)}`

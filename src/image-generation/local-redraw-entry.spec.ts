@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { BadRequestException, NotFoundException } from "@nestjs/common"
 import { ImageProjectService } from "../image-project/image-project.service"
 import { LocalRedrawService, parseLocalRedrawForm } from "./local-redraw.service"

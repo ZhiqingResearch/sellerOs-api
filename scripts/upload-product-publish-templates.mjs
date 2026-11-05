@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
+import { createStorage } from "./object-storage.mjs"
 import { readFile, readdir } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -61,45 +61,12 @@ if (dryRun) {
   process.exit(0)
 }
 
-const requiredEnvNames = [
-  "SPACES_KEY",
-  "SPACES_SECRET",
-  "SPACES_ENDPOINT",
-  "SPACES_BUCKET",
-  "SPACES_BASE_URL",
-]
-const missingEnvNames = requiredEnvNames.filter(name => !process.env[name]?.trim())
-if (missingEnvNames.length > 0) {
-  throw new Error(`缺少 Spaces 环境变量：${missingEnvNames.join(", ")}`)
-}
-
-const client = new S3Client({
-  endpoint: process.env.SPACES_ENDPOINT,
-  forcePathStyle: false,
-  region: process.env.SPACES_REGION || "us-east-1",
-  credentials: {
-    accessKeyId: process.env.SPACES_KEY,
-    secretAccessKey: process.env.SPACES_SECRET,
-  },
-  requestChecksumCalculation: "WHEN_REQUIRED",
-  responseChecksumValidation: "WHEN_REQUIRED",
-})
+const storage = createStorage()
 
 for (const item of mappings) {
   const key = `${KEY_PREFIX}/${item.filename}`
   const body = await readFile(path.join(TEMPLATE_DIR, item.filename))
-  await client.send(
-    new PutObjectCommand({
-      Bucket: process.env.SPACES_BUCKET,
-      Key: key,
-      Body: body,
-      ContentType: MIME_TYPE,
-      ContentDisposition: `attachment; filename="${item.filename}"`,
-      CacheControl: "public, max-age=3600",
-      ACL: "public-read",
-    })
-  )
-  const url = `${process.env.SPACES_BASE_URL.replace(/\/$/, "")}/${key}`
+  const url = await storage.uploadBuffer(body, key, MIME_TYPE, "public-read", undefined, { contentDisposition: `attachment; filename="${item.filename}"`, cacheControl: "public, max-age=3600" })
   console.log(`上传完成：${item.classification} -> ${url}`)
 }
 

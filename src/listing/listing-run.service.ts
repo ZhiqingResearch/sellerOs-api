@@ -5,6 +5,7 @@ import { getListingHistoryScore } from "../history/listing-history-score"
 import { PrismaService } from "../prisma/prisma.service"
 import { ListingAiInvocationDto } from "./dto/listing-ai.dto"
 import { CreateListingRunDto, UpdateListingRunDto } from "./dto/listing-run.dto"
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 
 const LISTING_TRANSACTION_MAX_WAIT_MS = 10_000
 const LISTING_TRANSACTION_TIMEOUT_MS = 60_000
@@ -66,7 +67,7 @@ export class ListingRunService {
     dto: UpdateListingRunDto,
     persistGeneration?: (tx: Prisma.TransactionClient) => Promise<void>
   ) {
-    return this.prisma.$transaction(
+    const result = await this.prisma.$transaction(
       async tx => {
         // 先锁公共报告，再锁任务，与通用编辑及另一方案保存按相同顺序串行。
         const run = await tx.listingRun.findFirst({
@@ -185,6 +186,8 @@ export class ListingRunService {
         timeout: LISTING_TRANSACTION_TIMEOUT_MS,
       }
     )
+    if (dto.status === "COMPLETED") await recordGenerationSuccess(this.prisma, "history", result.id)
+    return result
   }
 
   async beginStep(userId: number, dto: ListingAiInvocationDto) {

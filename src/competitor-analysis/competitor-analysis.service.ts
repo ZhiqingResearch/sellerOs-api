@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import { DomesticBusinessGateway } from "../common/business-ai/domestic-business-gateway"
 import { Inject, BadGatewayException, ConflictException, Injectable, Logger } from "@nestjs/common"
 import { Prisma } from "@prisma/client"
@@ -205,7 +206,7 @@ export class CompetitorAnalysisService {
 
     const summary = this._normalizeSummary(analysis.summary, dto.asins)
     const record = await this._archiveSummaryRecord(userId, dto, summary)
-    await this._finalizeSummaryRun(userId, dto, billing, tokenUsage)
+    await this._finalizeSummaryRun(userId, dto, billing, tokenUsage, record.recordId)
 
     return {
       summary,
@@ -362,31 +363,35 @@ export class CompetitorAnalysisService {
         }
       }),
       reportData: { profiles, boards, priceBoards },
-    })
+    }, { deferGenerationRecord: true })
   }
 
   private async _finalizeSummaryRun(
     userId: number,
     dto: SummarizeCompetitorsDto,
     billing: AiGatewayBillingUsage,
-    tokenUsage: AiGatewayTokenUsage
+    tokenUsage: AiGatewayTokenUsage,
+    recordId?: string
   ): Promise<void> {
     if (!dto.runId) {
-      await this._charge(
+      const charge = await this._charge(
         userId,
         "summary",
         dto.country,
         dto.asins,
         { billing, tokenUsage },
-        dto.runId
+        dto.runId,
+        recordId
       )
+      if (recordId) await recordGenerationSuccess(this.prisma, "competitorAnalysisRecord", recordId, { credits: charge.creditsCharged, modelPublicId: billing.model })
       return
     }
-    await this.prisma.$transaction(
+    const outcome = await this.prisma.$transaction(
       async tx => {
         let usageLogId: number | null = null
+        let settledCredits: Prisma.Decimal | undefined
         {
-          await this.usageService.chargeFixedModule(userId, "competitor.research", {
+          const charge = await this.usageService.chargeFixedModule(userId, "competitor.research", {
             quantity: new Set(dto.asins).size,
             model: billing.model,
             requestId: billing.requestId,
@@ -394,6 +399,7 @@ export class CompetitorAnalysisService {
               phase: "summary",
               operation: "summary",
               businessEventId: dto.runId,
+              ...(recordId ? { recordId } : {}),
               country: dto.country,
               asins: dto.asins,
               actualCostCny: billing.costCny,
@@ -401,6 +407,7 @@ export class CompetitorAnalysisService {
               tokenUsage,
             },
           }, tx)
+          settledCredits = charge.creditsCharged
           const usageLog = await tx.usageLog.findUnique({
             where: { requestId: billing.requestId },
             select: { id: true },
@@ -416,6 +423,8 @@ export class CompetitorAnalysisService {
           },
           data: { status: "COMPLETED", usageLogId, error: null },
         })
+        const completed = await tx.businessAiRun.findFirst({ where: { userId, module: "competitor-analysis", runId: dto.runId }, select: { id: true } })
+        return { completed, settledCredits }
       },
       {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
@@ -423,6 +432,8 @@ export class CompetitorAnalysisService {
         timeout: COMPETITOR_TRANSACTION_TIMEOUT_MS,
       }
     )
+    if (recordId) await recordGenerationSuccess(this.prisma, "competitorAnalysisRecord", recordId, { credits: outcome.settledCredits, modelPublicId: billing.model })
+    else if (outcome.completed) await recordGenerationSuccess(this.prisma, "businessAiRun", outcome.completed.id)
   }
 
   private async _markSummaryRunFailed(
@@ -455,11 +466,12 @@ export class CompetitorAnalysisService {
       billing?: AiGatewayBillingUsage
       tokenUsage: AiGatewayTokenUsage
     },
-    businessEventId?: string
-  ): Promise<void> {
+    businessEventId?: string,
+    recordId?: string
+  ) {
     const billing = gatewayResult.billing
     if (!billing) throw new BadGatewayException("AI Gateway 未返回计费结果")
-    await this.usageService.chargeFixedModule(userId, "competitor.research", {
+    return this.usageService.chargeFixedModule(userId, "competitor.research", {
       quantity: new Set(asins).size,
       model: billing.model,
       requestId: billing.requestId,
@@ -467,6 +479,7 @@ export class CompetitorAnalysisService {
         phase,
         operation: phase,
         ...(businessEventId ? { businessEventId } : {}),
+        ...(recordId ? { recordId } : {}),
         country,
         asins,
         actualCostCny: billing.costCny,

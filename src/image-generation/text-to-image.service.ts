@@ -1,3 +1,4 @@
+import { publicGenerationMetadata } from "../common/utils/generation-metadata"
 import { gatewayImageDimensions, gatewayOriginalUrl, modelDisplayNames, jsonObject } from "../common/utils/generation-metadata";
 // src/image-generation/text-to-image.service.ts
 //
@@ -173,7 +174,7 @@ export class TextToImageService {
         url: item.url!,
         originalUrl: gatewayOriginalUrl(item.gatewayImage),
         usage: item.usage ?? undefined,
-        gatewayImage: item.gatewayImage ?? undefined,
+        gatewayImage: publicGenerationMetadata(item.gatewayImage) ?? undefined,
         width: item.width ?? gatewayImageDimensions(item.gatewayImage).width ?? null,
         height: item.height ?? gatewayImageDimensions(item.gatewayImage).height ?? null,
         modelPublicId: publicId,

@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { ConflictException, NotFoundException } from "@nestjs/common"
 import { Prisma, type VideoAnalysisRecord } from "@prisma/client"
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library"
