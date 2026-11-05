@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import { DomesticBusinessGateway } from "../common/business-ai/domestic-business-gateway"
 import {
   BadGatewayException,
@@ -511,6 +512,7 @@ export class ListingScoreService {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
       }
     )
+    await recordGenerationSuccess(this.prisma, "businessAiRun", run.id)
     return this.prisma.businessAiRun.findUniqueOrThrow({ where: { id: run.id } })
   }
 }

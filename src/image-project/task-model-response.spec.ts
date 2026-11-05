@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { ImageProjectService } from "./image-project.service"
 import { PortraitCreationService } from "./portrait-creation.service"
 

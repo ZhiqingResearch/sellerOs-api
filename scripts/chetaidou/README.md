@@ -25,7 +25,7 @@
 
 - 本地使用最新代码并安装依赖，先执行 `npm run build`。
 - `DATABASE_URL` 指向目标数据库，且已有最新表结构。使用 `npm run db:push` 同步；仓库保留的历史集中 SQL 资料已同步当前 Schema，参考 [统一上线 SQL](../sql/2026-10-08-chetaidou-deployment.sql)，旧建表和增量文件已删除。SQL 适用于已有平台基础表的环境，整份在同一目标库连接执行，遇错停止；临时部署过程需要 CREATE ROUTINE/ALTER ROUTINE/EXECUTE 权限。SQL 包含 9 张业务表（含调整历史 ChetaidouAdjustment）、生图表扩展与索引、当前 `deletedAt`，新建业务表的 159 个字段及 12 个生图扩展/调整字段定义均有中文 `COMMENT`，末尾查询同时显示字段注释，并兼容历史 `chetaidouRemovedAt` 删除标记；不批量确认已有用户上传图。完成后 `npx prisma generate` 再构建。初始化脚本本身不执行 DDL。
-- `SPACES_ENDPOINT`、`SPACES_BUCKET`、`SPACES_KEY`、`SPACES_SECRET` 能读写内置原图所在的 `erp-pro` 桶。`SPACES_REGION` 默认 `us-east-1`，可选 CDN 配置为 `SPACES_BASE_URL`。
+- `SPACES_ENDPOINT`、`SPACES_BUCKET`、`SPACES_KEY`、`SPACES_SECRET` 能读取内置原图所在的 `erp-pro` 桶。`SPACES_REGION` 默认 `us-east-1`，可选 CDN 配置为 `SPACES_BASE_URL`。
 - 首次新增模型需要 `AI_GATEWAY_BASE_URL`、`AI_GATEWAY_API_KEY`。只读取模型元数据，不调用生成。
 
 **新库首次全量初始化**（将尖括号替换为实际配置）：
@@ -66,7 +66,7 @@ npm run chetaidou:init -- --enable
 
 - `--tool-role=<已有角色code>`、`--admin-role=<已有角色code>`：可重复传多个角色，仅追加车泰斗授权。不创建角色或重置已有授权；未传时需在管理端分配。权限缓存最长 5 分钟。
 - `--actor-id=<现有启用用户ID>`：记录实际操作人。默认使用系统审计 ID=0，不关联个人账号；预置图 `ownerId=null`。
-- `--allow-origin=https://实际前端域名`：可重复，追加存储桶 GET/HEAD 规则并保留原规则；这是显式指定的存储配置操作。`--check-cors` 只读取跨域配置，但不会取消同一命令的数据初始化；整条命令只读需加 `--dry-run`。不传跨域参数时不访问 CORS 配置。
+- `--allow-origin=https://实际前端域名`：可重复，追加当前存储桶 GET/HEAD/PUT/POST 规则并保留原规则；这是显式指定的存储配置操作。`--check-cors` 只读取跨域配置，但不会取消同一命令的数据初始化；整条命令只读需加 `--dry-run`。不传跨域参数时不访问 CORS 配置。
 - `--data=<其他资料目录>`：使用自定义的完整资料。
 
 `--maintenance-only`、`--models-only`、`--replace-facts` 已移除。已有业务数据和模型的后续变更通过管理端完成。
@@ -83,9 +83,9 @@ npm run chetaidou:init -- --enable
 
 `manifest.factCardFile/factCardHash` 指向结构化事实卡并校验其完整内容；事实卡再通过 `provenance.sourcePath/sourceHash` 校验来源文档。缺少必需规则、卡片被修改、文档不匹配或跨 SKU 时，在读图片和写库前停止。旧版仅有文档的包需要重新打包，不能作为完整事实卡初始化。数据库 `contentHash` 按最终结构化规则及文档全文一起计算。
 
-无需素材包或登录 Token。原图 URL 指向 `erp-pro.nyc3.cdn.digitaloceanspaces.com`，路径为 `chetaidou/preset-library/CS1plus/<imageId>/<uuid>.<格式>`；原图沿用上传接口的 public-read ACL，脚本不改变 ACL。初始化复用已上传原图，只为新母版生成私有缩略图，数据库保存对象 key。
+无需素材包或登录 Token。原图 URL 指向 `erp-pro.nyc3.cdn.digitaloceanspaces.com`，路径为 `chetaidou/preset-library/CS1plus/<imageId>/<uuid>.<格式>`；读取资料源后校验字节，新初始化的母版和缩略图以 private ACL 写当前存储桶，数据库保存当前桶对象 key。
 
-脚本使用 Spaces 凭证读回原图，验证哈希、尺寸、类型与拆解来源；仅接受当前配置桶及其 CDN。换桶时需先上传原图并准备对应 URL 清单，不能直接复用旧桶 key。
+脚本使用 Spaces 凭证读回原图，验证哈希、尺寸、类型与拆解来源；仅接受当前配置桶及其 CDN。目标桶通过 STORAGE_PROVIDER 选择；资料源桶与目标桶独立，新建记录不会直接复用资料源的 key。
 
 仅校验资料（不连接数据库或网关，但读取 Spaces）：
 
@@ -177,3 +177,5 @@ node --env-file-if-exists=.env scripts/fix-chetaidou-camping-conflicts.mjs
 ```
 
 按 CS1plus 和图片哈希定位预置母版，仅删除当前拆解中两条完全匹配的误报，保留其他冲突及待核实信息。事务内追加修正版并切换当前指针，保留旧稿作审计；重复执行不新增版本。拆解内容哈希改变后，该母版已有联想和组合按原有过期规则重新生成。
+
+统一存储：默认 OSS，`STORAGE_PROVIDER=spaces` 可切换；先 `npm run build`，配置及 CORS 说明见 [src/storage/README.md](../../src/storage/README.md)。新初始化母版及缩略图均确保写入当前桶，不再凭旧 uploadedKey 直接复用源桶对象。默认远程资料源使用原 Spaces 读取凭证；本地 file 数据包无需该源凭证。已有数据库记录不迁移。

@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { ConflictException, NotFoundException } from "@nestjs/common"
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library"
 import { hashJson } from "../common/utils/canonical-json"
@@ -7,11 +8,28 @@ import { CreateAsinEvidenceRecordDto } from "./dto/create-asin-evidence-record.d
 const RECORD_ID = "b9912892-6909-468c-a252-6a40ec697d5a"
 
 describe("AsinEvidenceRecordService", () => {
+  it("preserves mixed provider facts, dates and fallback reasons through save/detail", async () => {
+    const { service, prisma } = createService()
+    const dto = createDto()
+    dto.evidence.D = { filled: true, group: { source: "xiyou", status: "partial", fallbackReason: "主数据源暂不可用", period: { startDate: "2026-09-28", endDate: "2026-10-27" } }, kwTop: [], kwDetail: [] }
+    dto.evidence.E = { groups: { price: { source: "sif" }, orders: { source: "xiyou" } }, ordersLast30Days: 50 }
+    dto.evidence.meta = { sources: { D: ["xiyou"], E: ["sif", "xiyou", "upload"] } }
+    let saved: Record<string, unknown> = {}
+    prisma.asinEvidenceRecord.create.mockImplementation((args: { data: Record<string, unknown> }) => {
+      saved = { id: RECORD_ID, createdAt: new Date(), updatedAt: new Date(), ...args.data }
+      return Promise.resolve(saved)
+    })
+    await service.create(7, dto)
+    prisma.asinEvidenceRecord.findFirst.mockResolvedValue(saved)
+    expect((await service.findOne(7, RECORD_ID)).evidence).toEqual(dto.evidence)
+  })
+
   it("normalizes asin/country and extracts productTitle from card A on create", async () => {
     const { service, prisma } = createService()
     const dto = createDto()
     dto.asin = "b0gqb1c381"
     dto.evidence.meta = {
+      generationRequestId: "generation-id",
       sources: { A: ["apify"], B: ["apify"] },
       sifWarnings: ["备用数据源未获取评论正文"],
     }
@@ -19,6 +37,12 @@ describe("AsinEvidenceRecordService", () => {
     prisma.asinEvidenceRecord.create.mockImplementation((args: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: RECORD_ID, createdAt: now, updatedAt: now, ...args.data })
     )
+    const meta = {
+      clientRequestId: "generation-id",
+      model: "ZQ-Think-Flash",
+      scene: "evidence-module",
+    }
+    prisma.usageLog.findMany.mockResolvedValue([{ id: 10904, meta }])
 
     const result = await service.create(7, dto)
 
@@ -31,6 +55,20 @@ describe("AsinEvidenceRecordService", () => {
       productTitle: "Example Smart Glasses",
       evidence: dto.evidence,
       model: "ZQ-Think-Flash",
+    })
+    expect(prisma.usageLog.updateMany).toHaveBeenCalledWith({
+      where: { id: 10904, meta: { equals: meta } },
+      data: { meta: { ...meta, recordId: RECORD_ID } },
+    })
+    const query = prisma.usageLog.findMany.mock.calls[0] as unknown as [
+      { where: { userId: number; source: string; AND: unknown[] } },
+    ]
+    expect(query[0].where).toMatchObject({ userId: 7, source: "asin.audit.evidence" })
+    expect(query[0].where.AND).toContainEqual({
+      OR: [
+        { meta: { path: "$.resultHash", equals: hashJson(dto.evidence) } },
+        { meta: { path: "$.clientRequestId", equals: "generation-id" } },
+      ],
     })
   })
 
@@ -217,7 +255,13 @@ function fingerprintOf(dto: CreateAsinEvidenceRecordDto) {
 }
 
 function createService() {
+  const transaction = jest.fn()
   const prisma = {
+    $transaction: transaction,
+    usageLog: {
+      findMany: jest.fn().mockResolvedValue([]),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
     asinEvidenceRecord: {
       create: jest.fn<Promise<unknown>, [{ data: Record<string, unknown> }]>(),
       findUnique: jest.fn().mockResolvedValue(null),
@@ -231,6 +275,7 @@ function createService() {
     },
     $queryRaw: jest.fn(),
   }
+  transaction.mockImplementation((callback: (tx: typeof prisma) => unknown) => callback(prisma))
   return { service: new AsinEvidenceRecordService(prisma as never), prisma }
 }
 

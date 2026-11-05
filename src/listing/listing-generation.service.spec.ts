@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { type ListingGenerationTask } from "@prisma/client"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"

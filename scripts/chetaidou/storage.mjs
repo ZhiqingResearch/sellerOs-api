@@ -26,8 +26,8 @@ export async function configureCors(s3, bucket, origins = [], apply = false) {
   catch (error) { if (!["NoSuchCORSConfiguration", "NoSuchCORS"].includes(error.name)) throw error; rules = [] }
   let changed = false
   for (const origin of new Set(origins)) {
-    if (!rules.some(r => r.AllowedOrigins?.includes(origin) && ["GET", "HEAD"].every(m => r.AllowedMethods?.includes(m)))) {
-      rules.push({ AllowedOrigins: [origin], AllowedMethods: ["GET", "HEAD"], AllowedHeaders: ["*"], ExposeHeaders: ["Content-Disposition", "ETag"], MaxAgeSeconds: 3600 })
+    if (!rules.some(r => r.AllowedOrigins?.includes(origin) && ["GET", "HEAD", "PUT", "POST"].every(m => r.AllowedMethods?.includes(m)))) {
+      rules.push({ AllowedOrigins: [origin], AllowedMethods: ["GET", "HEAD", "PUT", "POST"], AllowedHeaders: ["*"], ExposeHeaders: ["Content-Disposition", "ETag"], MaxAgeSeconds: 3600 })
       changed = true
     }
   }

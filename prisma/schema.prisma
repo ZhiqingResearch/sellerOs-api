@@ -3776,3 +3776,27 @@ model ChetaidouResultImport {
   @@unique([ownerId, idempotencyKey])
   @@index([ownerId, sourceResultId, action])
 }
+
+// 成功生成结果的查询投影；逻辑来源引用，删除后仍保留消费记录。
+model GenerationRecord {
+  id               BigInt    @id @default(autoincrement())
+  userId           Int
+  function         String    @db.VarChar(40)
+  sourceType       String    @db.VarChar(64)
+  sourceId         String    @db.VarChar(191)
+  operation        String    @default("") @db.VarChar(32)
+  prompt           String    @db.LongText
+  modelPublicId    String?   @db.VarChar(191)
+  modelDisplayName String?   @db.VarChar(255)
+  credits          Decimal?  @db.Decimal(18, 4)
+  resultUrl        String?   @db.Text
+  resultCount      Int?
+  deletedAt        DateTime?
+  occurredAt       DateTime
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([sourceType, sourceId, operation])
+  @@index([occurredAt, id])
+  @@index([function, occurredAt, id])
+  @@index([userId, occurredAt, id])
+}

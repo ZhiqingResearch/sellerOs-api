@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common"
 import { Prisma, type ListingAiStep, type ListingRun } from "@prisma/client"
 import { PaginationDto } from "../common/dto/pagination.dto"
@@ -254,6 +255,7 @@ export class HistoryService {
         revisions: { create: { version: 1, data: dto.data as Prisma.InputJsonValue } },
       },
     })
+    if (["LISTING_GENERATION", "LISTING_SCORING"].includes(record.type)) await recordGenerationSuccess(this.prisma, "history", record.id)
     this.logger.log(`History created: id=${record.id}, user=${userId}`)
     return record
   }

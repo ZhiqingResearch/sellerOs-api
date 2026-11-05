@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { BadGatewayException } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/library"
 import { AiGatewayProvider } from "../common/providers/ai-gateway.provider"

@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import { labelImage } from "../aigc/image-label"
 import { deliverVideo, objectAigcMetadata } from "../aigc/media-delivery"
 import { retryDelivery, AigcDeliveryError, contentId } from "../aigc/aigc-metadata"
@@ -694,7 +695,7 @@ export class RpaCreationService implements OnModuleInit {
       }
 
       const now = new Date()
-      return tx.rpaCreationTask.update({
+      const completed = await tx.rpaCreationTask.update({
         where: { id: current.id },
         data: {
           status: "SUCCESS",
@@ -707,7 +708,9 @@ export class RpaCreationService implements OnModuleInit {
         },
         include: { outputs: ACTIVE_OUTPUTS_QUERY },
       })
+      return completed
     })
+    if (result.status === "SUCCESS") await recordGenerationSuccess(this.prisma, "rpaCreationTask", result.id)
     return this.toPublicTask(result)
   }
 

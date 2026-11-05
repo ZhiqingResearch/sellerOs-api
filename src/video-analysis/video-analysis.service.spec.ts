@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { ConflictException } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/library"
 import type { Response } from "express"

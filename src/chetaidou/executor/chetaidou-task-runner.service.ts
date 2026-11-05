@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../../generation-record/generation-record-success"
 import { withAigcUser } from "../../aigc/text-audit"
 // 车泰斗素材工作台 — 文本任务执行器（方案 §6/§7）
 // BREAKDOWN/IDEATION/REFRESH_GROUP/DIVERGE/COMPOSE 的推进：
@@ -1760,7 +1761,7 @@ export class ChetaidouTaskRunnerService implements OnModuleInit {
         : null,
     }
     if (task.type === "IDEATION") {
-      await this.prisma.$transaction(async tx => {
+      const rootStatus = await this.prisma.$transaction(async tx => {
         // 与逐维结果发布共用根任务行锁；模型调用仍并行。
         await tx.$queryRaw`SELECT id FROM ChetaidouTask WHERE id = ${task.rootTaskId} FOR UPDATE`
         const groups = await tx.chetaidouGroup.findMany({ where: { taskId: task.rootTaskId } })
@@ -1836,7 +1837,9 @@ export class ChetaidouTaskRunnerService implements OnModuleInit {
               : new Date(),
           },
         })
+        return rootStatus
       })
+      if (rootStatus === "SUCCEEDED") await recordGenerationSuccess(this.prisma, "chetaidouTask", task.rootTaskId)
       return
     }
     await this.prisma.chetaidouTask.update({ where: { id: task.id }, data })
@@ -1858,6 +1861,7 @@ export class ChetaidouTaskRunnerService implements OnModuleInit {
         },
       })
     }
+    if (status === "SUCCEEDED") await recordGenerationSuccess(this.prisma, "chetaidouTask", task.rootTaskId)
   }
 }
 

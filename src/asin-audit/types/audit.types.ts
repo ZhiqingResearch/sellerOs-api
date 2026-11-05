@@ -126,6 +126,7 @@ export interface AuditEvidence {
   D: KeywordTrafficEvidence
   E: AsinPerformanceEvidence
   meta: {
+    generationRequestId?: string
     sources: Partial<Record<"A" | "P" | "B" | "C" | "D" | "E", EvidenceSource[]>>
     sifDataReady?: boolean | null
     sifWarnings?: string[]

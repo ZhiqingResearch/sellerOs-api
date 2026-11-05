@@ -1,3 +1,4 @@
+jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { InvokeType } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library"
 import { GenerationTaskRunnerService } from "./executor/generation-task-runner.service"

@@ -1,3 +1,5 @@
+import { recordGenerationSuccess } from "../../generation-record/generation-record-success"
+import { markGeneratedImageSettlement } from "../../generation-record/image-generation-settlement"
 import type { ProviderGenerateResult } from "../core/types";
 // src/image-generation/executor/generation-task-runner.service.ts
 //
@@ -426,6 +428,7 @@ export class GenerationTaskRunnerService {
       });
     }
     await this.reportUsage(task);
+    await recordGenerationSuccess(this.prisma, "generationTask", taskId);
     await this.refreshPortraitProject(task);
   }
 
@@ -575,7 +578,7 @@ export class GenerationTaskRunnerService {
       );
       for (const entry of fixedEntries) {
         try {
-          await this.usage.chargeModel(task.userId, fixedCredits.div(CREDIT_PER_CNY).toString(), {
+          const charge = await this.usage.chargeModel(task.userId, fixedCredits.div(CREDIT_PER_CNY).toString(), {
             source: IMAGE_GENERATE_USAGE_SOURCE,
             invokeType,
             model: specProvider,
@@ -592,10 +595,12 @@ export class GenerationTaskRunnerService {
             requestId: entry.chargeRequestId ? `charge:${entry.chargeRequestId}` : undefined,
             allowOverdraft: true,
           })
+          await markGeneratedImageSettlement(this.prisma, task.id, entry.gatewayTaskId, charge.creditsCharged.toString(), { requestId: entry.chargeRequestId });
           this.logger.log(
             `[generate] fixed-price charged: taskId=${task.id} credits=${fixedCredits.toString()} gatewayAmount=${entry.amount ?? "0"}CNY`,
           );
         } catch (err) {
+          await markGeneratedImageSettlement(this.prisma, task.id, entry.gatewayTaskId, null, { requestId: entry.chargeRequestId });
           this.logger.error(
             `[generate] failed to charge fixed price: ${err instanceof Error ? err.message : String(err)}`,
           );
@@ -624,10 +629,11 @@ export class GenerationTaskRunnerService {
         this.logger.warn(
           `[generate] skip gateway charge: non-positive amount=${entry.amount} taskId=${task.id}`,
         );
+        if (Number(entry.amount) === 0) await markGeneratedImageSettlement(this.prisma, task.id, entry.gatewayTaskId, "0", { requestId: entry.chargeRequestId });
         continue;
       }
       try {
-        await this.usage.chargeModel(task.userId, entry.amount, {
+        const charge = await this.usage.chargeModel(task.userId, entry.amount, {
           source: IMAGE_GENERATE_USAGE_SOURCE,
           invokeType,
           model: specProvider,
@@ -646,10 +652,12 @@ export class GenerationTaskRunnerService {
           allowOverdraft: true,
           creditMultiplier: priceMultiplier,
         });
+        await markGeneratedImageSettlement(this.prisma, task.id, entry.gatewayTaskId, charge.creditsCharged.toString(), { requestId: entry.chargeRequestId });
         this.logger.log(
           `[generate] gateway usage reported: taskId=${task.id} amount=${entry.amount}CNY`,
         );
       } catch (err) {
+        await markGeneratedImageSettlement(this.prisma, task.id, entry.gatewayTaskId, null, { requestId: entry.chargeRequestId });
         this.logger.error(
           `[generate] failed to charge gateway usage: ${err instanceof Error ? err.message : String(err)}`,
         );
@@ -669,7 +677,7 @@ export class GenerationTaskRunnerService {
       return;
     }
     try {
-      await this.usage.chargeTokens(
+      const charge = await this.usage.chargeTokens(
         task.userId,
         {
           promptTokens: usage.promptTokens ?? 0,
@@ -680,10 +688,12 @@ export class GenerationTaskRunnerService {
         },
         { invokeType }
       )
+      await markGeneratedImageSettlement(this.prisma, task.id, undefined, charge.creditsCharged.toString(), { wholeTask: true });
       this.logger.log(
         `[generate] usage reported: totalTokens=${total} (meta=${JSON.stringify(meta)})`,
       );
     } catch (err) {
+      await markGeneratedImageSettlement(this.prisma, task.id, undefined, null, { wholeTask: true });
       this.logger.error(
         `[generate] failed to report token usage: ${err instanceof Error ? err.message : String(err)}`,
       );

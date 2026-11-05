@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../../generation-record/generation-record-success"
 import type { ProviderGenerateResult } from "../core/types";
 // src/image-generation/executor/image-gen-item-runner.service.ts
 //
@@ -266,7 +267,18 @@ export class ImageGenItemRunnerService {
       // image_generate)。快照携带 serverBilled:true,前端调用方见标记即跳过
       // 自身上报,无双重扣费窗口。best-effort:计费失败只记日志,不影响图片。
       if (settled.count > 0) {
-        await this.reportUsage(job, result, input.idempotencyKey);
+        const credits = await this.reportUsage(job, result, input.idempotencyKey);
+        try {
+          await this.prisma.imageGenItem.updateMany({
+            where: { id: itemId, status: "SUCCEEDED" },
+            data: { gatewayImage: JSON.parse(JSON.stringify({ ...gatewayImagePayload, generationRecordCredits: credits })) },
+          });
+        } catch (error) {
+          this.logger.error(
+            `生成记录结算证据保存失败 itemId=${itemId}`,
+            error instanceof Error ? error.stack : String(error),
+          );
+        }
       }
     } catch (err) {
       const message = describeImageError(err);
@@ -363,7 +375,7 @@ export class ImageGenItemRunnerService {
     job: { id: string; userId: number; kind: string; source?: string; request: unknown },
     result: { tokenUsage?: TokenUsage | null; costAmountCny?: string; gatewayTaskId?: string },
     chargeRequestId?: string,
-  ): Promise<void> {
+  ): Promise<string | null> {
     const invokeType = job.source === "vidflowos" ? InvokeType.API : InvokeType.PLATFORM
     const provider =
       (job.request as ImageGenRequestSnapshot | null)?.provider ?? "";
@@ -375,7 +387,7 @@ export class ImageGenItemRunnerService {
     const fixedCredits = await this.loadFixedCredits(provider, category);
     if (fixedCredits) {
       try {
-        await this.usage.chargeModel(job.userId, fixedCredits.div(CREDIT_PER_CNY).toString(), {
+        const charge = await this.usage.chargeModel(job.userId, fixedCredits.div(CREDIT_PER_CNY).toString(), {
           source: IMAGE_GENERATE_USAGE_SOURCE,
           invokeType,
           model: provider,
@@ -395,12 +407,13 @@ export class ImageGenItemRunnerService {
         this.logger.log(
           `[image-gen] fixed-price charged: job=${job.id} kind=${job.kind} credits=${fixedCredits.toString()} gatewayAmount=${result.costAmountCny ?? "0"}CNY`,
         );
-      } catch (err) {
+        return charge.creditsCharged.toString();
+    } catch (err) {
         this.logger.error(
           `[image-gen] failed to charge fixed price: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
-      return;
+      return null;
     }
 
     // 网关 amount(CNY)口径,走公共扣款 v2(chargeModel):注册表校验 +
@@ -412,11 +425,11 @@ export class ImageGenItemRunnerService {
         this.logger.warn(
           `[image-gen] skip gateway charge: non-positive amount=${result.costAmountCny} job=${job.id}`,
         );
-        return;
+        return Number(result.costAmountCny) === 0 ? "0" : null;
       }
       const priceMultiplier = await this.loadPriceMultiplier(provider, category);
       try {
-        await this.usage.chargeModel(job.userId, result.costAmountCny, {
+        const charge = await this.usage.chargeModel(job.userId, result.costAmountCny, {
           source: IMAGE_GENERATE_USAGE_SOURCE,
           invokeType,
           model: provider,
@@ -436,16 +449,17 @@ export class ImageGenItemRunnerService {
         this.logger.log(
           `[image-gen] gateway usage reported: job=${job.id} kind=${job.kind} amount=${result.costAmountCny}CNY`,
         );
-      } catch (err) {
+        return charge.creditsCharged.toString();
+    } catch (err) {
         this.logger.error(
           `[image-gen] failed to charge gateway usage: ${err instanceof Error ? err.message : String(err)}`,
         );
       }
-      return;
+      return null;
     }
 
     const usage = result.tokenUsage ?? null;
-    if (!usage) return;
+    if (!usage) return null;
     const prompt = usage.promptTokens ?? 0;
     const completion = usage.completionTokens ?? 0;
     const total = usage.totalTokens || prompt + completion;
@@ -460,10 +474,10 @@ export class ImageGenItemRunnerService {
       this.logger.warn(
         `[image-gen] skip usage report: totalTokens=${total} — provider returned no token usage (meta=${JSON.stringify(meta)})`,
       );
-      return;
+      return null;
     }
     try {
-      await this.usage.chargeTokens(
+      const charge = await this.usage.chargeTokens(
         job.userId,
         {
           promptTokens: prompt,
@@ -477,11 +491,13 @@ export class ImageGenItemRunnerService {
       this.logger.log(
         `[image-gen] usage reported: job=${job.id} kind=${job.kind} totalTokens=${total}`,
       );
+      return charge.creditsCharged.toString();
     } catch (err) {
       this.logger.error(
         `[image-gen] failed to report token usage: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+    return null;
   }
 
   /** 计费倍率(与其他模块同口径):AiGatewayModel.priceMultiplier,逻辑 ID
@@ -524,6 +540,7 @@ export class ImageGenItemRunnerService {
         tokenUsage: sumUsage(items.map((i) => i.usage as Record<string, unknown> | null)),
       },
     });
+    if (anySuccess) await recordGenerationSuccess(this.prisma, "imageGenJob", jobId);
   }
 
   private async buildProviderInput(

@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { parseArgs } from "node:util"
-import { ensureThumbnail, configureCors, validateOrigins } from "./chetaidou/storage.mjs"
+import { validateOrigins } from "./chetaidou/storage.mjs"
+import { createStorage, initializerStorage, configureStorageCors } from "./object-storage.mjs"
 import { loadBundle, packBundle, digest, readJson, uploadedImageKey } from "./chetaidou/data.mjs"
 import { CHETAIDOU_TEXT_MODELS } from "./chetaidou/text-models.mjs"
 import { CHETAIDOU_IMAGE_MODELS } from "./chetaidou/image-models.mjs"
@@ -100,7 +101,7 @@ async function main() {
 正式导入：[--actor-id=<现有用户ID>] [--enable] [--dry-run] [--data=<其他目录>]
 全量初始化：商品/最新版规则事实卡（新库版本 1）+ 25 张母版/拆解/缩略图 + 权限/扣费来源 + 模型/可选角色授权
 仅新增初始化资料，不迁移权限、不扫描历史图片、不补齐已有残缺记录
-可选跨域：--check-cors 仅读配置；--allow-origin=https://前端域名 追加 GET/HEAD（支持 --dry-run）
+可选跨域：--check-cors 仅读配置；--allow-origin=https://前端域名 追加 GET/HEAD/PUT/POST（支持 --dry-run）
 省略 --actor-id 时记录为系统初始化（审计 ID=0），不关联个人账号
 可选授权：--tool-role=<已有角色code> --admin-role=<已有角色code>（可重复，只追加授权）
 文本模型按内置清单全量初始化：${CHETAIDOU_TEXT_MODELS.join("、")}
@@ -110,7 +111,7 @@ async function main() {
 新模型价格需显式传 --text-multiplier=<倍率> --image-multiplier=<倍率>
 可选 --image-credits=<积分/张，0表示按量>；已有模型只复用，不改价格、不停用其他模型
 已有完整资料原样复用；不同事实卡或残缺记录报错，不覆盖、不修复
-需要数据库已有最新表结构；默认 URL 原图直接复用，仅为本次新建母版生成缩略图，元数据和拆解写数据库。
+需要数据库已有最新表结构；默认 URL 原图从资料源读回校验，新建母版与缩略图写当前对象存储，元数据和拆解写数据库。
 初始化母版及配套拆解已确认，导入为 PRESET/CONFIRMED，可直接联想；--enable 仅在全量导入成功后启用 SKU。`)
     return
   }
@@ -131,7 +132,7 @@ async function main() {
   console.log(`事实卡：规则日期 ${bundle.facts.provenance.rulesDate}；硬约束 ${bundle.facts.hardConstraints.length} 条、资料隔离 ${bundle.facts.dataIsolationRules.length} 条、条件规则 ${bundle.facts.conditionalRules.length} 条、单图参考 ${bundle.facts.imageReferences.length} 条、未知事项 ${bundle.facts.unknowns.length} 条；内容哈希 ${bundle.factsHash}。`)
   if (args["check-data"] || args["pack-from"]) return
   required("DATABASE_URL")
-  required("SPACES_KEY"); required("SPACES_SECRET"); required("SPACES_ENDPOINT"); required("SPACES_BUCKET")
+  const objectStorage = createStorage()
   const { PrismaClient } = await import("@prisma/client")
   const db = new PrismaClient()
   try {
@@ -158,10 +159,7 @@ async function main() {
     }
     console.log(`计划：导入全量资料；模型 ${models.map(m => `${m.category}=${m.existing?.publicId ?? m.data.publicId}`).join("，")}；授权 ${Object.values(grants).flat().length} 项；完成后${args.enable ? "启用" : "保持原有启停状态"}。`)
     if (args["check-cors"] || args["allow-origin"]?.length) {
-      const { S3Client } = await import("@aws-sdk/client-s3")
-      const s3 = new S3Client({ endpoint: required("SPACES_ENDPOINT"), region: process.env.SPACES_REGION || "us-east-1", credentials: { accessKeyId: required("SPACES_KEY"), secretAccessKey: required("SPACES_SECRET") } })
-      try { console.log("CORS：", JSON.stringify(await configureCors(s3, required("SPACES_BUCKET"), args["allow-origin"], !args["dry-run"]))) }
-      finally { s3.destroy() }
+      console.log("CORS：", JSON.stringify(await configureStorageCors(process.env, args["allow-origin"], !args["dry-run"])))
     }
     if (args["dry-run"]) {
       console.log("预览完成，未写库、未上传、未修改 CORS；对象存储写权限未验证。")
@@ -171,21 +169,8 @@ async function main() {
     await seedRegistry(db, registry.FEATURE_MODULE_DEFINITIONS, grants)
     await saveModels(db, models)
     const context = await ensureFacts(db, bundle, actorId)
-    const { S3Client, HeadObjectCommand, PutObjectCommand } = await import("@aws-sdk/client-s3")
-    const s3 = new S3Client({ endpoint: required("SPACES_ENDPOINT"), region: process.env.SPACES_REGION || "us-east-1", credentials: { accessKeyId: required("SPACES_KEY"), secretAccessKey: required("SPACES_SECRET") }, requestChecksumCalculation: "WHEN_REQUIRED", responseChecksumValidation: "WHEN_REQUIRED" })
-    try {
-      const storage = { async ensureFile(key, file, mime, checksum, uploadedBytes) {
-        try {
-          const head = await s3.send(new HeadObjectCommand({ Bucket: required("SPACES_BUCKET"), Key: key }))
-          if (head.Metadata?.sha256 && head.Metadata.sha256 !== checksum) throw new Error("对象存储文件哈希不匹配")
-          return
-        } catch (error) {
-          if (error.$metadata?.httpStatusCode !== 404) throw error
-        }
-        const bytes = uploadedBytes ?? await readFile(file)
-        if (digest(bytes) !== checksum) throw new Error("图片在校验后被修改，已停止上传")
-        await s3.send(new PutObjectCommand({ Bucket: required("SPACES_BUCKET"), Key: key, Body: bytes, ContentType: mime, ACL: "private", Metadata: { sha256: checksum } }))
-      }, async ensureThumbnail(key, file, uploadedBytes) { return ensureThumbnail(s3, required("SPACES_BUCKET"), key, () => uploadedBytes ?? readFile(file)) } }
+    {
+      const storage = initializerStorage(objectStorage, digest)
       const results = []
       for (const item of bundle.images) {
         const result = await importImage(db, storage, context, item, actorId)
@@ -195,7 +180,7 @@ async function main() {
       if (args.enable && results.some(r => r.qualityStatus === "INVALID")) throw new Error("现有母版有已失效拆解，未启用 SKU；请先通过管理端修复")
       if (args.enable) await activateSku(db, context, results.map(r => r.id))
       console.log(`初始化完成：SKU=${context.sku.code}，事实卡=${context.fact.id}，母版及拆解=${results.length}；任务/用户草稿/积分流水未创建。角色授权如未指定，请在管理端分配。`)
-    } finally { s3.destroy() }
+    }
   } finally { await db.$disconnect() }
 }
 main().catch(error => { console.error(`初始化失败：${error.message}`); process.exitCode = 1 }).finally(() => imageReader?.destroy())

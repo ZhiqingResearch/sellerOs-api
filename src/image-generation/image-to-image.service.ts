@@ -1,3 +1,4 @@
+import { publicGenerationMetadata } from "../common/utils/generation-metadata"
 import { gatewayImageDimensions, gatewayOriginalUrl, modelDisplayNames, jsonObject } from "../common/utils/generation-metadata";
 // src/image-generation/image-to-image.service.ts
 //
@@ -457,7 +458,7 @@ export class ImageToImageService {
           url: item.url ?? undefined,
           originalUrl: gatewayOriginalUrl(item.gatewayImage),
           mimeType: item.url ? mimeTypeForUrl(item.url) : undefined,
-          gatewayImage: item.gatewayImage ?? undefined,
+          gatewayImage: publicGenerationMetadata(item.gatewayImage) ?? undefined,
           width: item.width ?? gatewayImageDimensions(item.gatewayImage).width ?? null,
           height: item.height ?? gatewayImageDimensions(item.gatewayImage).height ?? null,
         };

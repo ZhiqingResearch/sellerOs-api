@@ -1,3 +1,4 @@
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import { createHash } from "crypto"
 import { UsageService } from "../usage/usage.service"
 import {
@@ -53,6 +54,8 @@ export class PromotionPlanRecordService {
         }, tx)
         return saved
       }, { timeout: 30000 })
+
+      await recordGenerationSuccess(this.prisma, "promotionPlanRecord", record.id)
 
       this.logger.log(`Promotion plan record created: id=${record.id}, user=${userId}`)
       return createResponse(record, false)

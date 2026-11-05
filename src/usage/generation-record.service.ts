@@ -1,14 +1,19 @@
-import { Injectable } from "@nestjs/common"
+import { UnifiedGenerationRecordReader } from "./unified-generation-record-reader"
+import { Injectable, Optional } from "@nestjs/common"
 import { CreditTxnType, Prisma } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library"
 import { PrismaService } from "../prisma/prisma.service"
 import { RPA_MODEL_LABELS } from "../rpa-creation/rpa-creation.capabilities"
 import { AuditPrismaService } from "./audit-prisma.service"
 import {
+  GENERATION_FUNCTION_LABELS,
+  GenerationFunction,
   GenerationRecordModelOptionDto,
   QueryGenerationRecordModelOptionsDto,
   QueryGenerationRecordsDto,
 } from "./dto/query-generation-records.dto"
+import { TextGenerationRecordService } from "./text-generation-record.service"
+import { recentGenerationQuery } from "./generation-record-time-window"
 
 const ZERO = new Decimal(0)
 
@@ -55,10 +60,16 @@ const INSPIRATION_PLATFORM_LABELS: Record<string, string> = {
   TIKTOK: "TikTok",
 }
 
-// 列表行（图片 / 视频 / 灵感雷达归一）
-interface GenerationRecord {
+// 列表行（媒体、灵感雷达和文本功能归一）
+export interface GenerationRecord {
   key: string
-  function: "IMAGE" | "VIDEO" | "INSPIRATION_RADAR"
+  function: GenerationFunction
+  contentType?: "TEXT"
+  models?: string[]
+  actualModel?: string | null
+  actualModels?: string[]
+  operation?: string
+  recordId?: string
   id: number | string // GenerationTask/VideoTask 等数字 id；t2i/i2i 为 jobId(UUID)，key 前缀区分
   userId: number
   username: string
@@ -68,7 +79,7 @@ interface GenerationRecord {
   prompt: string
   model: string
   modelLabel: string
-  credits: string | null // 实扣积分（按 UsageLog.meta.taskId / meta.jobId 反查）
+  credits: string | null // 实扣积分（按任务/报告/请求标识反查台账）
   status: string
   resultUrl: string | null
   resultCount?: number
@@ -244,13 +255,26 @@ export class GenerationRecordService {
     private readonly prisma: PrismaService,
     // 审计/对账视图专用的只读客户端：不挂软删除扩展，能读到已删除行。
     // 软删除模型（图片/视频任务、灵感雷达订阅）的统计与列表走它，其余（计费流水表，非软删除）走 prisma。
-    private readonly audit: AuditPrismaService
+    private readonly audit: AuditPrismaService,
+    private readonly textRecords: TextGenerationRecordService,
+    @Optional() private readonly unified?: UnifiedGenerationRecordReader
   ) {}
+
+  getFunctionOptions() {
+    return [
+      { value: "", label: "全部功能" },
+      ...Object.entries(GENERATION_FUNCTION_LABELS).map(([value, label]) => ({ value, label })),
+    ]
+  }
 
   /** 模型筛选选项：基于完整筛选集去重，不受列表分页和当前 model 影响。 */
   async getModelOptions(
     query: QueryGenerationRecordModelOptionsDto
   ): Promise<GenerationRecordModelOptionDto[]> {
+    if (process.env.GENERATION_RECORD_READ_MODE !== "legacy")
+      return (this.unified ?? new UnifiedGenerationRecordReader(this.prisma, this.audit)).getModelOptions(query)
+    const now = new Date()
+    query = recentGenerationQuery(query, now)
     const includeImage = !query.function || query.function === "IMAGE"
     const includeVideo = !query.function || query.function === "VIDEO"
     const rpaMediaTypes = this.rpaMediaTypes(query.function)
@@ -308,11 +332,21 @@ export class GenerationRecordService {
         : Promise.resolve(0),
     ])
 
-    const options: GenerationRecordModelOptionDto[] = imageModels.map(({ model }) => ({
-      value: model,
-      label: this.imageModelLabel(model),
-      function: "IMAGE",
-    }))
+    const textRows = await this.textRecords.list(query, now)
+    const options: GenerationRecordModelOptionDto[] = textRows.flatMap(row =>
+      [...(row.models ?? [row.model]), ...(row.actualModels ?? [])].filter(Boolean).map(model => ({
+        value: model,
+        label: model === "fixed-module" ? "按功能计费" : model,
+        function: row.function as GenerationRecordModelOptionDto["function"],
+      }))
+    )
+    options.push(
+      ...imageModels.map(({ model }) => ({
+        value: model,
+        label: this.imageModelLabel(model),
+        function: "IMAGE" as const,
+      }))
+    )
     for (const { model } of splitModels) {
       options.push({
         value: model,
@@ -386,8 +420,12 @@ export class GenerationRecordService {
     )
   }
 
-  /** 用户生成记录列表（管理员）：合并图片 + 视频 + RPA 创作 + 灵感雷达，附累计实扣积分 */
-  async list(query: QueryGenerationRecordsDto) {
+  /** 用户生成记录列表（管理员）：合并媒体、灵感雷达和文本功能，附累计实扣积分 */
+  async list(query: QueryGenerationRecordsDto, projection = false) {
+    if (!projection && process.env.GENERATION_RECORD_READ_MODE !== "legacy")
+      return (this.unified ?? new UnifiedGenerationRecordReader(this.prisma, this.audit)).list(query)
+    const requestTime = new Date()
+    if (!projection) query = recentGenerationQuery(query, requestTime)
     const { page, pageSize } = query
     const skip = (page - 1) * pageSize
     const includeImage = !query.function || query.function === "IMAGE"
@@ -396,6 +434,7 @@ export class GenerationRecordService {
       (!query.function || query.function === "INSPIRATION_RADAR") && !query.model
     const rpaMediaTypes = this.rpaMediaTypes(query.function)
     const includeRpa = rpaMediaTypes.length > 0
+    const textRows = await this.textRecords.list(query, requestTime, projection)
 
     const imageWhere = this.buildImageWhere(query)
     // AI 拆图并入 IMAGE 功能维度，但按任务组（groupId）聚合后参与归并，不与普通生图混行
@@ -610,14 +649,21 @@ export class GenerationRecordService {
         .filter(r => r.lastRefreshedAt != null)
         .map(r => this.toInspirationRecord({ ...r, lastRefreshedAt: r.lastRefreshedAt! })),
       ...rpaRows.map(r => this.toRpaRecord(r)),
+      ...textRows,
     ]
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.key.localeCompare(b.key))
       .slice(skip, skip + pageSize)
 
     const modelRecords = merged.filter(r => r.function !== "INSPIRATION_RADAR")
-    const gatewayLabels = await this.gatewayModelLabelMap(modelRecords.map(r => r.model))
+    const displayModel = (record: GenerationRecord) =>
+      record.actualModel ??
+      (record.model === "fixed-module" &&
+      ["SMART_PRICING", "PROMOTION_PLAN"].includes(record.function)
+        ? ""
+        : record.model)
+    const gatewayLabels = await this.gatewayModelLabelMap(modelRecords.map(displayModel))
     for (const record of modelRecords) {
-      record.modelLabel = gatewayLabels.get(record.model) ?? record.modelLabel
+      record.modelLabel = gatewayLabels.get(displayModel(record)) ?? record.modelLabel
     }
 
     // 图片 / AI 拆图 / t2i/i2i / 视频 / 分镜 / 美妆 / RPA / 灵感雷达积分：按各自任务标识反查当前页
@@ -711,6 +757,8 @@ export class GenerationRecordService {
       }
     }
 
+    if (projection) return { items: merged, total: merged.length, page, pageSize, totalPages: 1, summary: { totalCredits: "0" } }
+
     // 累计实扣积分：对筛选后的图片 + AI 拆图 + t2i/i2i + 视频 + 分镜 + 美妆 + RPA + 灵感雷达分别求和后汇总
     const [
       imageCredits,
@@ -739,6 +787,7 @@ export class GenerationRecordService {
       .plus(beautyCredits)
       .plus(inspirationCredits)
       .plus(rpaCredits)
+      .plus(textRows.reduce((sum, row) => sum.plus(row.credits ?? 0), ZERO))
     const total =
       imageTotal +
       splitGroups.length +
@@ -747,10 +796,15 @@ export class GenerationRecordService {
       storyboardTotal +
       beautyTotal +
       inspirationTotal +
-      rpaTotal
+      rpaTotal +
+      textRows.length
 
     return {
-      items: merged.map(r => ({ ...r, createdAt: r.createdAt.toISOString() })),
+      items: merged.map(r => ({
+        ...r,
+        functionLabel: GENERATION_FUNCTION_LABELS[r.function],
+        createdAt: r.createdAt.toISOString(),
+      })),
       total,
       page,
       pageSize,
@@ -1034,7 +1088,7 @@ export class GenerationRecordService {
   private rpaMediaTypes(functionFilter?: QueryGenerationRecordsDto["function"]): string[] {
     if (functionFilter === "IMAGE") return ["IMAGE"]
     if (functionFilter === "VIDEO") return ["VIDEO"]
-    if (functionFilter === "INSPIRATION_RADAR") return []
+    if (functionFilter) return []
     return ["IMAGE", "VIDEO"]
   }
 

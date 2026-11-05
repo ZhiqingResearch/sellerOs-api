@@ -271,7 +271,7 @@ test("URL 资料目录不复制原图；读回图片做完整校验并与本地�
   } finally { await rm(root, { recursive: true, force: true }) }
 })
 
-test("已上传原图直接复用对象 key，不重复上传；重复初始化不写库也不生成缩略图", async () => {
+test("远程原图重新确保当前桶对象；重复初始化不写库也不生成缩略图", async () => {
   const db = database(), ctx = await ensureFacts(db, bundle, 123)
   let originalUploads = 0, thumbnails = 0
   const bytes = Buffer.from("已在 loadBundle 校验的原图")
@@ -282,12 +282,13 @@ test("已上传原图直接复用对象 key，不重复上传；重复初始化�
   }
   await importImage(db, cloud, ctx, remoteItem, 123)
   await importImage(db, cloud, ctx, remoteItem, 123)
-  assert.equal(originalUploads, 0)
+  assert.equal(originalUploads, 1)
   assert.equal(thumbnails, 1)
   assert.equal(db.state.images.length, 1)
   assert.equal(db.state.breakdowns.length, 1)
-  assert.equal(db.state.images[0].fileKey, remoteItem.uploadedKey)
-  assert.equal(db.state.images[0].sourceMetadata.thumbnailKey, "uploads/original.jpg.thumbnail.webp")
+  assert.notEqual(db.state.images[0].fileKey, remoteItem.uploadedKey)
+  assert.match(db.state.images[0].fileKey, /^chetaidou\//)
+  assert.equal(db.state.images[0].sourceMetadata.thumbnailKey, `${db.state.images[0].fileKey}.thumbnail.webp`)
 })
 
 test("不扫描或迁移旧演示记录，旧记录原样保留", async () => {
