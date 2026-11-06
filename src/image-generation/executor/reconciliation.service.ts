@@ -51,12 +51,23 @@ export class ReconciliationService implements OnModuleInit {
     try {
       await this.requeueStaleItems();
       await this.convergePastDeadline();
+      await this.archiveCompletedI2IJobs();
       await this.cleanupExpiredJobs();
       await this.requeueStaleGenerationImages();
       await this.convergePastDeadlineGenerationTasks();
     } finally {
       this.running = false;
     }
+  }
+
+  private async archiveCompletedI2IJobs(): Promise<void> {
+    const jobs = await this.prisma.imageGenJob.findMany({
+      where: { source: "platform", businessType: IMAGE_CREATIVE_BUSINESS_TYPE, kind: "IMAGE_TO_IMAGE", taskId: null,
+        request: { path: "$.projectId", gt: 0 },
+        items: { some: { status: "SUCCEEDED", deletedAt: null }, none: { status: { notIn: ["SUCCEEDED", "FAILED"] } } } },
+      select: { id: true },
+    });
+    for (const job of jobs) await this.runner.archiveJob(job.id);
   }
 
   private async requeueStaleItems(): Promise<void> {

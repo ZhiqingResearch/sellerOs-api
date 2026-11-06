@@ -245,7 +245,7 @@ export class ImageProjectController {
 
   @ApiOperation({
     summary: "创建生图任务",
-    description: "AI 调用在前端完成；后端只负责保存。任务字段 + generatedImages 数组一次落库。",
+    description: "保存任务字段及 generatedImages。选项目提交的批量改图由后端自动归档，无需前端再次调用；同源 Job 的兼容归档返回已有任务。",
   })
   @Post(":id/task")
   createTask(

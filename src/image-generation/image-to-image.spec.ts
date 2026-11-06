@@ -15,6 +15,7 @@ import sharp from "sharp"
 import { Decimal } from "@prisma/client/runtime/library";
 import { PrismaService } from "../prisma/prisma.service";
 import { UsageService } from "../usage/usage.service";
+import { ImageProjectService } from "../image-project/image-project.service";
 import { resetSpacesPresignTransport, setSpacesPresignTransport } from "./core/storage";
 import type { ImageProvider, ProviderGenerateInput } from "./core/types"
 import { DispatchQueueService } from "./executor/dispatch-queue.service";
@@ -28,9 +29,11 @@ import {
   type I2IUploadFiles,
 } from "./image-to-image.service";
 import { IMAGE_PROVIDER_FACTORY } from "./providers/provider-factory.token";
+import { ImageToImageController } from "./image-to-image.controller";
 
 const mockPrisma = () => ({
-  aiGatewayModel: { findFirst: jest.fn().mockResolvedValue({
+  imageProject: { findFirst: jest.fn().mockResolvedValue({ id: 41 }) },
+  aiGatewayModel: { findMany: jest.fn().mockResolvedValue([]), findFirst: jest.fn().mockResolvedValue({
     publicId: "ZQ-Image-2", modality: "IMAGE", enabled: true, gatewayActive: true,
     gatewayConfig: { detail: { facts: { modes: ["edit"], max_reference_images: 10,
       size_capability: { min_pixels: 1048576, max_pixels: 1572864, ratio_min: 0.6667, ratio_max: 1.5 } } } },
@@ -79,6 +82,7 @@ async function makeServices(overrides?: {
         detail: { modality: "image", facts: {} }, requestSchema: { request_schema: { type: "object" } },
       }) } },
       ImageGenItemRunnerService,
+      { provide: ImageProjectService, useValue: { createTask: jest.fn() } },
       { provide: DispatchQueueService, useValue: { enqueue: jest.fn() } },
       { provide: PrismaService, useValue: withDeliveryCheckpoint(prisma) },
       { provide: IMAGE_PROVIDER_FACTORY, useValue: () => provider },
@@ -144,6 +148,56 @@ afterAll(() => {
 // ─── 创建契约 ───────────────────────────────────────────────────────────────
 
 describe("image-to-image create (contract parity)", () => {
+  it("提交接口原样返回后端确认的目标项目，不把 UUID taskId 换成项目任务 ID", async () => {
+    const result = { ok: true, jobId: "job-uuid", taskId: "task-uuid", traceId: "trace-uuid", total: 1, items: [], projectId: 41 }
+    const service = { create: jest.fn().mockResolvedValue(result) }
+    const response = { json: jest.fn() }
+    await new ImageToImageController(service as never).create({}, "{}", { user: { id: 7 } } as never, response as never)
+    expect(response.json).toHaveBeenCalledWith({ jobId: "job-uuid", taskId: "task-uuid", traceId: "trace-uuid", total: 1, items: [], projectId: 41 })
+  })
+
+  it("选中的 Seller 项目在派发前持久化，离开页面后仍可自动入库", async () => {
+    const { i2i, prisma, queue } = await makeServices()
+    prisma.imageGenItem.findMany.mockResolvedValue([{ id: 21 }])
+    queue.enqueue.mockImplementation(() => {
+      expect(prisma.imageGenJob.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({ request: expect.objectContaining({ projectId: 41, mode: "batch" }) }),
+      }))
+    })
+    const result = await i2i.create({ form: makeForm({ projectId: 41, mode: "batch" }),
+      files: { references: [makeFile("references")] },
+    }, 7)
+    expect(result).toMatchObject({ ok: true, projectId: 41 })
+    expect(prisma.imageProject.findFirst).toHaveBeenCalledWith({
+      where: { id: 41, userId: 7, source: "platform", type: "GENERAL", deletedAt: null, status: { not: "ARCHIVED" } },
+      select: { id: true },
+    })
+    expect(queue.enqueue).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([0, -1, 1.5, "41", null])("拒绝非法目标项目 %j，上传和派发前返回", async projectId => {
+    const { i2i, prisma, queue } = await makeServices()
+    const result = await i2i.create({ form: makeForm({ projectId }), files: { main: [makeFile()] } }, 7)
+    expect(result).toMatchObject({ ok: false, status: 400 })
+    expect(prisma.imageGenJob.create).not.toHaveBeenCalled()
+    expect(queue.enqueue).not.toHaveBeenCalled()
+  })
+
+  it("不允许自动入库到他人、已删除或非通用创作项目", async () => {
+    const { i2i, prisma } = await makeServices()
+    prisma.imageProject.findFirst.mockResolvedValue(null as never)
+    expect(await i2i.create({ form: makeForm({ projectId: 41 }), files: { main: [makeFile()] } }, 7))
+      .toMatchObject({ ok: false, status: 400 })
+    expect(prisma.imageGenJob.create).not.toHaveBeenCalled()
+  })
+
+  it("VidFlow 请求不能使用 Seller 项目自动入库", async () => {
+    const { i2i, prisma } = await makeServices()
+    expect(await i2i.create({ form: makeForm({ projectId: 41 }), files: { main: [makeFile()] } }, 7, "vidflowos"))
+      .toMatchObject({ ok: false, status: 400 })
+    expect(prisma.imageGenJob.create).not.toHaveBeenCalled()
+  })
+
   it("未归档局部重绘同样冻结原生比例档位，并传给执行器", async () => {
     const { i2i, prisma, gateway, runner } = await makeServices()
     prisma.imageGenItem.findMany.mockResolvedValue([{ id: 21 }])
@@ -571,6 +625,15 @@ describe("image-to-image snapshot projection", () => {
       ...over,
     };
   }
+
+  it.each([null, 91])("快照返回目标项目和归档关联 %j，兼容旧 UUID taskId", async taskId => {
+    const { prisma, i2i } = await makeServices()
+    prisma.imageGenJob.findFirst.mockResolvedValue(jobRow({
+      request: { ...baseRequest, projectId: 41 }, taskId,
+      items: [itemRow({ status: "SUCCEEDED", url: "https://cdn.example.com/a.png" })],
+    }))
+    expect(await i2i.getSnapshot("j1", 7)).toMatchObject({ projectId: 41, projectTaskId: taskId, taskId: "task-uuid", status: "completed" })
+  })
 
   it("projects queued while items are QUEUED", async () => {
     const prisma = mockPrisma();

@@ -22,6 +22,7 @@ import {
 } from "../../common/utils/marketplace-language"
 import { IMAGE_CREATIVE_BUSINESS_TYPE } from "../../chetaidou/chetaidou.constants";
 import { PrismaService } from "../../prisma/prisma.service";
+import { ImageProjectService } from "../../image-project/image-project.service";
 import { CREDIT_PER_CNY } from "../../membership/membership.constants";
 import { UsageService } from "../../usage/usage.service";
 import { IMAGE_PIPELINE_IDEMPOTENCY_PREFIX } from "../../ai-gateway/ai-gateway-image-callbacks.service";
@@ -76,6 +77,7 @@ interface T2IRequestSnapshot {
  */
 export type I2IRequestSnapshot = {
   kind: "IMAGE_TO_IMAGE";
+  projectId?: number;
   localRedraw?: LocalRedrawPlan;
   /** 逻辑 ID 或目录直传的网关 model id(同 T2IRequestSnapshot)。 */
   provider: string;
@@ -138,6 +140,7 @@ export class ImageGenItemRunnerService {
     private readonly providerFactory: ImageProviderFactory,
     private readonly usage: UsageService,
     private readonly queue: DispatchQueueService,
+    private readonly imageProject: ImageProjectService,
   ) {}
 
   get maxAttempts(): number {
@@ -541,7 +544,39 @@ export class ImageGenItemRunnerService {
         tokenUsage: sumUsage(items.map((i) => i.usage as Record<string, unknown> | null)),
       },
     });
+    await this.archiveJob(jobId);
     if (anySuccess) await recordGenerationSuccess(this.prisma, "imageGenJob", jobId);
+  }
+
+  /** 入库失败只重试保存，不重新生图或扣费；定时对账复用此入口。 */
+  async archiveJob(jobId: string): Promise<void> {
+    try {
+      const job = await this.prisma.imageGenJob.findFirst({
+        where: { id: jobId, source: "platform", kind: "IMAGE_TO_IMAGE", businessType: IMAGE_CREATIVE_BUSINESS_TYPE,
+          taskId: null, request: { path: "$.projectId", gt: 0 } },
+        include: { items: { orderBy: { idx: "asc" } } },
+      });
+      if (!job) return;
+      const request = job.request as I2IRequestSnapshot;
+      const projectId = request.projectId;
+      if (typeof projectId !== "number" || !Number.isSafeInteger(projectId) || projectId <= 0 || request.localRedraw ||
+        job.items.some(item => item.status !== "SUCCEEDED" && item.status !== "FAILED")) return;
+      const images = job.items.filter(item => item.status === "SUCCEEDED" && item.url && item.deletedAt === null);
+      if (!images.length) return;
+      await this.imageProject.createTask(projectId, {
+        sourceJobId: job.id,
+        presetCategory: "批量改图",
+        model: request.provider,
+        prompt: request.prompt,
+        aspectRatio: request.aspectRatio,
+        refImageUrls: request.referenceUrls ?? request.perItemReferenceUrls?.flat(),
+        n: images.length,
+        status: "SUCCESS",
+        generatedImages: images.map(item => ({ url: item.url!, status: "SUCCESS", order: item.idx })),
+      }, job.userId);
+    } catch (error) {
+      this.logger.error(`批量改图自动入库失败，等待对账重试 job=${jobId}: ${String(error)}`);
+    }
   }
 
   private async buildProviderInput(
