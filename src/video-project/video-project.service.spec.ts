@@ -235,6 +235,30 @@ describe("VideoProjectService AI Gateway 视频任务", () => {
     expect(result).not.toHaveProperty("modelName")
   })
 
+  it("原始输入单独留档，模型执行仍使用完整视频提示词", async () => {
+    const { service, prisma, gateway } = setup()
+    await service.createTask(
+      3,
+      {
+        category: "NORMAL",
+        publicId: "sourcing-veo-fast-i2v",
+        params: { prompt: "系统拼接后的成片提示词" },
+      },
+      7,
+      "用户原始商品描述"
+    )
+    expect(prisma.videoTask.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        prompt: "系统拼接后的成片提示词",
+        deliveryMeta: { userInput: "用户原始商品描述" },
+      }) as Record<string, unknown>,
+    })
+    expect(gateway.createVideoTask).toHaveBeenCalledWith(
+      expect.objectContaining({ prompt: "系统拼接后的成片提示词" }),
+      "video-task:10"
+    )
+  })
+
   it("拒绝未启用的分类模型", async () => {
     const { service, prisma, gateway } = setup()
     prisma.aiGatewayModel.findFirst.mockResolvedValue(null)

@@ -1,4 +1,5 @@
 import { recordGenerationSuccess } from "../generation-record/generation-record-success"
+import { inputString } from "../generation-record/generation-user-input"
 import {
   BadRequestException,
   ConflictException,
@@ -80,7 +81,10 @@ export class CompetitorAnalysisRecordService {
         return created
       })
 
-      if (!options?.deferGenerationRecord) await recordGenerationSuccess(this.prisma, "competitorAnalysisRecord", record.id)
+      if (!options?.deferGenerationRecord)
+        await recordGenerationSuccess(this.prisma, "competitorAnalysisRecord", record.id, {
+          prompt: inputString(dto.input.sourceText ?? dto.input.keyword ?? dto.input),
+        })
 
       this.logger.log(
         `Competitor analysis record created: id=${record.id}, user=${userId}, ` +

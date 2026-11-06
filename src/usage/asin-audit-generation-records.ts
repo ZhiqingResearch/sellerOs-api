@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library"
+import { generationUserInput } from "../generation-record/generation-user-input"
 import type { AuditPrismaService } from "./audit-prisma.service"
 
 export const ASIN_AUDIT_STAGE_SELECT = {
@@ -77,7 +78,7 @@ export function asinAuditStageRecords(records: AuditRecord[]) {
         function: "ASIN_AUDIT" as const,
         userId: record.userId,
         operation,
-        prompt: `${record.asin} ${record.productTitle}`,
+        prompt: generationUserInput("asinAuditRecord", record),
         status: operation === "score" ? "SCORED" : "OPTIMIZED",
         resultLabel: operation === "score" ? "审计打分" : "审计优化",
         createdAt: events[events.length - 1],
@@ -112,7 +113,7 @@ export function asinEvidenceGenerationRecords(
     function: "ASIN_EVIDENCE" as const,
     operation: "evidence" as const,
     status: "SUCCESS",
-    prompt: `${record.asin} ${record.productTitle ?? ""}`.trim(),
+    prompt: generationUserInput("asinEvidenceRecord", record),
     audit: {
       recordId: record.id,
       clientRequestId: record.clientRequestId,

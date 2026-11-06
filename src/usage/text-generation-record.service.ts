@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common"
 import { Prisma } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library"
+import { generationUserInput } from "../generation-record/generation-user-input"
 import {
   ASIN_AUDIT_STAGE_SELECT,
   ASIN_EVIDENCE_SELECT,
@@ -215,12 +216,7 @@ export class TextGenerationRecordService {
           function: fn,
           id: `usage:${log.id}`,
           userId: log.userId,
-          prompt:
-            text(meta.prompt) ||
-            text(meta.productName) ||
-            text(meta.title) ||
-            text(meta.videoUrl) ||
-            GENERATION_FUNCTION_LABELS[fn],
+          prompt: text(meta.userInput),
           status: "BILLED",
           createdAt: log.createdAt,
           links: [],
@@ -407,6 +403,7 @@ export class TextGenerationRecordService {
               id: true,
               userId: true,
               title: true,
+              data: true,
               type: true,
               createdAt: true,
               listingRun: {
@@ -450,6 +447,7 @@ export class TextGenerationRecordService {
               status: true,
               usageLogId: true,
               requestId: true,
+              billing: true,
               createdAt: true,
             },
           })
@@ -461,6 +459,8 @@ export class TextGenerationRecordService {
               id: true,
               userId: true,
               title: true,
+              keywords: true,
+              categories: true,
               status: true,
               createdAt: true,
               deletedAt: true,
@@ -478,6 +478,7 @@ export class TextGenerationRecordService {
               id: true,
               userId: true,
               primaryCategoryName: true,
+              steps: { where: { stepNo: 1 }, select: { payload: true } },
               status: true,
               createdAt: true,
               deletedAt: true,
@@ -491,7 +492,7 @@ export class TextGenerationRecordService {
               id: true,
               userId: true,
               clientRequestId: true,
-              productName: true,
+              product: true,
               createdAt: true,
               deletedAt: true,
             },
@@ -505,6 +506,7 @@ export class TextGenerationRecordService {
               userId: true,
               clientRequestId: true,
               productName: true,
+              input: true,
               createdAt: true,
             },
           })
@@ -527,6 +529,7 @@ export class TextGenerationRecordService {
               userId: true,
               title: true,
               focus: true,
+              videoUrl: true,
               model: true,
               chargeRequestId: true,
               createdAt: true,
@@ -574,7 +577,7 @@ export class TextGenerationRecordService {
             select: {
               id: true,
               userId: true,
-              title: true,
+              inputSnapshot: true,
               clientRequestId: true,
               reportPdfUrl: true,
               createdAt: true,
@@ -589,7 +592,15 @@ export class TextGenerationRecordService {
               type: { not: "GENERATE" },
               ...withIds(strings("CHETAIDOU_TEXT", "taskId")),
             },
-            select: { id: true, ownerId: true, type: true, status: true, createdAt: true },
+            select: {
+              id: true,
+              ownerId: true,
+              type: true,
+              status: true,
+              createdAt: true,
+              snapshot: true,
+              input: true,
+            },
           })
         : [],
       wanted("CHETAIDOU_TEXT")
@@ -616,7 +627,15 @@ export class TextGenerationRecordService {
       linkedTasks.push(
         ...(await this.audit.chetaidouTask.findMany({
           where: { id: { in: missingTaskIds }, ownerId: userId, type: { not: "GENERATE" } },
-          select: { id: true, ownerId: true, type: true, status: true, createdAt: true },
+          select: {
+            id: true,
+            ownerId: true,
+            type: true,
+            status: true,
+            createdAt: true,
+            snapshot: true,
+            input: true,
+          },
         }))
       )
     const candidates: Candidate[] = []
@@ -626,7 +645,7 @@ export class TextGenerationRecordService {
         function: fn,
         id: row.id,
         userId: row.userId,
-        prompt: row.title,
+        prompt: generationUserInput("history", row),
         status: row.listingRun?.status ?? "SUCCESS",
         createdAt: row.createdAt,
         model: row.listingRun?.steps.find(
@@ -654,7 +673,7 @@ export class TextGenerationRecordService {
       candidates.push({
         ...row,
         function: "COMPETITOR_ANALYSIS",
-        prompt: row.title,
+        prompt: generationUserInput("competitorAnalysisRecord", row),
         status: "SUCCESS",
         resultUrl: row.reportPdfUrl,
         links: [
@@ -678,7 +697,7 @@ export class TextGenerationRecordService {
           ...row,
           key: `TEXT_RUN:${row.module}:${row.id}`,
           function: row.module === "listing-score" ? "LISTING_SCORING" : "COMPETITOR_ANALYSIS",
-          prompt: row.module === "listing-score" ? "Listing 独立打分" : "竞品分析总结",
+          prompt: generationUserInput("businessAiRun", row),
           operation: row.operation,
           links: [
             ["usageLogId", row.usageLogId],
@@ -691,14 +710,14 @@ export class TextGenerationRecordService {
       candidates.push({
         ...row,
         function: "CATEGORY_ANALYSIS",
-        prompt: row.title,
+        prompt: generationUserInput("categoryAnalysisRecord", row),
         links: [["analysisId", row.id]],
       })
     for (const row of selections)
       candidates.push({
         ...row,
         function: "PRODUCT_SELECTION",
-        prompt: row.primaryCategoryName ?? "产品验证",
+        prompt: generationUserInput("selectionAnalysisRecord", row),
         operation: "product_validation",
         links: [["analysisId", row.id]],
       })
@@ -711,7 +730,7 @@ export class TextGenerationRecordService {
         ...row,
         ...(pricingModels.get(row.id) ?? { actualModel: null, actualModels: [] }),
         function: "SMART_PRICING",
-        prompt: row.productName,
+        prompt: generationUserInput("smartPricingRecord", row),
         status: "SUCCESS",
         links: [["recordId", row.id]],
       })
@@ -720,7 +739,7 @@ export class TextGenerationRecordService {
         ...row,
         ...(promotionModels.get(row.id) ?? { actualModel: null, actualModels: [] }),
         function: "PROMOTION_PLAN",
-        prompt: row.productName,
+        prompt: generationUserInput("promotionPlanRecord", row),
         status: "SUCCESS",
         links: [["recordId", row.id]],
       })
@@ -728,19 +747,12 @@ export class TextGenerationRecordService {
       candidates.push({
         ...row,
         function: "VIDEO_ANALYSIS",
-        prompt: [row.title, row.focus].filter(Boolean).join(" · "),
+        prompt: generationUserInput("videoAnalysisRecord", row),
         status: "SUCCESS",
         links: [["requestId", `charge:${row.chargeRequestId}`]],
       })
     candidates.push(...asinEvidenceGenerationRecords(evidence))
     candidates.push(...asinAuditStageRecords(audits))
-    const taskLabels: Record<string, string> = {
-      BREAKDOWN: "母版拆解",
-      IDEATION: "联想扩展",
-      REFRESH_GROUP: "联想刷新",
-      DIVERGE: "维度发散",
-      COMPOSE: "指令组合",
-    }
     const callsByTask = new Map<string, Array<{ id: string; model: string }>>()
     for (const call of calls) {
       const group = callsByTask.get(call.taskId) ?? []
@@ -753,7 +765,7 @@ export class TextGenerationRecordService {
         ...row,
         function: "CHETAIDOU_TEXT",
         userId: row.ownerId,
-        prompt: `车泰斗 · ${taskLabels[row.type] ?? row.type}`,
+        prompt: generationUserInput("chetaidouTask", row),
         status: row.status ?? "GENERATING",
         operation: row.type,
         model: taskCalls[0]?.model,

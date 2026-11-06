@@ -32,6 +32,210 @@ const image = (extra = {}) => ({
 })
 
 describe("generation projection", () => {
+  it.each(["  前端原文\r\n第二行  ", ""])(
+    "在线原始输入不受业务字段归一化影响：%j",
+    async prompt => {
+      const { tx, data } = memoryClient({ generationTask: [image({ prompt: "模型执行稿" })] })
+      await syncGenerationSource(tx, "generationTask", 1, { prompt })
+      expect(data.generationRecord[0].prompt).toBe(prompt)
+    }
+  )
+
+  it.each([
+    {
+      source: "history" as const,
+      extra: {
+        type: "LISTING_GENERATION",
+        title: "系统标题",
+        data: { params: { keyword: "用户描述" }, result: { title: "AI结果" } },
+        version: 1,
+      },
+      prompt: "用户描述",
+    },
+    {
+      source: "categoryAnalysisRecord" as const,
+      extra: { title: "系统标题", status: "COMPLETED", keywords: ["用户关键词"], categories: [] },
+      prompt: JSON.stringify(["用户关键词"]),
+    },
+    {
+      source: "selectionAnalysisRecord" as const,
+      extra: {
+        status: "COMPLETED",
+        entry: "PRODUCT",
+        primaryCategoryName: "系统类目",
+        steps: [{ payload: { productData: { asin: "B0DSGRHL7C" } } }],
+      },
+      prompt: "B0DSGRHL7C",
+    },
+    {
+      source: "promotionPlanRecord" as const,
+      extra: {
+        productName: "AI商品名",
+        input: { productText: "用户描述", competitorLinks: ["B0DSGRHL7C"] },
+      },
+      prompt: JSON.stringify({ productText: "用户描述", competitorLinks: ["B0DSGRHL7C"] }),
+    },
+    {
+      source: "videoAnalysisRecord" as const,
+      extra: { title: "AI视频标题", videoUrl: "https://example.com/user.mp4", focus: "用户关注点" },
+      prompt: JSON.stringify({ videoUrl: "https://example.com/user.mp4", focus: "用户关注点" }),
+    },
+    {
+      source: "businessAiRun" as const,
+      extra: {
+        module: "listing-score",
+        status: "COMPLETED",
+        outputText: "AI评分结果",
+        billing: { userInput: "用户评分输入" },
+      },
+      prompt: "用户评分输入",
+    },
+    {
+      source: "videoTask" as const,
+      extra: {
+        user,
+        status: "SUCCESS",
+        mode: "MOTION_CONTROL",
+        prompt: "系统默认提示词",
+        deliveryMeta: { userInput: "用户动作说明" },
+      },
+      prompt: "用户动作说明",
+    },
+    {
+      source: "beautyTask" as const,
+      extra: {
+        user,
+        status: "SUCCESS",
+        prompt: "系统美妆模板",
+        beautyInput: { style: "用户妆容要求" },
+      },
+      prompt: JSON.stringify({ style: "用户妆容要求" }),
+    },
+    {
+      source: "imageGenJob" as const,
+      extra: {
+        user,
+        status: "COMPLETED",
+        kind: "TEXT_TO_IMAGE",
+        prompt: "系统合成稿",
+        request: { userInput: "用户生图输入" },
+        items: [],
+      },
+      prompt: "用户生图输入",
+    },
+  ])(
+    "$source writes user input through the real snapshot projection",
+    async ({ source, extra, prompt }) => {
+      const root = {
+        id: source === "history" ? 9 : "input-report",
+        userId: 7,
+        source: "platform",
+        project: { source: "platform" },
+        taskId: null,
+        businessType: "IMAGE_CREATIVE",
+        clientRequestId: null,
+        createdAt: occurredAt,
+        deletedAt: null,
+        ...extra,
+      }
+      const { tx, data } = memoryClient({
+        [source]: [root],
+        historyRevision: [
+          {
+            id: 1,
+            historyId: root.id,
+            data: "data" in extra ? extra.data : {},
+            createdAt: occurredAt,
+          },
+        ],
+      })
+      await syncGenerationSource(tx, source, root.id)
+      expect(data.generationRecord).toHaveLength(1)
+      expect(data.generationRecord[0].prompt).toBe(prompt)
+    }
+  )
+
+  it.each([
+    {
+      source: "smartPricingRecord" as const,
+      row: {
+        productName: "模型提取的商品名",
+        product: { sourceText: "用户输入的商品描述", sourceUrl: "https://example.com/product" },
+      },
+      prompt: "用户输入的商品描述",
+    },
+    {
+      source: "smartPricingRecord" as const,
+      row: {
+        productName: "模型提取的商品名",
+        product: { sourceUrl: "https://example.com/product" },
+      },
+      prompt: "https://example.com/product",
+    },
+    {
+      source: "smartPricingRecord" as const,
+      row: { productName: "模型提取的商品名", product: { filenames: ["采购报价.pdf"] } },
+      prompt: JSON.stringify(["采购报价.pdf"]),
+    },
+    {
+      source: "competitorAnalysisRecord" as const,
+      row: { title: "竞品分析 · 1 个竞品", inputSnapshot: { sourceText: "B0DSGRHL7C" } },
+      prompt: "B0DSGRHL7C",
+    },
+    {
+      source: "competitorAnalysisRecord" as const,
+      row: {
+        title: "自动标题",
+        inputSnapshot: { mode: "ASIN", ownAsin: "B0AAAA0001", competitorAsins: ["B0BBBB0002"] },
+      },
+      prompt: JSON.stringify({
+        mode: "ASIN",
+        ownAsin: "B0AAAA0001",
+        competitorAsins: ["B0BBBB0002"],
+      }),
+    },
+    {
+      source: "competitorAnalysisRecord" as const,
+      row: {
+        title: "自动标题",
+        inputSnapshot: {
+          mode: "KEYWORD",
+          keyword: "portable blender",
+          competitorAsins: ["B0BBBB0002"],
+        },
+      },
+      prompt: "portable blender",
+    },
+    {
+      source: "smartPricingRecord" as const,
+      row: { productName: "不能冒充用户输入的商品名", product: {} },
+      prompt: "",
+    },
+    {
+      source: "competitorAnalysisRecord" as const,
+      row: { title: "不能冒充用户输入的标题", inputSnapshot: {} },
+      prompt: "",
+    },
+  ])(
+    "$source freezes user input instead of a generated title: $prompt",
+    async ({ source, row, prompt }) => {
+      const root = {
+        id: "report",
+        userId: 7,
+        clientRequestId: null,
+        createdAt: occurredAt,
+        deletedAt: null,
+        ...row,
+      }
+      const { tx, data } = memoryClient({ [source]: [root] })
+      await syncGenerationSource(tx, source, root.id)
+      expect(data.generationRecord).toHaveLength(1)
+      expect(data.generationRecord[0].prompt).toBe(prompt)
+      const select = tx[source].findMany.mock.calls[0][0].select
+      expect(select[source === "smartPricingRecord" ? "product" : "inputSnapshot"]).toBe(true)
+    }
+  )
+
   it("writes only successful sources and keeps identities without redundant stage", () => {
     expect(
       generationIdentity({

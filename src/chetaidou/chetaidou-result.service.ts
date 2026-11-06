@@ -208,6 +208,7 @@ export class ChetaidouResultService {
               sourceChecksum: source.checksum,
               referenceFileKeys: keys,
               prompt,
+              userInput: JSON.stringify(dto),
               generation,
               model: publicId,
               count: 1,

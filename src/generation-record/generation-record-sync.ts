@@ -470,6 +470,7 @@ export async function syncGenerationSource(
     credits?: Prisma.Decimal | string | number
     requireSettlement?: boolean
     modelPublicId?: string
+    prompt?: string
   }
 ) {
   const root = await lockGenerationSource(tx, source, id)
@@ -534,7 +535,7 @@ export async function syncGenerationSource(
       ...identity,
       userId: row.userId,
       function: row.function,
-      prompt: row.prompt,
+      prompt: range?.prompt ?? row.prompt,
       modelPublicId: model,
       credits: range?.credits != null ? new Prisma.Decimal(range.credits) : row.credits,
       resultUrl: row.resultUrl,

@@ -57,6 +57,8 @@ interface I2IForm {
   editMode?: "local-redraw"
   mode: Mode;
   prompt: string;
+  /** 后端留档：现有 prompt 字段的原始值，不读取新增前端字段。 */
+  userInput?: string
   /** 可选站点；不传时不注入图上文字语言规则。 */
   market?: string
   /** 逻辑 ID 或目录直传的网关 model id(B4 后均为网关通道)。 */
@@ -197,6 +199,7 @@ function parseForm(raw: unknown): ParseFormResult {
       mode: f.mode,
       editMode: f.editMode,
       prompt: f.prompt.trim(),
+      userInput: f.prompt,
       market: typeof f.market === "string" && f.market.trim() ? f.market.trim() : undefined,
       provider: f.provider ?? "",
       aspectRatio: f.aspectRatio as AspectRatio,
@@ -352,6 +355,7 @@ export class ImageToImageService {
       modelPublicId: resolveGatewayModel(form.provider) ?? form.provider,
       localRedraw,
       prompt: form.prompt,
+      userInput: form.userInput ?? form.prompt,
       market: form.market,
       aspectRatio: form.aspectRatio,
       customAspectW: form.customAspectW,

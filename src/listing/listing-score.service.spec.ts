@@ -224,6 +224,16 @@ describe("独立评分持久化、恢复与结算", () => {
     expect(f.chargeSavedOutput).toHaveBeenCalledTimes(1)
   })
 
+  it("现有 userPrompt 原样留档，不要求前端增加字段", async () => {
+    const f = fixture()
+    await f.service.complete(3, {
+      ...dto,
+      userPrompt: "  前端原文\r\n已有内容  ",
+    })
+    expect(f.row().billing).toHaveProperty("userInput", "  前端原文\r\n已有内容  ")
+    expect(f.streamChat.mock.calls[0][1]).toBe("  前端原文\r\n已有内容  ")
+  })
+
   it("生成、保存、扣费、重放，同一请求只调用和扣费一次", async () => {
     const f = fixture()
     expect(JSON.parse((await f.service.complete(3, dto)).text)).toEqual(report)

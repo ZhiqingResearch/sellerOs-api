@@ -1,4 +1,5 @@
 import { recordGenerationSuccess } from "../generation-record/generation-record-success"
+import { inputString } from "../generation-record/generation-user-input"
 import { createHash } from "crypto"
 import { UsageService } from "../usage/usage.service"
 import {
@@ -79,7 +80,11 @@ export class SmartPricingRecordService {
         return saved
       }, { timeout: 30000 })
 
-      await recordGenerationSuccess(this.prisma, "smartPricingRecord", record.id)
+      await recordGenerationSuccess(this.prisma, "smartPricingRecord", record.id, {
+        prompt: inputString(
+          dto.product.sourceText ?? dto.product.sourceUrl ?? dto.product.filenames
+        ),
+      })
 
       this.logger.log(
         `Smart pricing record created: id=${record.id}, user=${userId}, payloadBytes=${snapshot.payloadBytes}`

@@ -101,6 +101,8 @@ export type GenerationExecutionSpec = {
   modelPublicId?: string;
   /** 任务级编译 prompt(image-creation 的最终稿;legacy 为 items[0] 编译稿)。 */
   taskPrompt: string;
+  /** 生成记录使用的原始输入，与模型执行提示词分开保存。 */
+  userInput?: string
   /** prompt 编译用的目标尺寸串(如 "1024x1024")。 */
   promptResolution: string;
   /** 重建 provider 输入 / legacy 逐图 prompt 所需的表单快照。 */

@@ -436,6 +436,7 @@ describe("generate create (prompt compilation + task payload)", () => {
     const spec = updateArg.data.executionSpec as GenerationExecutionSpec;
     expect(spec.kind).toBe("IMAGE_CREATIVE_GENERATE");
     expect(spec.mode).toBe("image-creation");
+    expect(spec.userInput).toBe("用户手打 brief")
     expect(spec.mainCount).toBe(1);
     expect(spec.paperclipAttachedCount).toBe(1);
     expect(spec.referenceUrls).toEqual([fakePresign.publicUrl, fakePresign.publicUrl]);

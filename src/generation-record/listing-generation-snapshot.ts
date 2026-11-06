@@ -4,6 +4,7 @@ import { prepareListingScoreDelivery } from "../listing/listing-score-delivery"
 import { parseListingScoreSource } from "../listing/listing-score-evidence"
 import { listingGenerationChargeId } from "../usage/fixed-module-credits"
 import type { GenerationRecord } from "../usage/generation-record.service"
+import { inputString, listingUserInput } from "./generation-user-input"
 
 type HistorySource = Pick<
   History,
@@ -43,7 +44,8 @@ function record(
   operation: string,
   model: string | null,
   credits: Prisma.Decimal | null,
-  occurredAt: Date
+  occurredAt: Date,
+  userInput = listingUserInput(history.data)
 ): GenerationRecord {
   return {
     key: `TEXT:${history.type}:${history.id}${suffix}`,
@@ -54,7 +56,7 @@ function record(
     phone: "",
     orgs: [],
     roles: [],
-    prompt: history.title,
+    prompt: userInput,
     model: model ?? "",
     modelLabel: model ?? "—",
     models: model ? [model] : [],
@@ -132,7 +134,17 @@ export async function projectListingGenerationRecords(
         credits = new Prisma.Decimal(0)
     }
     records.push(
-      record(history, `:task:${task.id}`, operation, main.model, credits, task.updatedAt)
+      record(
+        history,
+        `:task:${task.id}`,
+        operation,
+        main.model,
+        credits,
+        task.updatedAt,
+        typeof object(input.main).userPrompt === "string"
+          ? inputString(object(input.main).userPrompt)
+          : listingUserInput(input.context) || listingUserInput(history.data)
+      )
     )
   }
   if (tasks.length) return records
@@ -167,7 +179,8 @@ export async function projectListingGenerationRecords(
         original.map(log => log.id),
         logs
       ),
-      revision.createdAt
+      revision.createdAt,
+      listingUserInput(revision.data)
     )
   )
   for (const step of steps) {

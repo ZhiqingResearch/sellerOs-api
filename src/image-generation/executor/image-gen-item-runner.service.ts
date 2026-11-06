@@ -82,6 +82,7 @@ export type I2IRequestSnapshot = {
   modelPublicId?: string;
   /** 去空白的用户 prompt;角色/风格/场景附加段由执行器拼接(照源路由)。 */
   prompt: string;
+  userInput?: string
   market?: string
   aspectRatio: AspectRatio;
   customAspectW?: number;

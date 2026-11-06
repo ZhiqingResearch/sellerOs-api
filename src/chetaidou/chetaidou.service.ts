@@ -1699,6 +1699,7 @@ export class ChetaidouService {
       sourceFileKey: image.fileKey,
       sourceChecksum: image.checksum,
       prompt: effectivePrompt,
+      userInput: JSON.stringify(dto),
       model: snapshot.models.image.publicId,
       category: snapshot.models.image.category,
       generation,

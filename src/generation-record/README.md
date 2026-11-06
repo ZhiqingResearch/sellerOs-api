@@ -11,6 +11,17 @@
 - 本文的“重试”指同一成功事件重放；RPA 重试失败输出后**新产生成功结果和新扣费**，按新的成功输出批次记录。
 - 正文继续留在业务表；不承诺源正文被删除后可以恢复。已有详情权限和删除判断保持原样；列表保留成功时的元数据和预览快照。详情仍仅支持文本，不加 14 天限制。
 - 用户名称、手机、组织、角色实时读取。模型 publicId 和真实目录展示名在写入时拍快照；不把 `fixed-module` 或任意 code 当展示名。目录缺失保留 null，RPA 仅使用其已注册的静态模型目录作为可信补充。
+- 生成记录的 `prompt` 保存现有接口收到的输入，前端无需改动、无需增加 `userInput` 字段。字符串保留空格、换行、空串，不修剪、不改写、不拼接系统文案；数组和对象仅做 JSON 序列化。既有成功快照仍保持不变，重放/回填不覆盖已保存的字段。
+
+### 现有输入字段
+
+- 图片创作使用已有 `displayPrompt`/`prompt`，无文本字段的产品图入口保存原始表单；文生图、图生图分别保存现有 `prompt` 的原始值，日志不追加负向提示词或系统包装。模型执行仍沿用原先的编译、归一化流程。
+- 普通/分镜/人像视频图片、RPA 读取接口已有 `prompt`；动作复刻保留传入的 `prompt`（未填为空），不使用后端默认稿。带货视频读取向导已有的文字/链接/文件输入，不使用后端拼接的成片稿。
+- Listing 成功任务读取已有 `input.main.userPrompt`，独立评分在现有账单 JSON 中留档 `dto.userPrompt`；旧 Listing 使用对应版本的 `params.keyword`/`params`。不要求前端新增字段，也不剥离前端已经传入的文本。
+- 智能定价、竞品分析读取已有 `sourceText`；直接提交归档时通过内部成功钩子保存校验归一化前的原文。缺少文本时使用现有链接/输入对象，不能用自动报告标题代替。
+- ASIN 使用输入 ASIN；类目分析保存关键词数组/类目输入，选品验证保存已有来源文本/目标 ASIN，推广计划、美妆、车泰斗保存各自已有的输入对象，视频分析保存视频链接和关注点，雷达保存关键词数组。对象按 JSON 存，不重组为自然语言摘要。
+
+代码中的 `userInput` 仅为后端已有 JSON 快照内的留档键，不是新的前端请求参数。不新增数据库字段，不改变模型执行或计费。未执行真实数据覆盖、回填或部署。
 
 覆盖原有 14 功能：IMAGE、VIDEO、INSPIRATION_RADAR、ASIN_EVIDENCE、ASIN_AUDIT、COMPETITOR_ANALYSIS、LISTING_GENERATION、LISTING_SCORING、CATEGORY_ANALYSIS、PRODUCT_SELECTION（仅 PRODUCT 入口）、SMART_PRICING、PROMOTION_PLAN、VIDEO_ANALYSIS、CHETAIDOU_TEXT。vidflowos 与 platform 隔离；CROP 不计入；车泰斗 GENERATE 仅属于 IMAGE。
 

@@ -162,6 +162,7 @@ describe("BeautyWorkflowService.createTaskBatch", () => {
       data: expect.objectContaining({
         model: "sourcing-beauty-seedance-mini",
         generationParams: request,
+        beautyInput: expect.objectContaining({ style: "清透妆" }) as unknown,
       }) as Record<string, unknown>,
     })
     expect(gateway.createVideoTask).toHaveBeenCalledWith(request, "beauty-task:30")

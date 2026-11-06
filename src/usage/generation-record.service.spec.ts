@@ -611,6 +611,7 @@ describe("GenerationRecordService RPA 生成记录", () => {
         directionIndex: 0,
         status: "FAILED",
         prompt: "方向0首次提示词",
+        promptConfig: { reference: { url: "https://example.com/user-reference.png" } },
         model: "ZQ-Image-1",
         createdAt: startedAt,
         deletedAt: null,
@@ -697,7 +698,7 @@ describe("GenerationRecordService RPA 生成记录", () => {
       key: "AI_SPLIT:g1",
       function: "IMAGE",
       id: 100,
-      prompt: "方向0首次提示词", // 代表任务（组内最小 id）
+      prompt: "https://example.com/user-reference.png", // 代表任务的用户参考图，不取 AI 提示词
       model: "ZQ-Image-1",
       modelLabel: "ZQ-Image-1",
       status: "SUCCESS",
@@ -808,6 +809,7 @@ describe("GenerationRecordService 通用生图 t2i/i2i 生成记录", () => {
       status: "COMPLETED",
       model: "atlas-gpt",
       prompt: "文生图提示词",
+      request: { userInput: "文生图提示词", prompt: "文生图提示词\nNegative prompt: 系统包装" },
       createdAt: t2iCreatedAt,
       user,
       items: [
