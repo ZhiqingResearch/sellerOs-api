@@ -67,7 +67,8 @@ describe("生成结果先落库，图片标识重试不再生成", () => {
             db as never,
             factory,
             {} as never,
-            { enqueue: jest.fn() } as never
+            { enqueue: jest.fn() } as never,
+            {} as never
           )
       jest.spyOn(runner as any, "buildProviderInput").mockResolvedValue({ prompt: "生成图片" })
       jest

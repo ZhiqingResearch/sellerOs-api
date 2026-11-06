@@ -13,6 +13,7 @@ import { Decimal } from "@prisma/client/runtime/library";
 import sharp from "sharp";
 import { PrismaService } from "../prisma/prisma.service";
 import { UsageService } from "../usage/usage.service";
+import { ImageProjectService } from "../image-project/image-project.service";
 import { resetSpacesPresignTransport, setSpacesPresignTransport } from "./core/storage";
 import { RelayError } from "./core/retry-utils";
 import type { ImageProvider } from "./core/types";
@@ -27,6 +28,7 @@ import { TextToImageService } from "./text-to-image.service";
 const mockPrisma = () => ({
   imageGenJob: {
     create: jest.fn(),
+    findFirst: jest.fn(),
     findUnique: jest.fn(),
     findMany: jest.fn(),
     updateMany: jest.fn(),
@@ -64,6 +66,7 @@ async function makeServices(overrides?: {
     providers: [
       TextToImageService,
       ImageGenItemRunnerService,
+      { provide: ImageProjectService, useValue: { createTask: jest.fn() } },
       { provide: DispatchQueueService, useValue: { enqueue: jest.fn() } },
       { provide: PrismaService, useValue: withDeliveryCheckpoint(prisma) },
       { provide: IMAGE_PROVIDER_FACTORY, useValue: () => provider },

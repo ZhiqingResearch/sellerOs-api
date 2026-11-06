@@ -54,6 +54,8 @@ const DEFAULT_MAX_I2I_COUNT = 4; // 目录直传的动态 model id 同上限(源
 type Mode = "normal" | "batch";
 
 interface I2IForm {
+  /** Seller 所选通用创作项目；不传时保留原手动归档流程。 */
+  projectId?: number;
   editMode?: "local-redraw"
   mode: Mode;
   prompt: string;
@@ -88,6 +90,7 @@ export type I2ICreateResult =
       traceId: string;
       total: number;
       items: I2ITaskItem[];
+      projectId?: number;
       localRedraw?: LocalRedrawPlan;
     }
   | { ok: false; status: number; error: string };
@@ -107,6 +110,9 @@ export interface I2IJobImageSnapshot extends I2ITaskItem {
 }
 
 export interface I2IJobSnapshot {
+  projectId?: number;
+  /** 项目归档任务的数字 ID，与原有 UUID taskId 区分。 */
+  projectTaskId?: number | null;
   modelPublicId?: string | null;
   displayName?: string | null;
   resolutionTier?: string | null;
@@ -165,6 +171,9 @@ function parseForm(raw: unknown): ParseFormResult {
     return { ok: false, reason: "form payload is not an object" };
   }
   const f = parsed as Partial<I2IForm>;
+  if (f.projectId !== undefined && (!Number.isSafeInteger(f.projectId) || f.projectId <= 0)) {
+    return { ok: false, reason: "projectId 必须为正整数" };
+  }
   if (f.editMode !== undefined && (f.editMode !== "local-redraw" || f.mode !== "normal")) {
     return { ok: false, reason: "局部重绘仅支持 mode=normal、editMode=local-redraw" };
   }
@@ -196,6 +205,7 @@ function parseForm(raw: unknown): ParseFormResult {
   return {
     ok: true,
     value: {
+      projectId: f.projectId,
       mode: f.mode,
       editMode: f.editMode,
       prompt: f.prompt.trim(),
@@ -286,6 +296,17 @@ export class ImageToImageService {
       };
     }
 
+    if (parsedForm.value.projectId !== undefined) {
+      if (source !== "platform" || parsedForm.value.editMode === "local-redraw") {
+        return { ok: false, status: 400, error: "项目自动入库仅支持 Seller 普通改图，局部重绘请使用项目重绘接口" };
+      }
+      const project = await this.prisma.imageProject.findFirst({
+        where: { id: parsedForm.value.projectId, userId, source, type: "GENERAL", deletedAt: null, status: { not: "ARCHIVED" } },
+        select: { id: true },
+      });
+      if (!project) return { ok: false, status: 400, error: "所选项目不存在、不可用或不属于当前用户的通用创作项目" };
+    }
+
     let localRedraw: LocalRedrawPlan | undefined
     if (parsedForm.value.editMode === "local-redraw") {
       const files = input.files
@@ -351,6 +372,7 @@ export class ImageToImageService {
 
     const requestDraft: I2IRequestSnapshot = {
       kind: "IMAGE_TO_IMAGE",
+      projectId: form.projectId,
       provider: form.provider,
       modelPublicId: resolveGatewayModel(form.provider) ?? form.provider,
       localRedraw,
@@ -422,7 +444,9 @@ export class ImageToImageService {
       }
     }
 
-    return { ok: true, jobId, taskId, traceId, total, items: built.items, ...(localRedraw ? { localRedraw } : {}) };
+    return { ok: true, jobId, taskId, traceId, total, items: built.items,
+      ...(form.projectId !== undefined ? { projectId: form.projectId } : {}),
+      ...(localRedraw ? { localRedraw } : {}) };
   }
 
   /** 过期/不存在/非本人 → null(控制器 404);否则投影源路由 I2IJobSnapshot。 */
@@ -498,6 +522,7 @@ export class ImageToImageService {
     }
 
     const snapshot: I2IJobSnapshot = {
+      ...(request?.projectId !== undefined ? { projectId: request.projectId, projectTaskId: job.taskId ?? null } : {}),
       jobId: job.id,
       taskId: request?.taskId ?? "",
       traceId: request?.traceId ?? job.traceId ?? "",
