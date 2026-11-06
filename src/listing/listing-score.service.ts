@@ -51,6 +51,7 @@ interface ScoreAttempt {
 }
 
 interface ScoreSnapshot {
+  userInput?: string
   sourceFacts?: ListingScoreSource
   primary: ScoreAttempt
   repair?: ScoreAttempt
@@ -171,7 +172,11 @@ export class ListingScoreService {
             status: "GENERATED",
             outputText,
             requestId: primary.billing?.requestId,
-            billing: toJson({ primary, ...(sourceFacts ? { sourceFacts } : {}) }),
+            billing: toJson({
+              primary,
+              userInput: dto.userPrompt,
+              ...(sourceFacts ? { sourceFacts } : {}),
+            }),
             error: primary.error?.slice(0, 1000) ?? null,
           },
         })

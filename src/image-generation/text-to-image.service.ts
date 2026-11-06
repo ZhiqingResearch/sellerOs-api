@@ -125,6 +125,7 @@ export class TextToImageService {
         businessType: IMAGE_CREATIVE_BUSINESS_TYPE,
           provider,
           modelPublicId: resolveGatewayModel(provider) ?? provider,
+          userInput: body.prompt,
           prompt,
           aspectRatio,
           resolutionTier,

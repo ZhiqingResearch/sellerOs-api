@@ -1,7 +1,7 @@
-import { UnifiedGenerationRecordReader } from "./unified-generation-record-reader"
 import { Injectable, Optional } from "@nestjs/common"
 import { CreditTxnType, Prisma } from "@prisma/client"
 import { Decimal } from "@prisma/client/runtime/library"
+import { generationUserInput } from "../generation-record/generation-user-input"
 import { PrismaService } from "../prisma/prisma.service"
 import { RPA_MODEL_LABELS } from "../rpa-creation/rpa-creation.capabilities"
 import { AuditPrismaService } from "./audit-prisma.service"
@@ -14,6 +14,7 @@ import {
 } from "./dto/query-generation-records.dto"
 import { TextGenerationRecordService } from "./text-generation-record.service"
 import { recentGenerationQuery } from "./generation-record-time-window"
+import { UnifiedGenerationRecordReader } from "./unified-generation-record-reader"
 
 const ZERO = new Decimal(0)
 
@@ -118,6 +119,10 @@ interface InspirationCreditInfo {
 type ImageGenerationRecordRow = {
   id: number
   prompt: string
+  type?: string
+  generationMode?: string
+  promptConfig?: Prisma.JsonValue
+  executionSpec?: Prisma.JsonValue
   model: string
   status: string
   createdAt: Date
@@ -136,6 +141,7 @@ type ImageGenJobRecordRow = {
   businessType: string
   model: string | null
   prompt: string | null
+  request?: Prisma.JsonValue
   createdAt: Date
   user: UserRow
   items: { url: string | null; status: string; fileKey?: string | null }[]
@@ -148,6 +154,7 @@ type SplitTaskRow = {
   directionIndex: number | null
   status: string
   prompt: string
+  promptConfig?: Prisma.JsonValue
   model: string
   createdAt: Date
   deletedAt: Date | null
@@ -175,6 +182,10 @@ interface SplitGroupRow {
 type VideoGenerationRecordRow = {
   id: number
   prompt: string
+  mode?: string
+  salesWorkflowId?: number | null
+  deliveryMeta?: Prisma.JsonValue
+  generationParams?: Prisma.JsonValue
   model: string
   modelName: string | null
   status: string
@@ -199,6 +210,7 @@ type StoryboardVideoRecordRow = {
 type BeautyVideoRecordRow = {
   id: number
   prompt: string
+  beautyInput?: Prisma.JsonValue
   model: string
   status: string
   resultUrl: string | null
@@ -497,6 +509,10 @@ export class GenerationRecordService {
                 createdAt: true,
                 deletedAt: true,
                 sourceJobId: true,
+              type: true,
+              generationMode: true,
+              promptConfig: true,
+              executionSpec: true,
                 user: USER_SELECT,
                 generatedImages: {
                   where: { source: "platform" },
@@ -517,6 +533,7 @@ export class GenerationRecordService {
               kind: true,
               status: true,
               businessType: true,
+              request: true,
               model: true,
               prompt: true,
               createdAt: true,
@@ -538,6 +555,10 @@ export class GenerationRecordService {
               prompt: true,
               model: true,
               modelName: true,
+              mode: true,
+              salesWorkflowId: true,
+              deliveryMeta: true,
+              generationParams: true,
               status: true,
               resultUrl: true,
               createdAt: true,
@@ -578,6 +599,7 @@ export class GenerationRecordService {
             select: {
               id: true,
               prompt: true,
+              beautyInput: true,
               model: true,
               status: true,
               resultUrl: true,
@@ -899,6 +921,7 @@ export class GenerationRecordService {
         id: true,
         groupId: true,
         directionIndex: true,
+        promptConfig: true,
         status: true,
         prompt: true,
         model: true,
@@ -922,7 +945,7 @@ export class GenerationRecordService {
         group = {
           groupId: key,
           representativeId: task.id,
-          prompt: task.prompt,
+          prompt: generationUserInput("generationTask", { ...task, generationMode: "AI_SPLIT" }),
           model: task.model,
           createdAt: task.createdAt,
           user: task.user,
@@ -941,7 +964,10 @@ export class GenerationRecordService {
       group.taskIds.push(task.id)
       if (task.id < group.representativeId) {
         group.representativeId = task.id
-        group.prompt = task.prompt
+        group.prompt = generationUserInput("generationTask", {
+          ...task,
+          generationMode: "AI_SPLIT",
+        })
         group.model = task.model
         group.createdAt = task.createdAt
         group.user = task.user
@@ -1530,7 +1556,7 @@ export class GenerationRecordService {
       function: "IMAGE",
       id: r.id,
       ...this.userFields(r.user),
-      prompt: r.prompt,
+      prompt: generationUserInput("generationTask", r),
       model: r.model,
       modelLabel: this.imageModelLabel(r.model),
       credits: null, // 反查后回填
@@ -1603,7 +1629,7 @@ export class GenerationRecordService {
       function: "IMAGE",
       id: r.id,
       ...this.userFields(r.user),
-      prompt: r.prompt ?? "",
+      prompt: generationUserInput("imageGenJob", r),
       model: r.model ?? "",
       modelLabel: this.imageModelLabel(r.model ?? ""),
       credits: null, // 反查后回填
@@ -1634,7 +1660,7 @@ export class GenerationRecordService {
       function: "VIDEO",
       id: r.id,
       ...this.userFields(r.user),
-      prompt: r.prompt,
+      prompt: generationUserInput("videoTask", r),
       model: r.model,
       modelLabel: r.modelName ?? r.model,
       credits: null, // 反查后回填
@@ -1668,13 +1694,13 @@ export class GenerationRecordService {
 
   private toStoryboardVideoRecord(r: StoryboardVideoRecordRow): GenerationRecord {
     const deleted = r.deletedAt != null
-    const { model, prompt } = this.storyboardParams(r)
+    const { model } = this.storyboardParams(r)
     return {
       key: `STORYBOARD_VIDEO:${r.id}`,
       function: "VIDEO",
       id: r.id,
       ...this.userFields(r.storyboard.production.project.customer.user),
-      prompt: prompt ?? "（分镜视频）",
+      prompt: generationUserInput("storyboardVideo", r),
       model: model ?? "",
       modelLabel: model ?? "分镜视频",
       credits: null, // 反查后回填
@@ -1693,7 +1719,7 @@ export class GenerationRecordService {
       function: "VIDEO",
       id: r.id,
       ...this.userFields(r.user),
-      prompt: r.prompt,
+      prompt: generationUserInput("beautyTask", r),
       model: r.model,
       modelLabel: r.model,
       credits: null, // 反查后回填
@@ -1735,7 +1761,6 @@ export class GenerationRecordService {
     _count: { items: number }
   }): GenerationRecord {
     const deleted = r.deletedAt != null
-    const keywords = Array.isArray(r.keywords) ? r.keywords.map(String) : []
     const platforms = Array.isArray(r.platforms)
       ? r.platforms
           .filter((p): p is string => typeof p === "string")
@@ -1747,7 +1772,7 @@ export class GenerationRecordService {
       function: "INSPIRATION_RADAR",
       id: r.id,
       ...this.userFields(r.user),
-      prompt: keywords.length ? `订阅「${r.name}」: ${keywords.join(", ")}` : `订阅「${r.name}」`,
+      prompt: generationUserInput("inspirationSubscription", r),
       model: "APIFY",
       modelLabel: platforms.length ? platforms.join(" / ") : "Apify",
       credits: null,

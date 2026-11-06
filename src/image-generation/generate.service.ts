@@ -741,6 +741,8 @@ export class GenerateService {
       modelPublicId: resolveGatewayModel(form.provider) ?? form.provider,
       localRedraw,
       taskPrompt,
+      userInput:
+        form.displayPrompt ?? form.prompt ?? (typeof input.form === "string" ? input.form : ""),
       promptResolution,
       form: {
         productName: form.productName,

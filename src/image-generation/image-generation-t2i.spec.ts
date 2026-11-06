@@ -140,6 +140,7 @@ describe("text-to-image create (contract parity)", () => {
     expect((created.request as ImageGenRequestSnapshot).prompt).toBe(
       "角色卡\n\nNegative prompt: 不要文字",
     );
+    expect((created as { request: { userInput: string } }).request.userInput).toBe("角色卡")
     expect((created.request as ImageGenRequestSnapshot).aspectRatio).toBe("16:9");
     expect((created.request as ImageGenRequestSnapshot).resolutionTier).toBe("2K");
     expect(created.items.create).toEqual([{ idx: 0, status: "QUEUED" }]);

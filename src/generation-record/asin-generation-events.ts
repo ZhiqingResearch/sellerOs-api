@@ -3,6 +3,7 @@ import { hashJson } from "../common/utils/canonical-json"
 import { auditUsageStage } from "../usage/asin-audit-generation-records"
 import type { GenerationRecord } from "../usage/generation-record.service"
 import type { RecordClient } from "./generation-record-sync"
+import { generationUserInput } from "./generation-user-input"
 
 /** 一个成功保存的评分/优化版本是一笔业务事件；正文、积分绝不跟随后续版本覆盖。 */
 export async function projectAsinGenerationEvents(
@@ -151,7 +152,7 @@ export async function projectAsinGenerationEvents(
         phone: user.phone,
         orgs: user.orgs.map(row => row.org.name),
         roles: user.roles.map(row => row.role),
-        prompt: `${root.asin} ${root.productTitle}`,
+        prompt: generationUserInput("asinAuditRecord", root),
         model,
         modelLabel: model,
         credits: amounts.length

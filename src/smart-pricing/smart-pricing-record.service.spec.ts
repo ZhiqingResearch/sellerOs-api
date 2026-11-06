@@ -1,5 +1,6 @@
 jest.mock("../generation-record/generation-record-success", () => ({ recordGenerationSuccess: jest.fn().mockResolvedValue(undefined) }))
 import { UsageService } from "../usage/usage.service"
+import { recordGenerationSuccess } from "../generation-record/generation-record-success"
 import { ConflictException, NotFoundException } from "@nestjs/common"
 import { PrismaService } from "../prisma/prisma.service"
 import { createSmartPricingDto as createDto } from "./smart-pricing-record.fixture"
@@ -57,6 +58,9 @@ describe("SmartPricingRecordService", () => {
       createdAt: now,
       updatedAt: now,
       idempotentReplay: false,
+    })
+    expect(recordGenerationSuccess).toHaveBeenCalledWith(prisma, "smartPricingRecord", recordId, {
+      prompt: "https://www.1688.com/offer/123.html?spm=tracking",
     })
     expect(firstCallArg(prisma.smartPricingRecord.create)).toMatchObject({
       data: {

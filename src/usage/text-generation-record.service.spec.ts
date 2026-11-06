@@ -622,9 +622,11 @@ describe("文本生成记录功能与费用关联", () => {
     })
   })
 
-  it("组织和角色取交集，关键词可搜索用户名、手机号及报告标题，日期含当日", async () => {
+  it("组织和角色取交集，关键词可搜索用户名、手机号及用户输入，日期含当日", async () => {
     const { audit, service } = createMocks()
-    audit.smartPricingRecord.findMany.mockResolvedValue([{ ...base, productName: "Coffee 定价" }])
+    audit.smartPricingRecord.findMany.mockResolvedValue([
+      { ...base, productName: "模型提取的商品名", product: { sourceText: "Coffee 定价" } },
+    ])
     for (const keyword of ["coffee", "测试", "1380000"]) {
       const rows = await service.list({
         function: "SMART_PRICING",
@@ -648,6 +650,9 @@ describe("文本生成记录功能与费用关联", () => {
     expect(await service.list({ function: "SMART_PRICING", dateFrom: "2026-11-03" })).toEqual([])
     expect(await service.list({ function: "SMART_PRICING", dateTo: "2026-11-01" })).toEqual([])
     expect(await service.list({ function: "SMART_PRICING", keyword: "不存在" })).toEqual([])
+    expect(await service.list({ function: "SMART_PRICING", keyword: "模型提取的商品名" })).toEqual(
+      []
+    )
   })
 
   it("保留软删报告和实扣积分，隐藏结果链接；硬删报告的流水作为历史扣费保留", async () => {

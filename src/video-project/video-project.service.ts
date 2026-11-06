@@ -175,7 +175,12 @@ export class VideoProjectService implements OnModuleInit {
     return { success: true }
   }
 
-  async createTask(projectId: number, dto: AiGatewayVideoRequestDto, userId: number) {
+  async createTask(
+    projectId: number,
+    dto: AiGatewayVideoRequestDto,
+    userId: number,
+    userInput?: string
+  ) {
     await this.assertProjectOwned(projectId, userId)
     const model = await this.prisma.aiGatewayModel.findFirst({
       where: {
@@ -218,6 +223,7 @@ export class VideoProjectService implements OnModuleInit {
         model: model.publicId,
         modelName: model.displayName,
         prompt: request.prompt.trim(),
+        deliveryMeta: { userInput: userInput ?? request.prompt },
         durationSec: request.duration_seconds ?? 0,
         aspectRatio: request.aspect_ratio ?? null,
         resolution: request.resolution ?? null,
@@ -310,6 +316,7 @@ export class VideoProjectService implements OnModuleInit {
       dto.targetImages.map(targetImage => ({
         actionVideo,
         targetImage,
+        userInput: dto.prompt ?? "",
         request: {
           model: model.publicId,
           prompt: dto.prompt?.trim() || MOTION_CONTROL_PROMPT_FALLBACK,
@@ -594,6 +601,7 @@ export class VideoProjectService implements OnModuleInit {
     job: {
       actionVideo: CreateMotionControlBatchDto["actionVideos"][number]
       targetImage: CreateMotionControlBatchDto["targetImages"][number]
+      userInput: string
     }
   ): Promise<VideoTask> {
     const task = await this.prisma.videoTask.create({
@@ -601,6 +609,7 @@ export class VideoProjectService implements OnModuleInit {
         projectId,
         userId,
         mode: "MOTION_CONTROL",
+        deliveryMeta: { userInput: job.userInput },
         model: request.model,
         modelName: displayName,
         prompt: request.prompt,

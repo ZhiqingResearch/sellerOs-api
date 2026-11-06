@@ -1,4 +1,5 @@
 import { modelDisplayNames, videoMetadata } from "../../common/utils/generation-metadata"
+import { inputString } from "../../generation-record/generation-user-input"
 import {
   BadRequestException,
   ForbiddenException,
@@ -369,7 +370,8 @@ export class SalesService {
     const task = await this.videoService.createTask(
       wf.projectId,
       this.toGatewayRequest(base, prompt, durationSec),
-      userId
+      userId,
+      inputString(wf.textInput ?? wf.sourceUrl ?? wf.manualFileUrl ?? wf.productImages)
     )
     // 在新任务上回填锚点（不动旧任务）→ 历史版本保留
     await this.prisma.videoTask.update({
@@ -397,7 +399,8 @@ export class SalesService {
       const task = await this.videoService.createTask(
         wf.projectId,
         this.toGatewayRequest(base, prompt, durationSec),
-        userId
+        userId,
+        inputString(wf.textInput ?? wf.sourceUrl ?? wf.manualFileUrl ?? wf.productImages)
       )
       // 锚在向导上 + segmentOrder 标记归属分镜 + 批次号归属该次成片（不动旧任务）。
       // 即使后续 saveScript 删掉分镜行，历史仍挂在 workflow 上不丢。

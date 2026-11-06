@@ -7,7 +7,7 @@ export async function recordGenerationSuccess(
   client: PrismaClient,
   source: GenerationSource,
   id: string | number,
-  options?: { credits?: Prisma.Decimal | string | number; modelPublicId?: string }
+  options?: { credits?: Prisma.Decimal | string | number; modelPublicId?: string; prompt?: string }
 ): Promise<void> {
   try {
     await client.$transaction(
